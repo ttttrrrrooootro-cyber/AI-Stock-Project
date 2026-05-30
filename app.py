@@ -275,7 +275,7 @@ if not data.empty:
                 full_prompt = system_prompt + "\n\n---\n" + full_query
 
                 response = client.models.generate_content(
-                    model="gemini-1.5-flash",
+                    model="gemini-2.0-flash",
                     contents=history + [{"role": "user", "parts": [{"text": full_prompt}]}],
                 )
                 ai_reply = response.text
