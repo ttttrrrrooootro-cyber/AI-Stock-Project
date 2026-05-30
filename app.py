@@ -83,7 +83,10 @@ stocks = [
     "MSFT",
     "NVDA",
     "GOOGL",
-    "META"
+    "META",
+    "PTT",
+    "TSLA",
+    "NDQ",
 ]
 results = []
 
@@ -161,3 +164,7 @@ fig.add_trace(
 )
 
 st.plotly_chart(fig, use_container_width=True)
+user_input = st.chat_input("ถามเกี่ยวกับหุ้น")
+
+if user_input:
+    st.write("คุณถาม:", user_input)
