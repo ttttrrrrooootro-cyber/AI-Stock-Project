@@ -3,267 +3,221 @@ import plotly.graph_objects as go
 import streamlit as st
 import yfinance as yf
 
-# ตั้งค่าหน้าเว็บให้ดูเป็นมืออาชีพ
-st.set_page_config(page_title="AI Stock Investment Platform", layout="wide")
-st.title("📊 AI Stock Investment Platform")
+# 1. ตั้งค่าหน้าเว็บในสไตล์ Dashboard แบบกว้าง
+st.set_page_config(page_title="AI Trading & Chatbot Platform", layout="wide")
+st.title("🚀 AI Stock Investment & Chatbot Platform")
 
-# ส่วนรับอินพุตจากผู้ใช้
-symbol = st.text_input("กรอกชื่อหุ้น (เช่น AAPL, TSLA, PTT.BK)", "AAPL").upper()
+# ใช้ st.session_state สำหรับจำประวัติการค้นหาหุ้นและการคุยกับ Chatbot
+if "search_history" not in st.session_state:
+    st.session_state.search_history = []
+if "chat_messages" not in st.session_state:
+    st.session_state.chat_messages = [
+        {"role": "assistant", "content": "สวัสดีครับ! พิมพ์คุยหรือสอบถามเกี่ยวกับหุ้นที่ค้นหาได้เลยครับ เช่น 'หุ้นตัวนี้แนวโน้มเป็นอย่างไรบ้าง?'"}
+    ]
 
-# ดักจับการดึงข้อมูลเพื่อไม่ให้แอปพัง
+# --- ส่วนรับข้อมูลเข้า ---
+col_input, col_empty = st.columns([1, 2])
+with col_input:
+    symbol = st.text_input(
+        "🔍 กรอกชื่อหุ้นที่ต้องการวิเคราะห์", "AAPL"
+    ).upper()
+
+# ดึงข้อมูลจาก yfinance
 try:
-    with st.spinner("กำลังดึงข้อมูล..."):
+    with st.spinner("กำลังวิเคราะห์ข้อมูลเชิงลึก..."):
         ticker = yf.Ticker(symbol)
         data = ticker.history(period="1y")
 
     if data.empty:
-        st.error(
-            f"ไม่พบข้อมูลสำหรับหุ้น '{symbol}' กรุณาตรวจสอบชื่อหุ้นอีกครั้ง"
-        )
+        st.error(f"❌ ไม่พบข้อมูลของหุ้น {symbol} กรุณาลองใหม่อีกครั้ง")
+else:
+    # --- 2. การคำนวณอินดิเคเตอร์และคะแนน AI ---
+    data["MA50"] = data["Close"].rolling(50).mean()
+
+    #คำนวณ Growth (6 เดือน)
+    if len(data) >= 126:
+        growth = (
+            (data["Close"].iloc[-1] - data["Close"].iloc[-126])
+            / data["Close"].iloc[-126]
+        ) * 100
     else:
-        # --- 1. คำนวณอินดิเคเตอร์ ---
-        # MA50
-        data["MA50"] = data["Close"].rolling(50).mean()
+        growth = 0
 
-        # Growth (ประมาณ 6 เดือน หรือ 126 วันทำการ)
-        if len(data) >= 126:
-            growth = (
-                (data["Close"].iloc[-1] - data["Close"].iloc[-126])
-                / data["Close"].iloc[-126]
-            ) * 100
-        else:
-            growth = 0  # กรณีข้อมูลไม่พอ 6 เดือน
+    # คำนวณ Volume และ Volatility
+    data["Vol_Avg20"] = data["Volume"].rolling(20).mean()
+    volatility = data["Close"].pct_change().tail(30).std() * 100
 
-        # Volume (ปริมาณการซื้อขายเฉลี่ย 20 วัน เทียบกับวันล่าสุด)
-        data["Vol_Avg20"] = data["Volume"].rolling(20).mean()
-        current_volume = data["Volume"].iloc[-1]
-        avg_volume = data["Vol_Avg20"].iloc[-1]
+    # คำนวณ Score (เต็ม 100)
+    score = 0
+    reasons = []
 
-        # Volatility (ความผันผวนย้อนหลัง 30 วัน)
-        volatility = data["Close"].pct_change().tail(30).std() * 100
+    if data["Close"].iloc[-1] > data["MA50"].iloc[-1]:
+        score += 30
+        reasons.append("ราคาอยู่เหนือเส้น MA50 (แนวโน้มขาขึ้น)")
+    else:
+        reasons.append("ราคาต่ำกว่าเส้น MA50 (แนวโน้มขาลง)")
 
-        # --- 2. ระบบให้คะแนน AI Score (เต็ม 100) ---
-        score = 0
-        reasons = []
+    if growth > 0:
+        score += 30
+        reasons.append(f"ผลตอบแทน 6 เดือนเป็นบวก (+{growth:.2f}%)")
+    else:
+        reasons.append(f"ผลตอบแทน 6 เดือนติดลบ ({growth:.2f}%)")
 
-        # เงื่อนไขที่ 1: ราคาเหนือเส้น MA50 (เทรนด์ขาขึ้น) -> 30 คะแนน
-        if data["Close"].iloc[-1] > data["MA50"].iloc[-1]:
-            score += 30
-            reasons.append("✅ราคายังอยู่บนแนวโน้มขาขึ้น (เหนือ MA50)")
-        else:
-            reasons.append("❌ราคาต่ำกว่าเส้น MA50 (แนวโน้มขาลง)")
+    if data["Volume"].iloc[-1] > data["Vol_Avg20"].iloc[-1]:
+        score += 20
+        reasons.append("ปริมาณการซื้อขายล่าสุดสูงกว่าค่าเฉลี่ย 20 วัน")
+    else:
+        reasons.append("ปริมาณการซื้อขายเบาบาง")
 
-        # เงื่อนไขที่ 2: การเติบโตเป็นบวกในรอบ 6 เดือน -> 30 คะแนน
-        if growth > 0:
-            score += 30
-            reasons.append(f"✅ผลตอบแทน 6 เดือนเป็นบวก (+{growth:.2f}%)")
-        else:
-            reasons.append(f"❌ผลตอบแทน 6 เดือนติดลบ ({growth:.2f}%)")
+    if volatility < 2.5:
+        score += 20
+        reasons.append(f"ความผันผวนต่ำ สภาพคล่องค่อนข้างนิ่ง")
+    else:
+        reasons.append(f"ความผันผวนสูง มีความเสี่ยงในการแกว่งตัว")
 
-        # เงื่อนไขที่ 3: ปริมาณการซื้อขายหนาแน่นกว่าค่าเฉลี่ย -> 20 คะแนน
-        if current_volume > avg_volume:
-            score += 20
-            reasons.append("✅ปริมาณการซื้อขายล่าสุดสูงกว่าค่าเฉลี่ย 20 วัน")
-        else:
-            reasons.append("❌ปริมาณการซื้อขายค่อนข้างเบาบาง")
+    # บันทึกประวัติการค้นหาลงตารางจัดอันดับ (อัปเดตคะแนนล่าสุดเสมอ)
+    history_dict = {
+        item["Ticker"]: item for item in st.session_state.search_history
+    }
+    history_dict[symbol] = {
+        "Ticker": symbol,
+        "Score": score,
+        "ราคาปัจจุบัน": f"{data['Close'].iloc[-1]:.2f}",
+        "เหตุผลเด่น": reasons[0] if score >= 50 else reasons[1],
+    }
+    st.session_state.search_history = list(history_dict.values())
 
-        # เงื่อนไขที่ 4: ความผันผวนไม่สูงจนเกินไป (< 2.5%) -> 20 คะแนน
-        if volatility < 2.5:
-            score += 20
-            reasons.append(
-                f"✅ความผันผวนต่ำ สภาพคล่องมั่นคง ({volatility:.2f}%)"
-            )
-        else:
-            reasons.append(
-                f"⚠️ความผันผวนค่อนข้างสูง เสี่ยงสูง ({volatility:.2f}%)"
-            )
+    # --- 3. การจัดเลย์เอาต์หน้าจอแสดงผล ---
+    # แบ่งหน้าจอเป็น 2 ฝั่งหลัก
+    left_main_col, right_main_col = st.columns([3, 2])
 
-        # --- 3. การแสดงผลบน Streamlit ---
-        # แบ่งคอลัมน์แสดงข้อมูลสรุป
-        col1, col2 = st.columns([1, 2])
+    with left_main_col:
+        # ส่วนแสดงผลกราฟเทคนิค
+        st.subheader(f"📈 กราฟเทคนิคอลหุ้น {symbol}")
+        chart_type = st.radio(
+            "เลือกประเภทกราฟ:",
+            ("กราฟแท่งเทียน (Candlestick)", "กราฟเส้น (Line Chart)"),
+            horizontal=True,
+        )
+        show_ma50 = st.checkbox("แสดงเส้นค่าเฉลี่ย MA50", value=True)
 
-        with col1:
-            st.subheader("🤖 AI Analysis Score")
-            # แสดงคะแนนขนาดใหญ่
-            st.metric(label="คะแนนความน่าลงทุน", value=f"{score} / 100")
+        fig = go.Figure()
 
-            # แสดงแถบสีตามระดับคะแนน
-            if score >= 80:
-                st.success("🔥 คำแนะนำ: น่าสนใจลงทุนอย่างยิ่ง (Strong Buy)")
-            elif score >= 50:
-                st.warning("⏳ คำแนะนำ: ถือ/รอดูจังหวะ (Hold/Watchlist)")
-            else:
-                st.error(
-                    "🚨 คำแนะนำ: ควรหลีกเลี่ยงในตอนนี้ (Avoid/High Risk)"
+        if chart_type == "กราฟแท่งเทียน (Candlestick)":
+            fig.add_trace(
+                go.Candlestick(
+                    x=data.index,
+                    open=data["Open"],
+                    high=data["High"],
+                    low=data["Low"],
+                    close=data["Close"],
+                    name="ราคาแท่งเทียน",
                 )
-
-            # แสดงเหตุผลประกอบ
-            st.write("**สรุปมุมมอง AI:**")
-            for reason in reasons:
-                st.write(reason)
-
-        with col2:
-            st.subheader("📈 กราฟราคาเชิงเทคนิค")
-            # ใช้ Plotly เพื่อให้กราฟสวยงาม ซูมได้ และแสดงเส้น MA50 คู่กันได้
-            fig = go.Figure()
+            )
+        else:
             fig.add_trace(
                 go.Scatter(
                     x=data.index,
                     y=data["Close"],
                     mode="lines",
-                    name="ราคาปิด",
+                    name="ราคาปิด (Line)",
                 )
             )
+
+        if show_ma50:
             fig.add_trace(
                 go.Scatter(
                     x=data.index,
                     y=data["MA50"],
                     mode="lines",
-                    name="MA50",
-                    line=dict(dash="dash"),
+                    name="MA50 Line",
+                    line=dict(color="orange", width=1.5),
                 )
             )
-            fig.update_layout(
-                margin=dict(l=20, r=20, t=20, b=20),
-                legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01),
-            )
-            st.plotly_chart(fig, use_container_width=True)
 
-        # ตารางข้อมูลดิบล่าสุด
-        st.subheader("📋 ข้อมูลราคาล่าสุด")
-        st.dataframe(data[["Close", "Volume", "MA50"]].tail(5))
+        fig.update_layout(
+            xaxis_rangeslider_visible=False,
+            margin=dict(l=10, r=10, t=10, b=10),
+            legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01),
+        )
+        st.plotly_chart(fig, use_container_width=True)
+
+        # ส่วนแสดงผลการจัดอันดับหุ้นน่าลงทุน
+        st.subheader("🏆 อันดับหุ้นน่าลงทุนที่ผ่านการวิเคราะห์")
+        df_rank = pd.DataFrame(st.session_state.search_history)
+        if not df_rank.empty:
+            # เรียงลำดับจากคะแนนสูงสุดไปต่ำสุด
+            df_rank = df_rank.sort_values(by="Score", ascending=False).reset_index(
+                drop=True
+            )
+            st.dataframe(df_rank, use_container_width=True)
+
+    with right_main_col:
+        # ส่วนแสดงผลคะแนนและสรุปเหตุผล
+        st.subheader("💡 ผลการวิเคราะห์จาก AI")
+        st.metric(label=f"AI Investment Score ({symbol})", value=f"{score} / 100")
+
+        if score >= 80:
+            st.success("🔥 สัญญาณ: น่าสนใจลงทุนสูงมาก (Strong Buy)")
+        elif score >= 50:
+            st.warning("⏳ สัญญาณ: ทยอยสะสม หรือรอเลือกจังหวะ (Hold/Watch)")
+        else:
+            st.error("🚨 สัญญาณ: ความเสี่ยงสูง ควรชะลอการลงทุน (Avoid)")
+
+        st.write("**เหตุผลประกอบการประเมิน:**")
+        for r in reasons:
+            st.write(f"- {r}")
+
+        st.markdown("---")
+
+        # --- 4. ระบบห้องแชทจำลองตอบโต้กับ AI (Chatbot Interactivity) ---
+        st.subheader("💬 AI Stock Assistant Chat")
+
+        # แสดงกล่องข้อความแชท
+        chat_container = st.container(height=300)
+        with chat_container:
+            for msg in st.session_state.chat_messages:
+                with st.chat_message(msg["role"]):
+                    st.write(msg["content"])
+
+        # รับข้อความแชทจากผู้ใช้
+        if user_query := st.chat_input("พิมพ์คำถามของคุณที่นี่..."):
+            # แสดงสิ่งที่ผู้ใช้พิมพ์ลงไปในหน้าแชททันที
+            st.session_state.chat_messages.append(
+                {"role": "user", "content": user_query}
+            )
+            with chat_container:
+                with st.chat_message("user"):
+                    st.write(user_query)
+
+            # ตรรกะของ AI ในการตอบโต้ (ประมวลผลคำตอบอัตโนมัติอ้างอิงจากหุ้นตัวที่ส่องอยู่)
+            ai_reply = ""
+            query_lower = user_query.lower()
+
+            if "ซื้อ" in query_lower or "ลงทุน" in query_lower or "คำแนะนำ" in query_lower:
+                if score >= 80:
+                    ai_reply = f"สำหรับ {symbol} มีคะแนนสูงถึง {score}/100 ครับ เทคนิคอลเป็นขาขึ้นและโวลุ่มซัพพอร์ต ชวนให้มองเป็นโอกาสเข้าสะสมครับ"
+                elif score >= 50:
+                    ai_reply = f"สถานะของ {symbol} อยู่ในช่วงก้ำกึ่ง ({score}/100) แนะนำแบ่งไม้ซื้อ หรือรอให้ราคาทะลุแนวต้านสำคัญก่อนครับ"
+                else:
+                    ai_reply = f"ตอนนี้ {symbol} ได้คะแนนต่ำค่อนข้างน่าเป็นห่วงครับ ({score}/100) แนะนำให้รอดูสถานการณ์ไปก่อนดีกว่าครับ"
+            elif "แนวโน้ม" in query_lower or "กราฟ" in query_lower or "เทคนิค" in query_lower:
+                if data["Close"].iloc[-1] > data["MA50"].iloc[-1]:
+                    ai_reply = f"กราฟของ {symbol} ปัจจุบันยืนอยู่เหนือเส้น MA50 ได้สะท้อนภาพเชิงบวก คาดว่ายังมีแรงเฉื่อยในทิศทางขาขึ้นต่อครับ"
+                else:
+                    ai_reply = f"ตอนนี้ราคาของ {symbol} หลุดเส้น MA50 ลงมา ภาพรวมติดลบระยะสั้น ต้องระวังแรงเทขายเพิ่มเติมครับ"
+            elif "ราคา" in query_lower or "เท่าไหร่" in query_lower:
+                ai_reply = f"ราคาปิดล่าสุดของ {symbol} อยู่ที่ {data['Close'].iloc[-1]:.2f} ครับ"
+            else:
+                ai_reply = f"ผมได้รับคำถามเรื่อง '{user_query}' แล้วครับ! จากมุมมองภาพรวมของหุ้น {symbol} ปัจจุบันมี AI Score อยู่ที่ {score} คะแนน ซึ่งปัจจัยเทคนิคสำคัญคือ {reasons[0]} ครับ มีอะไรอยากให้ช่วยเจาะลึกเพิ่มไหมครับ?"
+
+            # บันทึกและแสดงคำตอบของ AI
+            st.session_state.chat_messages.append(
+                {"role": "assistant", "content": ai_reply}
+            )
+            with chat_container:
+                with st.chat_message("assistant"):
+                    st.write(ai_reply)
 
 except Exception as e:
-    st.error(f"เกิดข้อผิดพลาดในการประมวลผล: {e}")
-# 1. คำนวณค่าเฉลี่ย Volume ก่อน (ประกาศตัวแปรให้ชัดเจน)
-volume_avg = data["Volume"].rolling(20).mean()
-
-# 2. นำมาสร้างเงื่อนไขในระบบคะแนน (ตรวจสอบให้มั่นใจว่าชื่อสะกดเหมือนกันเป๊ะๆ)
-if data["Volume"].iloc[-1] > volume_avg.iloc[-1]:
-    score += 20
-if growth > 0:
-    score += 30
-
-if volatility < 0.03:
-    score += 20
-
-st.subheader("ผลการวิเคราะห์")
-
-st.metric("คะแนนหุ้น", score)
-
-st.write(f"Growth 6 เดือน : {growth:.2f}%")
-st.write(f"Volatility : {volatility:.4f}")
-
-if score >= 80:
-    st.success("น่าลงทุน")
-elif score >= 60:
-    st.warning("น่าจับตา")
-else:
-    st.error("ความเสี่ยงสูง")
-    import plotly.graph_objects as go
-fig = go.Figure()
-
-fig.add_trace(
-    go.Scatter(
-        x=data.index,
-        y=data["Close"],
-        name="Close Price"
-    )
-)
-
-fig.add_trace(
-    go.Scatter(
-        x=data.index,
-        y=data["MA50"],
-        name="MA50"
-    )
-)
-
-st.plotly_chart(fig)
-
-stocks = [
-    "AAPL",
-    "MSFT",
-    "NVDA",
-    "GOOGL",
-    "META",
-    "PTT",
-    "TSLA",
-    "NDQ",
-]
-results = []
-
-for s in stocks:
-
-    d = yf.Ticker(s).history(period="1y")
-
-    d["MA50"] = d["Close"].rolling(50).mean()
-
-    growth = (
-        (d["Close"].iloc[-1]
-        - d["Close"].iloc[-126])
-        / d["Close"].iloc[-126]
-    ) * 100
-
-    volume_avg = d["Volume"].rolling(20).mean()
-
-    volatility = d["Close"].pct_change().std()
-
-    score = 0
-
-    if d["Close"].iloc[-1] > d["MA50"].iloc[-1]:
-        score += 30
-
-    if d["Volume"].iloc[-1] > volume_avg.iloc[-1]:
-        score += 20
-
-    if growth > 0:
-        score += 30
-
-    if volatility < 0.03:
-        score += 20
-
-    results.append([s, score])
-
-ranking = pd.DataFrame(
-    results,
-    columns=["Stock", "Score"]
-)
-
-ranking = ranking.sort_values(
-    by="Score",
-    ascending=False
-)
-ranking = ranking.reset_index(drop=True)
-
-ranking.insert(
-    0,
-    "Rank",
-    range(1, len(ranking) + 1)
-)
-st.subheader("Top 5 หุ้นน่าลงทุน")
-
-st.dataframe(ranking)
-
-
-fig = go.Figure(
-    data=[
-        go.Candlestick(
-            x=data.index,
-            open=data["Open"],
-            high=data["High"],
-            low=data["Low"],
-            close=data["Close"]
-        )
-    ]
-)
-
-fig.add_trace(
-    go.Scatter(
-        x=data.index,
-        y=data["MA50"],
-        name="MA50"
-    )
-)
-
-st.plotly_chart(fig, use_container_width=True)
+    st.error(f"เกิดข้อผิดพลาดทางระบบ: {e}")
