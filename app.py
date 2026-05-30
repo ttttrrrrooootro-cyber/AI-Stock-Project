@@ -281,7 +281,7 @@ if not data.empty:
                 ai_reply = response.text
 
             except Exception as e:
-                ai_reply = f" ขออภัย ไม่สามารถเชื่อมต่อ AI ได้: {str(e)}"
+                ai_reply = f" ขออภัย กำลังปรับปรุง {str(e)}"
 
             st.session_state.chat_messages.append({"role": "assistant", "content": ai_reply})
             with chat_container:
