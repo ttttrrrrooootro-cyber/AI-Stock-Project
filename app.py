@@ -53,6 +53,6 @@ st.write(f"Volatility : {volatility:.4f}")
 if score >= 80:
     st.success("น่าลงทุน")
 elif score >= 60:
-    st.warning("น่าจับตา)
+    st.warning("น่าจับตา")
                else:
     st.error("ความเสี่ยงสูง")
