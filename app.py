@@ -125,6 +125,9 @@ ranking = pd.DataFrame(
 )
 
 ranking = ranking.sort_values(
+    by="Score",
+    ascending=False
+)
 ranking = ranking.reset_index(drop=True)
 
 ranking.insert(
@@ -132,12 +135,6 @@ ranking.insert(
     "Rank",
     range(1, len(ranking) + 1)
 )
-
-st.dataframe(ranking)
-    by="Score",
-    ascending=False
-)
-
 st.subheader("Top 5 หุ้นน่าลงทุน")
 
 st.dataframe(ranking)
