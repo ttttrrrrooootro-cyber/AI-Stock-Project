@@ -205,7 +205,7 @@ if not data.empty:
 
         st.markdown("---")
 
-        # --- 4. ระบบห้องแชทจำลองตอบโต้กับ AI ---
+        # --- 4. ระบบห้องแชทจำลองตอบโต้กับ AI (ปรับปรุงให้ตรงคำถาม) ---
         st.subheader("💬 AI Stock Assistant Chat")
 
         chat_container = st.container(height=250)
@@ -224,23 +224,48 @@ if not data.empty:
 
             ai_reply = ""
             query_lower = user_query.lower()
+            
+            # ตรวจสอบประเภทสินทรัพย์ปัจจุบันที่เปิดดูอยู่ เพื่อใช้ในการตอบคำถาม
+            asset_type = "หุ้น"
+            if "=X" in symbol:
+                asset_type = "คู่เงิน Forex"
+            elif "GC=F" in symbol:
+                asset_type = "ทองคำ"
 
-            if "ซื้อ" in query_lower or "ลงทุน" in query_lower or "คำแนะนำ" in query_lower:
-                if score >= 80:
-                    ai_reply = f"สำหรับ {symbol} มีคะแนนสูงถึง {score}/100 ครับ เทคนิคอลเป็นขาขึ้นและโวลุ่มซัพพอร์ต ชวนให้มองเป็นโอกาสเข้าสะสมครับ"
-                elif score >= 50:
-                    ai_reply = f"สถานะของ {symbol} อยู่ในช่วงก้ำกึ่ง ({score}/100) แนะนำแบ่งไม้ซื้อ หรือรอให้ราคาทะลุแนวต้านสำคัญก่อนครับ"
+            # 1. เงื่อนไขเกี่ยวกับทองคำโดยเฉพาะ
+            if "ทอง" in query_lower or "gold" in query_lower or ("GC=F" in symbol and ("ซื้อ" in query_lower or "แนวโน้ม" in query_lower)):
+                if "GC=F" in symbol:
+                    if score >= 70:
+                        ai_reply = f"ทองคำ ({symbol}) ตอนนี้ได้คะแนน {score}/100 ครับ ภาพรวมค่อนข้างแข็งแกร่งและปลอดภัย น่าสนใจพิจารณาตามแนวโน้มครับ"
+                    else:
+                        ai_reply = f"ภาพเทคนิคอลของ ทองคำ ({symbol}) ปัจจุบันหลุดเส้นสำคัญบางเส้น ทำให้คะแนนอยู่ที่ {score}/100 แนะนำรอสะสมเมื่อย่อตัวดีกว่าครับ"
                 else:
-                    ai_reply = f"ตอนนี้ {symbol} ได้คะแนนต่ำค่อนข้างน่าเป็นห่วงครับ ({score}/100) แนะนำให้รอดูสถานการณ์ไปก่อนดีกว่าครับ"
+                    ai_reply = f"หากต้องการคุยเกี่ยวกับทองคำ รบกวนพิมพ์เปลี่ยนชื่อสินทรัพย์ในช่องค้นหาด้านบนเป็น 'GC=F' ก่อนนะครับ ผมจะได้ดึงกราฟทองคำมาช่วยวิเคราะห์ให้แม่นยำยิ่งขึ้นครับ!"
+            
+            # 2. เงื่อนไขคำแนะนำการซื้อ/ลงทุนทั่วไป
+            elif "ซื้อ" in query_lower or "ลงทุน" in query_lower or "คำแนะนำ" in query_lower:
+                if score >= 80:
+                    ai_reply = f"สำหรับ {symbol} ({asset_type}) มีคะแนนสูงถึง {score}/100 ครับ ปัจจัยเทคนิคอลสนับสนุนการปรับตัวขึ้น ชวนให้มองเป็นโอกาสเข้าสะสมครับ"
+                elif score >= 50:
+                    ai_reply = f"สถานะของ {symbol} อยู่ในช่วงพักตัวหรือสะสมกำลัง คะแนนอยู่ที่ {score}/100 แนะนำแบ่งไม้ซื้อ หรือรอเลือกจังหวะตั้งรับครับ"
+                else:
+                    ai_reply = f"ตอนนี้ {symbol} มีความเสี่ยงทางเทคนิคอล คะแนนค่อนข้างต่ำ ({score}/100) แนะนำชะลอการลงทุนไปก่อนครับ"
+            
+            # 3. เงื่อนไขแนวโน้มกราฟ
             elif "แนวโน้ม" in query_lower or "กราฟ" in query_lower or "เทคนิค" in query_lower:
                 if data["Close"].iloc[-1] > data["MA50"].iloc[-1]:
-                    ai_reply = f"กราฟของ {symbol} ปัจจุบันยืนอยู่เหนือเส้น MA50 ได้สะท้อนภาพเชิงบวก คาดว่ายังมีแรงเฉื่อยในทิศทางขาขึ้นต่อครับ"
+                    ai_reply = f"กราฟของ {symbol} ปัจจุบันยืนอยู่เหนือเส้นค่าเฉลี่ย MA50 ได้อย่างแข็งแกร่ง สะท้อนแนวโน้มขาขึ้นในภาพรวมครับ"
                 else:
-                    ai_reply = f"ตอนนี้ราคาของ {symbol} หลุดเส้น MA50 ลงมา ภาพรวมติดลบระยะสั้น ต้องระวังแรงเทขายเพิ่มเติมครับ"
+                    ai_reply = f"ปัจจุบันราคาของ {symbol} ต่ำกว่าเส้น MA50 สัญญาณระยะสั้นแสดงถึงแรงเทขาย ต้องระวังการปรับฐานครับ"
+            
+            # 4. เงื่อนไขราคาล่าสุด
             elif "ราคา" in query_lower or "เท่าไหร่" in query_lower:
-                ai_reply = f"ราคาปัจจุบันของ {symbol} อยู่ที่ {current_price:,.4f if '=X' in symbol else ',.2f'} ครับ"
+                price_fmt = f"{current_price:,.4f}" if "=X" in symbol else f"${current_price:,.2f}"
+                ai_reply = f"ราคาตลาดล่าสุดของ {symbol} อยู่ที่ {price_fmt} ครับ"
+            
+            # 5. คำตอบแบบ Default (ในกรณีที่เดาเจตนาไม่ออก)
             else:
-                ai_reply = f"ผมได้รับคำถามเรื่อง '{user_query}' แล้วครับ! จากมุมมองภาพรวมของสินทรัพย์ {symbol} ปัจจุบันมี AI Score อยู่ที่ {score} คะแนน ครับ มีอะไรอยากให้ช่วยเจาะลึกเพิ่มไหมครับ?"
+                ai_reply = f"เกี่ยวกับ {symbol} ({asset_type}) ปัจจุบันระบบให้คะแนน AI Score อยู่ที่ {score} คะแนนเต็ม 100 ครับ โดยมีสัญญาณสำคัญคือ {reasons[0]} อยากให้ผมช่วยวิเคราะห์จุดไหนเพิ่มเติมพิมพ์บอกได้เลยครับ!"
 
             st.session_state.chat_messages.append(
                 {"role": "assistant", "content": ai_reply}
@@ -252,8 +277,3 @@ if not data.empty:
     # --- 5. ลูปหน่วงเวลาเพื่อให้หน้าจออัปเดตราคาตลาดวิ่งตลอดเวลา ---
     time.sleep(10)
     st.rerun()
-
-else:
-    st.error(
-        f"❌ ไม่พบข้อมูลของ '{symbol}' กรุณาตรวจสอบและกรอกชื่อหุ้นใหม่อีกครั้ง (เช่น AAPL, TSLA, PTT.BK, EURUSD=X, GC=F)"
-    )
