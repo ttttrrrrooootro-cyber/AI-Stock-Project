@@ -103,7 +103,7 @@ for s in stocks:
 
     volatility = d["Close"].pct_change().std()
 
-    score = 1
+    score = 0
 
     if d["Close"].iloc[-1] > d["MA50"].iloc[-1]:
         score += 30
@@ -125,6 +125,12 @@ ranking = pd.DataFrame(
 )
 
 ranking = ranking.sort_values(
+ranking = ranking.reset_index(drop=True)
+ranking.insert(
+    0,
+    "Rank",
+    range(1, len(ranking) + 1)
+)
     by="Score",
     ascending=False
 )
