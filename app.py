@@ -164,7 +164,35 @@ fig.add_trace(
 )
 
 st.plotly_chart(fig, use_container_width=True)
-user_input = st.chat_input("ถามเกี่ยวกับหุ้น")
 
-if user_input:
-    st.write("คุณถาม:", user_input)
+st.subheader("💬 ผู้ช่วยวิเคราะห์หุ้น")
+
+question = st.chat_input("ถามเกี่ยวกับหุ้น")
+
+if question:
+
+    answer = f"""
+หุ้น {symbol}
+
+คะแนน : {score}/100
+
+Growth 6 เดือน : {growth:.2f}%
+
+Volatility : {volatility:.4f}
+"""
+
+    st.chat_message("assistant").write(answer)
+    ...
+st.plotly_chart(fig)
+
+st.metric("คะแนนหุ้น", score)
+
+st.dataframe(ranking)
+
+# เพิ่มตรงนี้
+st.subheader("💬 ผู้ช่วยวิเคราะห์หุ้น")
+
+question = st.chat_input("ถามเกี่ยวกับหุ้น")
+
+if question:
+    ...
