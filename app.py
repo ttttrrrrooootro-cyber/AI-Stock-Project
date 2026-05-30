@@ -1,11 +1,12 @@
+import time
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 import yfinance as yf
 
 # 1. ตั้งค่าหน้าเว็บในสไตล์ Dashboard แบบกว้าง
-st.set_page_config(page_title="AI Trading & Chatbot Platform", layout="wide")
-st.title("🚀 AI Stock Investment & Chatbot Platform")
+st.set_page_config(page_title="AI Live Trading & Chatbot Platform", layout="wide")
+st.title("🚀 AI Stock Investment & Chatbot Platform (LIVE)")
 
 # ใช้ st.session_state สำหรับจำประวัติการค้นหาหุ้นและการคุยกับ Chatbot
 if "search_history" not in st.session_state:
@@ -19,23 +20,49 @@ if "chat_messages" not in st.session_state:
     ]
 
 # --- ส่วนรับข้อมูลเข้า ---
-col_input, col_empty = st.columns([1, 2])
+col_input, col_refresh_info = st.columns([1, 2])
 with col_input:
-    symbol = st.text_input(
-        "🔍 กรอกชื่อหุ้นที่ต้องการวิเคราะห์", "AAPL"
-    ).upper()
+    # ลบเครื่องหมาย / ออกให้อัตโนมัติ เพื่อรองรับ EURUSD=X หรือ GC=F (ทองคำ)
+    symbol = (
+        st.text_input("🔍 กรอกชื่อหุ้น คู่เงิน หรือทองคำ (เช่น AAPL, EURUSD=X, GC=F)", "AAPL")
+        .upper()
+        .replace("/", "")
+    )
 
-# ดึงข้อมูลจาก yfinance ด้วยระบบดักจับข้อผิดพลาดที่ถูกต้อง
+# ดึงข้อมูลจาก yfinance ด้วยระบบดักจับข้อผิดพลาด
 try:
-    with st.spinner("กำลังวิเคราะห์ข้อมูลเชิงลึก..."):
-        ticker = yf.Ticker(symbol)
-        data = ticker.history(period="1y")
+    ticker = yf.Ticker(symbol)
+    # ดึงข้อมูลย้อนหลัง 1 ปี (สำหรับวาดกราฟและคำนวณอินดิเคเตอร์)
+    data = ticker.history(period="1y")
+    
+    # ดึงข้อมูลราคาล่าสุด (Real-time Market Price)
+    # ใช้ข้อมูลจากวันล่าสุดใน history หรือดึงราคา fast info
+    if not data.empty:
+        current_price = data["Close"].iloc[-1]
+        previous_close = data["Close"].iloc[-2] if len(data) > 1 else current_price
+        price_change = current_price - previous_close
+        price_change_pct = (price_change / previous_close) * 100
+    else:
+        current_price = 0
 except Exception as e:
     st.error(f"เกิดข้อผิดพลาดในการเชื่อมต่อข้อมูล: {e}")
     data = pd.DataFrame()
 
 # ทำงานต่อเมื่อดึงข้อมูลสำเร็จและมีข้อมูลอยู่จริง
 if not data.empty:
+    # --- แสดงราคาตลาดปัจจุบัน (Market Price Snapshot) ---
+    st.markdown("### 🔴 ราคาตลาดปัจจุบัน (Real-time Market Price)")
+    metric_col1, metric_col2 = st.columns([1, 3])
+    with metric_col1:
+        # แสดงราคาปัจจุบันพร้อมเปอร์เซ็นต์การเปลี่ยนแปลง (+/- เขียวแดงอัตโนมัติ)
+        st.metric(
+            label=f"ราคาล่าสุดของ {symbol}", 
+            value=f"{current_price:,.4f}" if "=X" in symbol else f"${current_price:,.2f}",
+            delta=f"{price_change:+.4f} ({price_change_pct:+.2f}%)" if "=X" in symbol else f"${price_change:+.2f} ({price_change_pct:+.2f}%)"
+        )
+    with col_refresh_info:
+        st.caption("🔄 **ระบบกำลังเปิดโหมด Live อัปเดตราคาอัตโนมัติทุกๆ 10 วินาที**")
+
     # --- 2. การคำนวณอินดิเคเตอร์และคะแนน AI ---
     data["MA50"] = data["Close"].rolling(50).mean()
 
@@ -68,11 +95,16 @@ if not data.empty:
     else:
         reasons.append(f"ผลตอบแทน 6 เดือนติดลบ ({growth:.2f}%)")
 
-    if data["Volume"].iloc[-1] > data["Vol_Avg20"].iloc[-1]:
+    # ดักจับเงื่อนไขสภาพคล่องสำหรับ Forex และ ทองคำ
+    if "=X" in symbol or "GC=F" in symbol:
         score += 20
-        reasons.append("ปริมาณการซื้อขายล่าสุดสูงกว่าค่าเฉลี่ย 20 วัน")
+        reasons.append("🌍 สภาพคล่องสินทรัพย์ระดับโลกสูงตลอด 24 ชั่วโมง (ข้ามการเช็ค Volume)")
     else:
-        reasons.append("ปริมาณการซื้อขายเบาบาง")
+        if data["Volume"].iloc[-1] > data["Vol_Avg20"].iloc[-1]:
+            score += 20
+            reasons.append("ราคาซื้อขายหนาแน่นกว่าค่าเฉลี่ย 20 วัน")
+        else:
+            reasons.append("ปริมาณการซื้อขายเบาบาง")
 
     if volatility < 2.5:
         score += 20
@@ -80,14 +112,14 @@ if not data.empty:
     else:
         reasons.append("ความผันผวนสูง มีความเสี่ยงในการแกว่งตัว")
 
-    # บันทึกประวัติการค้นหาลงตารางจัดอันดับ
+    # บันทึกประวัติการค้นหาลงตารางจัดอันดับ (อัปเดตราคาล่าสุดเสมอ)
     history_dict = {
         item["Ticker"]: item for item in st.session_state.search_history
     }
     history_dict[symbol] = {
         "Ticker": symbol,
         "Score": score,
-        "ราคาปัจจุบัน": f"{data['Close'].iloc[-1]:.2f}",
+        "ราคาปัจจุบัน": f"{current_price:,.4f}" if "=X" in symbol else f"{current_price:,.2f}",
         "เหตุผลเด่น": reasons[0] if score >= 50 else reasons[1],
     }
     st.session_state.search_history = list(history_dict.values())
@@ -147,7 +179,7 @@ if not data.empty:
         st.plotly_chart(fig, use_container_width=True)
 
         # ส่วนแสดงผลการจัดอันดับหุ้นน่าลงทุน
-        st.subheader("🏆 อันดับหุ้นน่าลงทุนที่ผ่านการวิเคราะห์")
+        st.subheader("🏆 อันดับสินทรัพย์น่าลงทุนที่ผ่านการวิเคราะห์")
         df_rank = pd.DataFrame(st.session_state.search_history)
         if not df_rank.empty:
             df_rank = df_rank.sort_values(by="Score", ascending=False).reset_index(
@@ -176,7 +208,7 @@ if not data.empty:
         # --- 4. ระบบห้องแชทจำลองตอบโต้กับ AI ---
         st.subheader("💬 AI Stock Assistant Chat")
 
-        chat_container = st.container(height=300)
+        chat_container = st.container(height=250)
         with chat_container:
             for msg in st.session_state.chat_messages:
                 with st.chat_message(msg["role"]):
@@ -206,9 +238,9 @@ if not data.empty:
                 else:
                     ai_reply = f"ตอนนี้ราคาของ {symbol} หลุดเส้น MA50 ลงมา ภาพรวมติดลบระยะสั้น ต้องระวังแรงเทขายเพิ่มเติมครับ"
             elif "ราคา" in query_lower or "เท่าไหร่" in query_lower:
-                ai_reply = f"ราคาปิดล่าสุดของ {symbol} อยู่ที่ {data['Close'].iloc[-1]:.2f} ครับ"
+                ai_reply = f"ราคาปัจจุบันของ {symbol} อยู่ที่ {current_price:,.4f if '=X' in symbol else ',.2f'} ครับ"
             else:
-                ai_reply = f"ผมได้รับคำถามเรื่อง '{user_query}' แล้วครับ! จากมุมมองภาพรวมของหุ้น {symbol} ปัจจุบันมี AI Score อยู่ที่ {score} คะแนน ซึ่งปัจจัยเทคนิคสำคัญคือ {reasons[0]} ครับ มีอะไรอยากให้ช่วยเจาะลึกเพิ่มไหมครับ?"
+                ai_reply = f"ผมได้รับคำถามเรื่อง '{user_query}' แล้วครับ! จากมุมมองภาพรวมของสินทรัพย์ {symbol} ปัจจุบันมี AI Score อยู่ที่ {score} คะแนน ครับ มีอะไรอยากให้ช่วยเจาะลึกเพิ่มไหมครับ?"
 
             st.session_state.chat_messages.append(
                 {"role": "assistant", "content": ai_reply}
@@ -216,7 +248,12 @@ if not data.empty:
             with chat_container:
                 with st.chat_message("assistant"):
                     st.write(ai_reply)
+
+    # --- 5. ลูปหน่วงเวลาเพื่อให้หน้าจออัปเดตราคาตลาดวิ่งตลอดเวลา ---
+    time.sleep(10)
+    st.rerun()
+
 else:
     st.error(
-        f"❌ ไม่พบข้อมูลของหุ้น '{symbol}' กรุณาตรวจสอบและกรอกชื่อหุ้นใหม่อีกครั้ง (เช่น AAPL, TSLA, PTT.BK)"
+        f"❌ ไม่พบข้อมูลของ '{symbol}' กรุณาตรวจสอบและกรอกชื่อหุ้นใหม่อีกครั้ง (เช่น AAPL, TSLA, PTT.BK, EURUSD=X, GC=F)"
     )
