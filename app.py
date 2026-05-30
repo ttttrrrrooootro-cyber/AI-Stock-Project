@@ -3,7 +3,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 import yfinance as yf
-import requests
+from google import genai
 
 st.set_page_config(page_title="AI Live Trading & Chatbot Platform", layout="wide")
 st.title("🚀 AI Stock Investment & Chatbot Platform (LIVE)")
@@ -75,24 +75,6 @@ def get_market_prices_for_query(query):
     if prices:
         return "\n\n[ราคาตลาดปัจจุบัน]\n" + "\n".join(prices)
     return ""
-
-def call_gemini(system_prompt, messages, api_key):
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={api_key}"
-    
-    contents = []
-    for m in messages:
-        role = "user" if m["role"] == "user" else "model"
-        contents.append({"role": role, "parts": [{"text": m["content"]}]})
-    
-    payload = {
-        "system_instruction": {"parts": [{"text": system_prompt}]},
-        "contents": contents,
-        "generationConfig": {"maxOutputTokens": 1000}
-    }
-    
-    resp = requests.post(url, json=payload, timeout=30)
-    resp.raise_for_status()
-    return resp.json()["candidates"][0]["content"]["parts"][0]["text"]
 
 try:
     ticker = yf.Ticker(symbol)
@@ -279,15 +261,25 @@ if not data.empty:
                     st.write(user_query)
 
             market_prices = get_market_prices_for_query(user_query)
-            
-            api_messages = list(st.session_state.chat_messages)
-            if market_prices:
-                api_messages[-1] = {"role": "user", "content": user_query + market_prices}
-            api_messages = api_messages[-20:]
+            full_query = user_query + market_prices if market_prices else user_query
 
             try:
                 api_key = st.secrets["GOOGLE_API_KEY"]
-                ai_reply = call_gemini(system_prompt, api_messages, api_key)
+                client = genai.Client(api_key=api_key)
+
+                history = []
+                for m in st.session_state.chat_messages[1:-1]:
+                    role = "user" if m["role"] == "user" else "model"
+                    history.append({"role": role, "parts": [{"text": m["content"]}]})
+
+                full_prompt = system_prompt + "\n\n---\n" + full_query
+
+                response = client.models.generate_content(
+                    model="gemini-2.0-flash",
+                    contents=history + [{"role": "user", "parts": [{"text": full_prompt}]}],
+                )
+                ai_reply = response.text
+
             except Exception as e:
                 ai_reply = f"⚠️ ขออภัย ไม่สามารถเชื่อมต่อ AI ได้: {str(e)}"
 
