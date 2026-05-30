@@ -3,7 +3,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 import yfinance as yf
-import anthropic
+import requests
 
 st.set_page_config(page_title="AI Live Trading & Chatbot Platform", layout="wide")
 st.title("🚀 AI Stock Investment & Chatbot Platform (LIVE)")
@@ -17,8 +17,6 @@ if "chat_messages" not in st.session_state:
             "content": "สวัสดีครับ! ผมเป็นผู้ช่วยด้านการลงทุนและการเทรด 📊\n\nถามได้เลยครับ เช่น:\n- หุ้น: AAPL, TSLA, NVDA แนวโน้มเป็นยังไง?\n- Forex: EUR/USD, USD/JPY น่าเทรดไหม?\n- ทองคำ: ราคาตอนนี้เท่าไหร่? แนวโน้มยังไง?\n- คริปโต: BTC, ETH วันนี้ราคาเท่าไหร่?\n- โลหะมีค่า: Silver, Platinum ราคาตอนนี้?",
         }
     ]
-if "market_context" not in st.session_state:
-    st.session_state.market_context = {}
 
 col_input, col_refresh_info = st.columns([1, 2])
 with col_input:
@@ -77,6 +75,24 @@ def get_market_prices_for_query(query):
     if prices:
         return "\n\n[ราคาตลาดปัจจุบัน]\n" + "\n".join(prices)
     return ""
+
+def call_gemini(system_prompt, messages, api_key):
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={api_key}"
+    
+    contents = []
+    for m in messages:
+        role = "user" if m["role"] == "user" else "model"
+        contents.append({"role": role, "parts": [{"text": m["content"]}]})
+    
+    payload = {
+        "system_instruction": {"parts": [{"text": system_prompt}]},
+        "contents": contents,
+        "generationConfig": {"maxOutputTokens": 1000}
+    }
+    
+    resp = requests.post(url, json=payload, timeout=30)
+    resp.raise_for_status()
+    return resp.json()["candidates"][0]["content"]["parts"][0]["text"]
 
 try:
     ticker = yf.Ticker(symbol)
@@ -208,7 +224,6 @@ if not data.empty:
             st.write(f"- {r}")
 
         st.markdown("---")
-
         st.subheader("💬 AI Trading Assistant")
 
         asset_type = "หุ้น"
@@ -242,16 +257,13 @@ if not data.empty:
             "ความสามารถของคุณ:\n"
             "1. วิเคราะห์แนวโน้มตลาด หุ้น Forex ทองคำ เงิน คริปโต โลหะมีค่า น้ำมัน\n"
             "2. อธิบาย Technical Analysis (SMC, FVG, OB, BOS, MA, RSI, MACD ฯลฯ)\n"
-            "3. บอกราคาตลาดโลก - เมื่อผู้ใช้ถามราคาสินทรัพย์ใด ให้แนะนำให้พิมพ์ symbol ในช่องค้นหา\n"
+            "3. บอกราคาตลาดโลก แนะนำให้พิมพ์ symbol ในช่องค้นหาเพื่อดูราคาจริง\n"
             "4. ให้คำแนะนำการเทรดแบบมืออาชีพ\n"
-            "5. อธิบาย Fundamental Analysis\n"
-            "6. แนะนำ risk management และ position sizing\n\n"
+            "5. แนะนำ risk management และ position sizing\n\n"
             "สไตล์การตอบ:\n"
             "- ตอบเป็นภาษาไทยเสมอ\n"
-            "- กระชับ ตรงประเด็น\n"
-            "- ใช้ emoji ประกอบบ้างเพื่อความน่าอ่าน\n"
-            "- อ้างอิงข้อมูลจริงที่มีอยู่\n"
-            "- ระบุว่าเป็นการวิเคราะห์เพื่อประกอบการตัดสินใจเท่านั้น ไม่ใช่คำแนะนำการลงทุน"
+            "- กระชับ ตรงประเด็น ใช้ emoji ประกอบ\n"
+            "- ระบุว่าเป็นการวิเคราะห์เพื่อประกอบการตัดสินใจเท่านั้น"
         )
 
         chat_container = st.container(height=300)
@@ -267,28 +279,17 @@ if not data.empty:
                     st.write(user_query)
 
             market_prices = get_market_prices_for_query(user_query)
-            enhanced_query = user_query + market_prices if market_prices else user_query
+            
+            api_messages = list(st.session_state.chat_messages)
+            if market_prices:
+                api_messages[-1] = {"role": "user", "content": user_query + market_prices}
+            api_messages = api_messages[-20:]
 
             try:
-                client = anthropic.Anthropic(api_key=st.secrets["ANTHROPIC_API_KEY"])
-                api_messages = [
-                    {"role": m["role"], "content": m["content"]}
-                    for m in st.session_state.chat_messages[:-1]
-                    if m["role"] in ["user", "assistant"]
-                ]
-                api_messages.append({"role": "user", "content": enhanced_query})
-                api_messages = api_messages[-20:]
-
-                response = client.messages.create(
-                    model="claude-sonnet-4-20250514",
-                    max_tokens=1000,
-                    system=system_prompt,
-                    messages=api_messages,
-                )
-                ai_reply = response.content[0].text
-
+                api_key = st.secrets["GOOGLE_API_KEY"]
+                ai_reply = call_gemini(system_prompt, api_messages, api_key)
             except Exception as e:
-                ai_reply = f"ขออภัย ไม่สามารถเชื่อมต่อ AI ได้: {str(e)}"
+                ai_reply = f"⚠️ ขออภัย ไม่สามารถเชื่อมต่อ AI ได้: {str(e)}"
 
             st.session_state.chat_messages.append({"role": "assistant", "content": ai_reply})
             with chat_container:
