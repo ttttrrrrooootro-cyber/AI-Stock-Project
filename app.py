@@ -141,7 +141,37 @@ ranking.insert(
 st.subheader("Top 5 หุ้นน่าลงทุน")
 
 st.dataframe(ranking)
+...
+st.plotly_chart(fig)
 
+st.metric("คะแนนหุ้น", score)
+
+st.dataframe(ranking)
+
+st.subheader("💬 ผู้ช่วยวิเคราะห์หุ้น")
+
+question = st.chat_input("ถามเกี่ยวกับหุ้น")
+
+if question:
+    answer = f"""
+หุ้น {symbol}
+
+คะแนน : {score}/100
+
+Growth 6 เดือน : {growth:.2f}%
+
+Volatility : {volatility:.4f}
+"""
+
+    st.chat_message("assistant").write(answer)
+
+# เพิ่มตรงนี้
+st.subheader("💬 ผู้ช่วยวิเคราะห์หุ้น")
+
+question = st.chat_input("ถามเกี่ยวกับหุ้น")
+
+if question:
+    ...
 
 fig = go.Figure(
     data=[
@@ -164,35 +194,3 @@ fig.add_trace(
 )
 
 st.plotly_chart(fig, use_container_width=True)
-
-st.subheader("💬 ผู้ช่วยวิเคราะห์หุ้น")
-
-question = st.chat_input("ถามเกี่ยวกับหุ้น")
-
-if question:
-
-    answer = f"""
-หุ้น {symbol}
-
-คะแนน : {score}/100
-
-Growth 6 เดือน : {growth:.2f}%
-
-Volatility : {volatility:.4f}
-"""
-
-    st.chat_message("assistant").write(answer)
-    ...
-st.plotly_chart(fig)
-
-st.metric("คะแนนหุ้น", score)
-
-st.dataframe(ranking)
-
-# เพิ่มตรงนี้
-st.subheader("💬 ผู้ช่วยวิเคราะห์หุ้น")
-
-question = st.chat_input("ถามเกี่ยวกับหุ้น")
-
-if question:
-    ...
