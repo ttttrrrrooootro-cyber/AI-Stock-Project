@@ -1,13 +1,56 @@
+
 import streamlit as st
 import yfinance as yf
 
 st.title("AI Stock Investment Platform")
 
-symbol = st.text_input(
-    "กรอกชื่อหุ้น",
-    "AAPL"
-)
+symbol = st.text_input("กรอกชื่อหุ้น", "AAPL")
 
 data = yf.Ticker(symbol).history(period="1y")
 
+# กราฟราคา
+st.subheader("กราฟราคาหุ้น")
 st.line_chart(data["Close"])
+
+# MA50
+data["MA50"] = data["Close"].rolling(50).mean()
+
+# Growth
+growth = (
+    (data["Close"].iloc[-1]
+    - data["Close"].iloc[-126])
+    / data["Close"].iloc[-126]
+) * 100
+
+# Volume
+volume_avg = data["Volume"].rolling(20).mean()
+
+# Volatility
+volatility = data["Close"].pct_change().std()
+
+# Score
+score = 0
+
+if data["Close"].iloc[-1] > data["MA50"].iloc[-1]:
+    score += 30
+
+if data["Volume"].iloc[-1] > volume_avg.iloc[-1]:
+    score += 20
+
+if growth > 0:
+    score += 30
+
+if volatility < 0.03:
+    score += 20
+
+st.subheader("ผลการวิเคราะห์")
+
+st.metric("คะแนนหุ้น", score)
+
+st.write(f"Growth 6 เดือน : {growth:.2f}%")
+st.write(f"Volatility : {volatility:.4f}")
+
+if score >= 80:
+    st.success("น่าลงทุน")
+elif score >= 60:
+    st.warning("น
