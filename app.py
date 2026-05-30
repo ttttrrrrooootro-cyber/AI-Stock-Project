@@ -1,6 +1,7 @@
 import plotly.graph_objects as go
 import streamlit as st
 import yfinance as yf
+import pandas as pd
 
 st.title("AI Stock Investment Platform")
 
@@ -76,3 +77,58 @@ fig.add_trace(
 )
 
 st.plotly_chart(fig)
+
+results = []
+
+for s in stocks:
+
+    d = yf.Ticker(s).history(period="1y")
+
+    d["MA50"] = d["Close"].rolling(50).mean()
+
+    growth = (
+        (d["Close"].iloc[-1]
+        - d["Close"].iloc[-126])
+        / d["Close"].iloc[-126]
+    ) * 100
+
+    volume_avg = d["Volume"].rolling(20).mean()
+
+    volatility = d["Close"].pct_change().std()
+
+    score = 0
+
+    if d["Close"].iloc[-1] > d["MA50"].iloc[-1]:
+        score += 30
+
+    if d["Volume"].iloc[-1] > volume_avg.iloc[-1]:
+        score += 20
+
+    if growth > 0:
+        score += 30
+
+    if volatility < 0.03:
+        score += 20
+
+    results.append([s, score])
+
+ranking = pd.DataFrame(
+    results,
+    columns=["Stock", "Score"]
+)
+
+ranking = ranking.sort_values(
+    by="Score",
+    ascending=False
+)
+stocks = [
+    "AAPL",
+    "MSFT",
+    "NVDA",
+    "GOOGL",
+    "META"
+]
+
+st.subheader("Top 5 หุ้นน่าลงทุน")
+
+st.dataframe(ranking)
