@@ -135,9 +135,12 @@ try:
 
 except Exception as e:
     st.error(f"เกิดข้อผิดพลาดในการประมวลผล: {e}")
+# 1. คำนวณค่าเฉลี่ย Volume ก่อน (ประกาศตัวแปรให้ชัดเจน)
+volume_avg = data["Volume"].rolling(20).mean()
+
+# 2. นำมาสร้างเงื่อนไขในระบบคะแนน (ตรวจสอบให้มั่นใจว่าชื่อสะกดเหมือนกันเป๊ะๆ)
 if data["Volume"].iloc[-1] > volume_avg.iloc[-1]:
     score += 20
-
 if growth > 0:
     score += 30
 
