@@ -12,7 +12,10 @@ if "search_history" not in st.session_state:
     st.session_state.search_history = []
 if "chat_messages" not in st.session_state:
     st.session_state.chat_messages = [
-        {"role": "assistant", "content": "สวัสดีครับ! พิมพ์คุยหรือสอบถามเกี่ยวกับหุ้นที่ค้นหาได้เลยครับ เช่น 'หุ้นตัวนี้แนวโน้มเป็นอย่างไรบ้าง?'"}
+        {
+            "role": "assistant",
+            "content": "สวัสดีครับ! พิมพ์คุยหรือสอบถามเกี่ยวกับหุ้นที่ค้นหาได้เลยครับ เช่น 'หุ้นตัวนี้แนวโน้มเป็นอย่างไรบ้าง?'",
+        }
     ]
 
 # --- ส่วนรับข้อมูลเข้า ---
@@ -22,19 +25,21 @@ with col_input:
         "🔍 กรอกชื่อหุ้นที่ต้องการวิเคราะห์", "AAPL"
     ).upper()
 
-# ดึงข้อมูลจาก yfinance
+# ดึงข้อมูลจาก yfinance ด้วยระบบดักจับข้อผิดพลาดที่ถูกต้อง
 try:
     with st.spinner("กำลังวิเคราะห์ข้อมูลเชิงลึก..."):
         ticker = yf.Ticker(symbol)
         data = ticker.history(period="1y")
+except Exception as e:
+    st.error(f"เกิดข้อผิดพลาดในการเชื่อมต่อข้อมูล: {e}")
+    data = pd.DataFrame()
 
-    if data.empty:
-        st.error(f"❌ ไม่พบข้อมูลของหุ้น {symbol} กรุณาลองใหม่อีกครั้ง")
-else:
+# ทำงานต่อเมื่อดึงข้อมูลสำเร็จและมีข้อมูลอยู่จริง
+if not data.empty:
     # --- 2. การคำนวณอินดิเคเตอร์และคะแนน AI ---
     data["MA50"] = data["Close"].rolling(50).mean()
 
-    #คำนวณ Growth (6 เดือน)
+    # คำนวณ Growth (6 เดือน หรือประมาณ 126 วันทำการ)
     if len(data) >= 126:
         growth = (
             (data["Close"].iloc[-1] - data["Close"].iloc[-126])
@@ -71,11 +76,11 @@ else:
 
     if volatility < 2.5:
         score += 20
-        reasons.append(f"ความผันผวนต่ำ สภาพคล่องค่อนข้างนิ่ง")
+        reasons.append("ความผันผวนต่ำ สภาพคล่องค่อนข้างนิ่ง")
     else:
-        reasons.append(f"ความผันผวนสูง มีความเสี่ยงในการแกว่งตัว")
+        reasons.append("ความผันผวนสูง มีความเสี่ยงในการแกว่งตัว")
 
-    # บันทึกประวัติการค้นหาลงตารางจัดอันดับ (อัปเดตคะแนนล่าสุดเสมอ)
+    # บันทึกประวัติการค้นหาลงตารางจัดอันดับ
     history_dict = {
         item["Ticker"]: item for item in st.session_state.search_history
     }
@@ -88,7 +93,6 @@ else:
     st.session_state.search_history = list(history_dict.values())
 
     # --- 3. การจัดเลย์เอาต์หน้าจอแสดงผล ---
-    # แบ่งหน้าจอเป็น 2 ฝั่งหลัก
     left_main_col, right_main_col = st.columns([3, 2])
 
     with left_main_col:
@@ -146,7 +150,6 @@ else:
         st.subheader("🏆 อันดับหุ้นน่าลงทุนที่ผ่านการวิเคราะห์")
         df_rank = pd.DataFrame(st.session_state.search_history)
         if not df_rank.empty:
-            # เรียงลำดับจากคะแนนสูงสุดไปต่ำสุด
             df_rank = df_rank.sort_values(by="Score", ascending=False).reset_index(
                 drop=True
             )
@@ -170,19 +173,16 @@ else:
 
         st.markdown("---")
 
-        # --- 4. ระบบห้องแชทจำลองตอบโต้กับ AI (Chatbot Interactivity) ---
+        # --- 4. ระบบห้องแชทจำลองตอบโต้กับ AI ---
         st.subheader("💬 AI Stock Assistant Chat")
 
-        # แสดงกล่องข้อความแชท
         chat_container = st.container(height=300)
         with chat_container:
             for msg in st.session_state.chat_messages:
                 with st.chat_message(msg["role"]):
                     st.write(msg["content"])
 
-        # รับข้อความแชทจากผู้ใช้
         if user_query := st.chat_input("พิมพ์คำถามของคุณที่นี่..."):
-            # แสดงสิ่งที่ผู้ใช้พิมพ์ลงไปในหน้าแชททันที
             st.session_state.chat_messages.append(
                 {"role": "user", "content": user_query}
             )
@@ -190,7 +190,6 @@ else:
                 with st.chat_message("user"):
                     st.write(user_query)
 
-            # ตรรกะของ AI ในการตอบโต้ (ประมวลผลคำตอบอัตโนมัติอ้างอิงจากหุ้นตัวที่ส่องอยู่)
             ai_reply = ""
             query_lower = user_query.lower()
 
@@ -211,13 +210,13 @@ else:
             else:
                 ai_reply = f"ผมได้รับคำถามเรื่อง '{user_query}' แล้วครับ! จากมุมมองภาพรวมของหุ้น {symbol} ปัจจุบันมี AI Score อยู่ที่ {score} คะแนน ซึ่งปัจจัยเทคนิคสำคัญคือ {reasons[0]} ครับ มีอะไรอยากให้ช่วยเจาะลึกเพิ่มไหมครับ?"
 
-            # บันทึกและแสดงคำตอบของ AI
             st.session_state.chat_messages.append(
                 {"role": "assistant", "content": ai_reply}
             )
             with chat_container:
                 with st.chat_message("assistant"):
                     st.write(ai_reply)
-
-except Exception as e:
-    st.error(f"เกิดข้อผิดพลาดทางระบบ: {e}")
+else:
+    st.error(
+        f"❌ ไม่พบข้อมูลของหุ้น '{symbol}' กรุณาตรวจสอบและกรอกชื่อหุ้นใหม่อีกครั้ง (เช่น AAPL, TSLA, PTT.BK)"
+    )
