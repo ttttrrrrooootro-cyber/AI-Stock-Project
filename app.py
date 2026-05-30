@@ -2,7 +2,7 @@ import plotly.graph_objects as go
 import streamlit as st
 import yfinance as yf
 import pandas as pd
-
+import plotly.graph_objects as go
 st.title("AI Stock Investment Platform")
 
 symbol = st.text_input("กรอกชื่อหุ้น", "AAPL")
@@ -138,3 +138,26 @@ ranking.insert(
 st.subheader("Top 5 หุ้นน่าลงทุน")
 
 st.dataframe(ranking)
+
+
+fig = go.Figure(
+    data=[
+        go.Candlestick(
+            x=data.index,
+            open=data["Open"],
+            high=data["High"],
+            low=data["Low"],
+            close=data["Close"]
+        )
+    ]
+)
+
+fig.add_trace(
+    go.Scatter(
+        x=data.index,
+        y=data["MA50"],
+        name="MA50"
+    )
+)
+
+st.plotly_chart(fig, use_container_width=True)
