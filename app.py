@@ -103,7 +103,7 @@ for s in stocks:
 
     volatility = d["Close"].pct_change().std()
 
-    score = 0
+    score = 1
 
     if d["Close"].iloc[-1] > d["MA50"].iloc[-1]:
         score += 30
