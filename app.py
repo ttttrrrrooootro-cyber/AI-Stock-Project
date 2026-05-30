@@ -275,13 +275,13 @@ if not data.empty:
                 full_prompt = system_prompt + "\n\n---\n" + full_query
 
                 response = client.models.generate_content(
-                    model="gemini-2.0-flash",
+                    model="gemini-1.5-flash",
                     contents=history + [{"role": "user", "parts": [{"text": full_prompt}]}],
                 )
                 ai_reply = response.text
 
             except Exception as e:
-                ai_reply = f"⚠️ ขออภัย ไม่สามารถเชื่อมต่อ AI ได้: {str(e)}"
+                ai_reply = f" ขออภัย ไม่สามารถเชื่อมต่อ AI ได้: {str(e)}"
 
             st.session_state.chat_messages.append({"role": "assistant", "content": ai_reply})
             with chat_container:
