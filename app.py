@@ -121,6 +121,11 @@ ranking = ranking.sort_values(
     by="Score",
     ascending=False
 )
+
+st.subheader("Top 5 หุ้นน่าลงทุน")
+
+st.dataframe(ranking)
+
 stocks = [
     "AAPL",
     "MSFT",
@@ -128,7 +133,3 @@ stocks = [
     "GOOGL",
     "META"
 ]
-
-st.subheader("Top 5 หุ้นน่าลงทุน")
-
-st.dataframe(ranking)
