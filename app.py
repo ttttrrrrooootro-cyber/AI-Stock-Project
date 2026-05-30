@@ -126,11 +126,14 @@ ranking = pd.DataFrame(
 
 ranking = ranking.sort_values(
 ranking = ranking.reset_index(drop=True)
+
 ranking.insert(
     0,
     "Rank",
     range(1, len(ranking) + 1)
 )
+
+st.dataframe(ranking)
     by="Score",
     ascending=False
 )
