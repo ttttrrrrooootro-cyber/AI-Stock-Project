@@ -1,4 +1,4 @@
-
+import plotly.graph_objects as go
 import streamlit as st
 import yfinance as yf
 
@@ -57,7 +57,6 @@ elif score >= 60:
 else:
     st.error("ความเสี่ยงสูง")
     import plotly.graph_objects as go
-
 fig = go.Figure()
 
 fig.add_trace(
