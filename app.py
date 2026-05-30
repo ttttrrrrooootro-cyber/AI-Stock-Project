@@ -56,3 +56,24 @@ elif score >= 60:
     st.warning("น่าจับตา")
 else:
     st.error("ความเสี่ยงสูง")
+    import plotly.graph_objects as go
+
+fig = go.Figure()
+
+fig.add_trace(
+    go.Scatter(
+        x=data.index,
+        y=data["Close"],
+        name="Close Price"
+    )
+)
+
+fig.add_trace(
+    go.Scatter(
+        x=data.index,
+        y=data["MA50"],
+        name="MA50"
+    )
+)
+
+st.plotly_chart(fig)
