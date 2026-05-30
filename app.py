@@ -78,6 +78,13 @@ fig.add_trace(
 
 st.plotly_chart(fig)
 
+stocks = [
+    "AAPL",
+    "MSFT",
+    "NVDA",
+    "GOOGL",
+    "META"
+]
 results = []
 
 for s in stocks:
@@ -125,11 +132,3 @@ ranking = ranking.sort_values(
 st.subheader("Top 5 หุ้นน่าลงทุน")
 
 st.dataframe(ranking)
-
-stocks = [
-    "AAPL",
-    "MSFT",
-    "NVDA",
-    "GOOGL",
-    "META"
-]
