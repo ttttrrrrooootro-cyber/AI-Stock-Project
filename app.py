@@ -229,7 +229,10 @@ if not data.empty:
 
 ข้อมูลสินทรัพย์ที่ผู้ใช้กำลังดูอยู่ตอนนี้:
 - Symbol: {symbol} ({asset_type})
-- price_fmt = f"{current_price:,.4f}" if "=X" in symbol else f"{current_price:,.2f}"
+price_fmt = f"{current_price:,.4f}" if "=X" in symbol else f"{current_price:,.2f}"
+system_prompt = f"""...
+- ราคาปัจจุบัน: {price_fmt}
+..."""
 - เปลี่ยนแปลง: {price_change:+.4f} ({price_change_pct:+.2f}%)
 - AI Score: {score}/100
 - สัญญาณ: {"Strong Buy" if score >= 80 else "Hold/Watch" if score >= 50 else "Avoid"}
