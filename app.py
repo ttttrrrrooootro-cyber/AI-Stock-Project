@@ -54,5 +54,5 @@ if score >= 80:
     st.success("น่าลงทุน")
 elif score >= 60:
     st.warning("น่าจับตา")
-               else:
+else:
     st.error("ความเสี่ยงสูง")
