@@ -4,7 +4,6 @@ import plotly.graph_objects as go
 import streamlit as st
 import yfinance as yf
 import anthropic
-import json
 
 st.set_page_config(page_title="AI Live Trading & Chatbot Platform", layout="wide")
 st.title("🚀 AI Stock Investment & Chatbot Platform (LIVE)")
@@ -15,7 +14,7 @@ if "chat_messages" not in st.session_state:
     st.session_state.chat_messages = [
         {
             "role": "assistant",
-            "content": "สวัสดีครับ! ผมเป็นผู้ช่วยด้านการลงทุนและการเทรด 📊\n\nถามได้เลยครับ เช่น:\n- **หุ้น**: AAPL, TSLA, NVDA แนวโน้มเป็นยังไง?\n- **Forex**: EUR/USD, USD/JPY น่าเทรดไหม?\n- **ทองคำ**: ราคาตอนนี้เท่าไหร่? แนวโน้มยังไง?\n- **คริปโต**: BTC, ETH วันนี้ราคาเท่าไหร่?\n- **เพชร/โลหะมีค่า**: Silver, Platinum ราคาตอนนี้?",
+            "content": "สวัสดีครับ! ผมเป็นผู้ช่วยด้านการลงทุนและการเทรด 📊\n\nถามได้เลยครับ เช่น:\n- หุ้น: AAPL, TSLA, NVDA แนวโน้มเป็นยังไง?\n- Forex: EUR/USD, USD/JPY น่าเทรดไหม?\n- ทองคำ: ราคาตอนนี้เท่าไหร่? แนวโน้มยังไง?\n- คริปโต: BTC, ETH วันนี้ราคาเท่าไหร่?\n- โลหะมีค่า: Silver, Platinum ราคาตอนนี้?",
         }
     ]
 if "market_context" not in st.session_state:
@@ -38,9 +37,6 @@ def fetch_price(sym):
                 "price": round(d["Close"].iloc[-1], 4),
                 "change": round(d["Close"].iloc[-1] - d["Close"].iloc[-2], 4),
                 "change_pct": round(((d["Close"].iloc[-1] - d["Close"].iloc[-2]) / d["Close"].iloc[-2]) * 100, 2),
-                "high": round(d["High"].iloc[-1], 4),
-                "low": round(d["Low"].iloc[-1], 4),
-                "volume": int(d["Volume"].iloc[-1]) if d["Volume"].iloc[-1] > 0 else None,
             }
     except:
         pass
@@ -48,13 +44,13 @@ def fetch_price(sym):
 
 MARKET_SYMBOLS = {
     "gold": "GC=F", "ทอง": "GC=F", "xauusd": "GC=F",
-    "silver": "SI=F", "เงิน": "SI=F", "xagusd": "SI=F",
+    "silver": "SI=F", "xagusd": "SI=F",
     "platinum": "PL=F", "แพลทินัม": "PL=F",
     "btc": "BTC-USD", "bitcoin": "BTC-USD", "บิทคอยน์": "BTC-USD",
     "eth": "ETH-USD", "ethereum": "ETH-USD", "อีเธอเรียม": "ETH-USD",
     "eurusd": "EURUSD=X", "gbpusd": "GBPUSD=X", "usdjpy": "USDJPY=X",
     "audusd": "AUDUSD=X", "usdthb": "USDTHB=X",
-    "oil": "CL=F", "น้ำมัน": "CL=F", "crude": "CL=F",
+    "oil": "CL=F", "น้ำมัน": "CL=F",
     "sp500": "^GSPC", "nasdaq": "^IXIC", "dow": "^DJI",
     "aapl": "AAPL", "tsla": "TSLA", "nvda": "NVDA", "msft": "MSFT",
     "google": "GOOGL", "meta": "META", "amazon": "AMZN",
@@ -134,7 +130,7 @@ if not data.empty:
 
     if "=X" in symbol or symbol in ["GC=F", "SI=F", "PL=F", "CL=F"]:
         score += 20
-        reasons.append("🌍 สภาพคล่องสินทรัพย์ระดับโลกสูงตลอด 24 ชั่วโมง (ข้ามการเช็ค Volume)")
+        reasons.append("สภาพคล่องสินทรัพย์ระดับโลกสูงตลอด 24 ชั่วโมง")
     else:
         if not data["Vol_Avg20"].empty and data["Volume"].iloc[-1] > data["Vol_Avg20"].iloc[-1]:
             score += 20
@@ -220,42 +216,43 @@ if not data.empty:
             asset_type = "คู่เงิน Forex"
         elif symbol in ["GC=F", "XAU=F"]:
             asset_type = "ทองคำ (Gold)"
-        elif symbol in ["SI=F"]:
+        elif symbol == "SI=F":
             asset_type = "เงิน (Silver)"
         elif symbol in ["BTC-USD", "ETH-USD"]:
             asset_type = "คริปโตเคอร์เรนซี"
 
-        system_prompt = f"""คุณคือ AI Trading Assistant ผู้ช่วยด้านการเทรดและการลงทุนมืออาชีพที่พูดภาษาไทย
+        above_ma50 = "ใช่" if data["Close"].iloc[-1] > data["MA50"].iloc[-1] else "ไม่ใช่"
+        signal = "Strong Buy" if score >= 80 else "Hold/Watch" if score >= 50 else "Avoid"
+        price_fmt = f"{current_price:,.4f}" if "=X" in symbol else f"{current_price:,.2f}"
+        change_fmt = f"{price_change:+.4f} ({price_change_pct:+.2f}%)" if "=X" in symbol else f"{price_change:+.2f} ({price_change_pct:+.2f}%)"
+        reasons_str = ", ".join(reasons)
 
-ข้อมูลสินทรัพย์ที่ผู้ใช้กำลังดูอยู่ตอนนี้:
-- Symbol: {symbol} ({asset_type})
-price_fmt = f"{current_price:,.4f}" if "=X" in symbol else f"{current_price:,.2f}"
-system_prompt = f"""...
-- ราคาปัจจุบัน: {price_fmt}
-..."""
-- เปลี่ยนแปลง: {price_change:+.4f} ({price_change_pct:+.2f}%)
-- AI Score: {score}/100
-- สัญญาณ: {"Strong Buy" if score >= 80 else "Hold/Watch" if score >= 50 else "Avoid"}
-- อยู่เหนือ MA50: {"ใช่" if data["Close"].iloc[-1] > data["MA50"].iloc[-1] else "ไม่ใช่"}
-- ผลตอบแทน 6 เดือน: {growth:.2f}%
-- ความผันผวน 30 วัน: {volatility:.2f}%
-- เหตุผลหลัก: {", ".join(reasons)}
-
-ความสามารถของคุณ:
-1. วิเคราะห์แนวโน้มตลาด หุ้น Forex ทองคำ เงิน คริปโต โลหะมีค่า น้ำมัน
-2. อธิบาย Technical Analysis (SMC, FVG, OB, BOS, MA, RSI, MACD ฯลฯ)
-3. บอกราคาตลาดโลก - เมื่อผู้ใช้ถามราคาสินทรัพย์ใด ให้บอกว่าจะดึงข้อมูลให้และแนะนำให้พิมพ์ชื่อ symbol ในช่องค้นหา
-4. ให้คำแนะนำการเทรดแบบมืออาชีพ
-5. อธิบาย Fundamental Analysis
-6. แนะนำ risk management และ position sizing
-
-สไตล์การตอบ:
-- ตอบเป็นภาษาไทยเสมอ
-- กระชับ ตรงประเด็น
-- ใช้ emoji ประกอบบ้างเพื่อความน่าอ่าน
-- อ้างอิงข้อมูลจริงที่มีอยู่
-- ถ้าไม่รู้ราคาล่าสุดของสินทรัพย์อื่น ให้บอกว่าให้ไปพิมพ์ symbol นั้นในช่องค้นหาด้านบน
-- ห้ามแนะนำอย่างเด็ดขาด (ระบุว่าเป็นการวิเคราะห์เพื่อประกอบการตัดสินใจเท่านั้น)"""
+        system_prompt = (
+            "คุณคือ AI Trading Assistant ผู้ช่วยด้านการเทรดและการลงทุนมืออาชีพที่พูดภาษาไทย\n\n"
+            "ข้อมูลสินทรัพย์ที่ผู้ใช้กำลังดูอยู่ตอนนี้:\n"
+            f"- Symbol: {symbol} ({asset_type})\n"
+            f"- ราคาปัจจุบัน: {price_fmt}\n"
+            f"- เปลี่ยนแปลง: {change_fmt}\n"
+            f"- AI Score: {score}/100\n"
+            f"- สัญญาณ: {signal}\n"
+            f"- อยู่เหนือ MA50: {above_ma50}\n"
+            f"- ผลตอบแทน 6 เดือน: {growth:.2f}%\n"
+            f"- ความผันผวน 30 วัน: {volatility:.2f}%\n"
+            f"- เหตุผลหลัก: {reasons_str}\n\n"
+            "ความสามารถของคุณ:\n"
+            "1. วิเคราะห์แนวโน้มตลาด หุ้น Forex ทองคำ เงิน คริปโต โลหะมีค่า น้ำมัน\n"
+            "2. อธิบาย Technical Analysis (SMC, FVG, OB, BOS, MA, RSI, MACD ฯลฯ)\n"
+            "3. บอกราคาตลาดโลก - เมื่อผู้ใช้ถามราคาสินทรัพย์ใด ให้แนะนำให้พิมพ์ symbol ในช่องค้นหา\n"
+            "4. ให้คำแนะนำการเทรดแบบมืออาชีพ\n"
+            "5. อธิบาย Fundamental Analysis\n"
+            "6. แนะนำ risk management และ position sizing\n\n"
+            "สไตล์การตอบ:\n"
+            "- ตอบเป็นภาษาไทยเสมอ\n"
+            "- กระชับ ตรงประเด็น\n"
+            "- ใช้ emoji ประกอบบ้างเพื่อความน่าอ่าน\n"
+            "- อ้างอิงข้อมูลจริงที่มีอยู่\n"
+            "- ระบุว่าเป็นการวิเคราะห์เพื่อประกอบการตัดสินใจเท่านั้น ไม่ใช่คำแนะนำการลงทุน"
+        )
 
         chat_container = st.container(height=300)
         with chat_container:
@@ -273,14 +270,13 @@ system_prompt = f"""...
             enhanced_query = user_query + market_prices if market_prices else user_query
 
             try:
-                client = anthropic.Anthropic()
+                client = anthropic.Anthropic(api_key=st.secrets["ANTHROPIC_API_KEY"])
                 api_messages = [
                     {"role": m["role"], "content": m["content"]}
                     for m in st.session_state.chat_messages[:-1]
                     if m["role"] in ["user", "assistant"]
                 ]
                 api_messages.append({"role": "user", "content": enhanced_query})
-
                 api_messages = api_messages[-20:]
 
                 response = client.messages.create(
@@ -292,7 +288,7 @@ system_prompt = f"""...
                 ai_reply = response.content[0].text
 
             except Exception as e:
-                ai_reply = f"⚠️ ขออภัย ไม่สามารถเชื่อมต่อ AI ได้ในขณะนี้: {str(e)}\n\nกรุณาตรวจสอบ ANTHROPIC_API_KEY ใน environment variable"
+                ai_reply = f"ขออภัย ไม่สามารถเชื่อมต่อ AI ได้: {str(e)}"
 
             st.session_state.chat_messages.append({"role": "assistant", "content": ai_reply})
             with chat_container:
