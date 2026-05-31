@@ -700,7 +700,7 @@ if not data.empty:
                 f"- Invest Score: {inv['score']}/100\n"
                 f"- Win Rate (Backtest): {bt['winrate']}% ({bt['wins']}W/{bt['losses']}L จาก {bt['total']} signals)\n"
                 f"- RSI: {inv['rsi']:.1f} | MACD: {'Bullish' if inv['macd']>inv['sig'] else 'Bearish'}\n"
-                f"- MA50: {inv['ma50']:.4f} | MA200: {inv['ma200']:.4f if inv['ma200'] else 'N/A'}\n"
+                f"- MA50: {inv['ma50']:.4f} | MA200: " + (f"{inv['ma200']:.4f}" if inv['ma200'] else "N/A") + "\n"
                 f"- ผลตอบแทน 1M: {inv['ret_1m']:+.1f}% | 3M: {inv['ret_3m']:+.1f}% | 6M: {inv['ret_6m']:+.1f}%\n"
                 f"- ความผันผวน: {inv['vol_30']:.1f}%\n\n"
                 "ตอบภาษาไทย กระชับ ให้ข้อมูลเชิงลึก พร้อมแนะนำ position sizing และ risk management\n"
