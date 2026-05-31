@@ -363,23 +363,39 @@ if not data.empty:
             bull_ob,  bear_ob  = detect_ob(d_smc, sh_idx, sl_idx)
             bos_events          = detect_bos_choch(d_smc, sh_idx, sl_idx)
 
-            fig_smc = go.Figure()
+            from plotly.subplots import make_subplots
 
-            # Candlestick
+            # คำนวณ RSI + MACD สำหรับ SMC chart
+            d_smc["RSI"] = calc_rsi(d_smc["Close"], 14)
+            ema12_s = d_smc["Close"].ewm(span=12).mean()
+            ema26_s = d_smc["Close"].ewm(span=26).mean()
+            d_smc["MACD"]   = ema12_s - ema26_s
+            d_smc["MACDsig"]= d_smc["MACD"].ewm(span=9).mean()
+            d_smc["MACDhist"]= d_smc["MACD"] - d_smc["MACDsig"]
+
+            fig_smc = make_subplots(
+                rows=3, cols=1,
+                shared_xaxes=True,
+                row_heights=[0.6, 0.2, 0.2],
+                vertical_spacing=0.03,
+                subplot_titles=("SMC Price", "RSI (14)", "MACD (12,26,9)")
+            )
+
+            # Candlestick (row 1)
             fig_smc.add_trace(go.Candlestick(
                 x=d_smc.index,
                 open=d_smc["Open"], high=d_smc["High"],
                 low=d_smc["Low"],   close=d_smc["Close"],
                 name="Price", increasing_line_color="#26a69a", decreasing_line_color="#ef5350"
-            ))
+            ), row=1, col=1)
 
-            # MA50
+            # MA50 (row 1)
             d_smc["MA50"] = d_smc["Close"].rolling(50).mean()
             fig_smc.add_trace(go.Scatter(
                 x=d_smc.index, y=d_smc["MA50"],
                 mode="lines", name="MA50",
                 line=dict(color="#ff9800", width=1.2, dash="dot")
-            ))
+            ), row=1, col=1)
 
             # Swing Highs / Lows (Liquidity)
             if show_liq and sh_idx:
@@ -389,14 +405,14 @@ if not data.empty:
                     x=sh_dates, y=sh_vals, mode="markers",
                     marker=dict(symbol="triangle-down", size=9, color="#ef5350"),
                     name="Swing High (Liq.)"
-                ))
+                ), row=1, col=1)
                 sl_dates = [d_smc.index[i] for i in sl_idx]
                 sl_vals  = [lows_arr[i]    for i in sl_idx]
                 fig_smc.add_trace(go.Scatter(
                     x=sl_dates, y=sl_vals, mode="markers",
                     marker=dict(symbol="triangle-up", size=9, color="#26a69a"),
                     name="Swing Low (Liq.)"
-                ))
+                ), row=1, col=1)
 
             x_start = d_smc.index[0]
             x_end   = d_smc.index[-1]
@@ -490,16 +506,43 @@ if not data.empty:
             else:
                 shapes_bos, annots_bos = [], []
 
+            # RSI subplot (row 2)
+            fig_smc.add_trace(go.Scatter(
+                x=d_smc.index, y=d_smc["RSI"],
+                mode="lines", name="RSI", line=dict(color="#7b1fa2", width=1.5)
+            ), row=2, col=1)
+            fig_smc.add_hline(y=70, line=dict(color="#ef5350", width=1, dash="dash"), row=2, col=1)
+            fig_smc.add_hline(y=30, line=dict(color="#26a69a", width=1, dash="dash"), row=2, col=1)
+
+            # MACD subplot (row 3)
+            macd_colors = ["#26a69a" if v >= 0 else "#ef5350" for v in d_smc["MACDhist"]]
+            fig_smc.add_trace(go.Bar(
+                x=d_smc.index, y=d_smc["MACDhist"],
+                name="MACD Hist", marker_color=macd_colors, opacity=0.7
+            ), row=3, col=1)
+            fig_smc.add_trace(go.Scatter(
+                x=d_smc.index, y=d_smc["MACD"],
+                mode="lines", name="MACD", line=dict(color="#1976d2", width=1.2)
+            ), row=3, col=1)
+            fig_smc.add_trace(go.Scatter(
+                x=d_smc.index, y=d_smc["MACDsig"],
+                mode="lines", name="Signal", line=dict(color="#ff9800", width=1.2)
+            ), row=3, col=1)
+
             fig_smc.update_layout(
                 shapes=shapes_fvg + shapes_ob + shapes_bos,
                 annotations=annots_fvg + annots_ob + annots_bos,
                 xaxis_rangeslider_visible=False,
-                height=500,
-                margin=dict(l=10, r=10, t=10, b=10),
+                height=680,
+                margin=dict(l=10, r=10, t=30, b=10),
                 legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01, bgcolor="rgba(255,255,255,0.7)"),
                 plot_bgcolor="white",
                 paper_bgcolor="white",
             )
+            fig_smc.update_yaxes(title_text="ราคา", row=1, col=1)
+            fig_smc.update_yaxes(title_text="RSI", range=[0,100], row=2, col=1)
+            fig_smc.update_yaxes(title_text="MACD", row=3, col=1)
+            fig_smc.update_xaxes(rangeslider_visible=False)
             st.plotly_chart(fig_smc, use_container_width=True)
 
             # SMC Summary
@@ -629,27 +672,36 @@ if not data.empty:
             r2.metric("3 เดือน",  f"{inv['ret_3m']:+.1f}%")
             r3.metric("6 เดือน",  f"{inv['ret_6m']:+.1f}%")
 
-            # ── Invest chart (Line + MA20 + MA50 + MA200)
-            fig_inv = go.Figure()
+            # ── Invest chart with RSI + MACD subplots
+            from plotly.subplots import make_subplots as _msp
+            fig_inv = _msp(
+                rows=3, cols=1,
+                shared_xaxes=True,
+                row_heights=[0.6, 0.2, 0.2],
+                vertical_spacing=0.03,
+                subplot_titles=("Price & MA", "RSI (14)", "MACD (12,26,9)")
+            )
+
+            # Price + MA (row 1)
             fig_inv.add_trace(go.Scatter(
                 x=inv["df"].index, y=inv["df"]["Close"],
                 mode="lines", name="ราคาปิด", line=dict(color="#1976d2", width=2)
-            ))
+            ), row=1, col=1)
             fig_inv.add_trace(go.Scatter(
                 x=inv["df"].index, y=inv["df"]["MA20"],
                 mode="lines", name="MA20", line=dict(color="#ff9800", width=1, dash="dot")
-            ))
+            ), row=1, col=1)
             fig_inv.add_trace(go.Scatter(
                 x=inv["df"].index, y=inv["df"]["MA50"],
                 mode="lines", name="MA50", line=dict(color="#9c27b0", width=1.2)
-            ))
+            ), row=1, col=1)
             if inv["ma200"]:
                 fig_inv.add_trace(go.Scatter(
                     x=inv["df"].index, y=inv["df"]["MA200"],
                     mode="lines", name="MA200", line=dict(color="#f44336", width=1.5, dash="dash")
-                ))
+                ), row=1, col=1)
 
-            # Mark backtest entries
+            # Backtest entries (row 1)
             if bt["entries"]:
                 win_dates  = [e["date"] for e in bt["entries"] if e["result"]=="win"]
                 lose_dates = [e["date"] for e in bt["entries"] if e["result"]=="lose"]
@@ -660,21 +712,49 @@ if not data.empty:
                         x=[d for d in win_dates if d in inv["df"].index],
                         y=win_prices, mode="markers", name="Entry Win",
                         marker=dict(symbol="triangle-up", size=10, color="#26a69a")
-                    ))
+                    ), row=1, col=1)
                 if lose_prices:
                     fig_inv.add_trace(go.Scatter(
                         x=[d for d in lose_dates if d in inv["df"].index],
                         y=lose_prices, mode="markers", name="Entry Lose",
                         marker=dict(symbol="triangle-down", size=10, color="#ef5350")
-                    ))
+                    ), row=1, col=1)
+
+            # RSI (row 2)
+            fig_inv.add_trace(go.Scatter(
+                x=inv["df"].index, y=inv["df"]["RSI"],
+                mode="lines", name="RSI", line=dict(color="#7b1fa2", width=1.5)
+            ), row=2, col=1)
+            fig_inv.add_hline(y=70, line=dict(color="#ef5350", width=1, dash="dash"), row=2, col=1)
+            fig_inv.add_hline(y=30, line=dict(color="#26a69a", width=1, dash="dash"), row=2, col=1)
+
+            # MACD (row 3)
+            inv["df"]["MACDhist"] = inv["df"]["MACD"] - inv["df"]["Signal"]
+            hist_colors = ["#26a69a" if v >= 0 else "#ef5350" for v in inv["df"]["MACDhist"]]
+            fig_inv.add_trace(go.Bar(
+                x=inv["df"].index, y=inv["df"]["MACDhist"],
+                name="MACD Hist", marker_color=hist_colors, opacity=0.7
+            ), row=3, col=1)
+            fig_inv.add_trace(go.Scatter(
+                x=inv["df"].index, y=inv["df"]["MACD"],
+                mode="lines", name="MACD Line", line=dict(color="#1976d2", width=1.2)
+            ), row=3, col=1)
+            fig_inv.add_trace(go.Scatter(
+                x=inv["df"].index, y=inv["df"]["Signal"],
+                mode="lines", name="Signal", line=dict(color="#ff9800", width=1.2)
+            ), row=3, col=1)
 
             fig_inv.update_layout(
-                height=380,
+                height=680,
                 xaxis_rangeslider_visible=False,
-                margin=dict(l=10, r=10, t=10, b=10),
+                margin=dict(l=10, r=10, t=30, b=10),
                 legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01, bgcolor="rgba(255,255,255,0.8)"),
                 plot_bgcolor="white", paper_bgcolor="white"
             )
+            fig_inv.update_yaxes(title_text="ราคา", row=1, col=1)
+            fig_inv.update_yaxes(title_text="RSI", range=[0,100], row=2, col=1)
+            fig_inv.update_yaxes(title_text="MACD", row=3, col=1)
+            fig_inv.update_xaxes(rangeslider_visible=False)
             st.plotly_chart(fig_inv, use_container_width=True)
 
             # ── Asset ranking table
