@@ -5,9 +5,72 @@ import streamlit as st
 import yfinance as yf
 from google import genai
 
-st.set_page_config(page_title="AI Live Trading & Chatbot Platform", layout="wide")
-st.title("🚀 AI Stock Investment & Chatbot Platform (LIVE)")
+st.set_page_config(page_title="OpenAI DGV", layout="wide")
 
+# ===== OpenAI DGV Header =====
+st.markdown("""
+<style>
+.dgv-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 0 4px 0;
+    margin-bottom: 4px;
+}
+.dgv-logo {
+    width: 36px; height: 36px;
+    background: #000;
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+}
+.dgv-logo svg { width: 22px; height: 22px; fill: #fff; }
+.dgv-title { font-size: 22px; font-weight: 600; color: #111; letter-spacing: -0.5px; }
+.dgv-title span { color: #666; font-weight: 400; }
+.dgv-sub { font-size: 13px; color: #888; margin-top: 2px; }
+
+/* Chat bubble styling */
+.chat-wrapper { max-height: 400px; overflow-y: auto; padding: 8px 0; }
+.msg-row { display: flex; gap: 10px; margin-bottom: 14px; align-items: flex-start; }
+.msg-row.user-row { flex-direction: row-reverse; }
+.avatar {
+    width: 30px; height: 30px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 600; flex-shrink: 0; margin-top: 2px;
+}
+.avatar.ai-av { background: #000; color: #fff; }
+.avatar.user-av { background: #e8f0fe; color: #1a56db; }
+.bubble {
+    max-width: 78%; padding: 10px 14px;
+    border-radius: 16px; font-size: 14px; line-height: 1.6;
+}
+.bubble.ai-bubble {
+    background: #f4f4f4; color: #111;
+    border-bottom-left-radius: 4px;
+}
+.bubble.user-bubble {
+    background: #000; color: #fff;
+    border-bottom-right-radius: 4px;
+}
+.dgv-disclaimer {
+    font-size: 11px; color: #bbb; text-align: center; margin-top: 6px;
+}
+</style>
+
+<div class="dgv-header">
+  <div class="dgv-logo">
+    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+      <path d="M22.2819 9.8211a5.9847 5.9847 0 0 0-.5157-4.9108 6.0462 6.0462 0 0 0-6.5098-2.9A6.0651 6.0651 0 0 0 4.9807 4.1818a5.9847 5.9847 0 0 0-3.9977 2.9 6.0462 6.0462 0 0 0 .7427 7.0966 5.98 5.98 0 0 0 .511 4.9107 6.051 6.051 0 0 0 6.5146 2.9001A5.9847 5.9847 0 0 0 13.2599 24a6.0557 6.0557 0 0 0 5.7718-4.2058 5.9894 5.9894 0 0 0 3.9977-2.9001 6.0557 6.0557 0 0 0-.7475-7.0729zm-9.022 12.6081a4.4755 4.4755 0 0 1-2.8764-1.0408l.1419-.0804 4.7783-2.7582a.7948.7948 0 0 0 .3927-.6813v-6.7369l2.02 1.1686a.071.071 0 0 1 .038.052v5.5826a4.504 4.504 0 0 1-4.4945 4.4944zm-9.6607-4.1254a4.4708 4.4708 0 0 1-.5346-3.0137l.142.0852 4.783 2.7582a.7712.7712 0 0 0 .7806 0l5.8428-3.3685v2.3324a.0804.0804 0 0 1-.0332.0615L9.74 19.9502a4.4992 4.4992 0 0 1-6.1408-1.6464zM2.3408 7.8956a4.485 4.485 0 0 1 2.3655-1.9728V11.6a.7664.7664 0 0 0 .3879.6765l5.8144 3.3543-2.0201 1.1685a.0757.0757 0 0 1-.071 0l-4.8303-2.7865A4.504 4.504 0 0 1 2.3408 7.872zm16.5963 3.8558L13.1038 8.364 15.1192 7.2a.0757.0757 0 0 1 .071 0l4.8303 2.7913a4.4944 4.4944 0 0 1-.6765 8.1042v-5.6772a.79.79 0 0 0-.407-.667zm2.0107-3.0231l-.142-.0852-4.7735-2.7818a.7759.7759 0 0 0-.7854 0L9.409 9.2297V6.8974a.0662.0662 0 0 1 .0284-.0615l4.8303-2.7866a4.4992 4.4992 0 0 1 6.6802 4.66zM8.3065 12.863l-2.02-1.1638a.0804.0804 0 0 1-.038-.0567V6.0742a4.4992 4.4992 0 0 1 7.3757-3.4537l-.142.0805L8.704 5.459a.7948.7948 0 0 0-.3927.6813zm1.0976-2.3654l2.602-1.4998 2.6069 1.4998v2.9994l-2.5974 1.4997-2.6067-1.4997Z"/>
+    </svg>
+  </div>
+  <div>
+    <div class="dgv-title">OpenAI <span>DGV</span></div>
+    <div class="dgv-sub">สำหรับวิเคราะห์การลงทุน · หุ้น · Forex · ทองคำ · คริปโต · สินทรัพย์ที่คุณสนใจ</div>
+  </div>
+</div>
+""", unsafe_allow_html=True)
+
+# ===== Session State =====
 if "search_history" not in st.session_state:
     st.session_state.search_history = []
 if "chat_messages" not in st.session_state:
@@ -206,7 +269,19 @@ if not data.empty:
             st.write(f"- {r}")
 
         st.markdown("---")
-        st.subheader("💬 AI Trading Assistant")
+
+        # ===== OpenAI DGV Chat Section =====
+        st.markdown("""
+        <div style="display:flex; align-items:center; gap:8px; margin-bottom:10px;">
+          <div style="width:22px;height:22px;background:#000;border-radius:5px;display:flex;align-items:center;justify-content:center;">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="#fff" xmlns="http://www.w3.org/2000/svg">
+              <path d="M22.2819 9.8211a5.9847 5.9847 0 0 0-.5157-4.9108 6.0462 6.0462 0 0 0-6.5098-2.9A6.0651 6.0651 0 0 0 4.9807 4.1818a5.9847 5.9847 0 0 0-3.9977 2.9 6.0462 6.0462 0 0 0 .7427 7.0966 5.98 5.98 0 0 0 .511 4.9107 6.051 6.051 0 0 0 6.5146 2.9001A5.9847 5.9847 0 0 0 13.2599 24a6.0557 6.0557 0 0 0 5.7718-4.2058 5.9894 5.9894 0 0 0 3.9977-2.9001 6.0557 6.0557 0 0 0-.7475-7.0729zm-9.022 12.6081a4.4755 4.4755 0 0 1-2.8764-1.0408l.1419-.0804 4.7783-2.7582a.7948.7948 0 0 0 .3927-.6813v-6.7369l2.02 1.1686a.071.071 0 0 1 .038.052v5.5826a4.504 4.504 0 0 1-4.4945 4.4944zm-9.6607-4.1254a4.4708 4.4708 0 0 1-.5346-3.0137l.142.0852 4.783 2.7582a.7712.7712 0 0 0 .7806 0l5.8428-3.3685v2.3324a.0804.0804 0 0 1-.0332.0615L9.74 19.9502a4.4992 4.4992 0 0 1-6.1408-1.6464zM2.3408 7.8956a4.485 4.485 0 0 1 2.3655-1.9728V11.6a.7664.7664 0 0 0 .3879.6765l5.8144 3.3543-2.0201 1.1685a.0757.0757 0 0 1-.071 0l-4.8303-2.7865A4.504 4.504 0 0 1 2.3408 7.872zm16.5963 3.8558L13.1038 8.364 15.1192 7.2a.0757.0757 0 0 1 .071 0l4.8303 2.7913a4.4944 4.4944 0 0 1-.6765 8.1042v-5.6772a.79.79 0 0 0-.407-.667zm2.0107-3.0231l-.142-.0852-4.7735-2.7818a.7759.7759 0 0 0-.7854 0L9.409 9.2297V6.8974a.0662.0662 0 0 1 .0284-.0615l4.8303-2.7866a4.4992 4.4992 0 0 1 6.6802 4.66zM8.3065 12.863l-2.02-1.1638a.0804.0804 0 0 1-.038-.0567V6.0742a4.4992 4.4992 0 0 1 7.3757-3.4537l-.142.0805L8.704 5.459a.7948.7948 0 0 0-.3927.6813zm1.0976-2.3654l2.602-1.4998 2.6069 1.4998v2.9994l-2.5974 1.4997-2.6067-1.4997Z"/>
+            </svg>
+          </div>
+          <span style="font-size:15px;font-weight:600;color:#111;">OpenAI DGV</span>
+          <span style="font-size:12px;color:#999;margin-left:2px;">Trading Assistant</span>
+        </div>
+        """, unsafe_allow_html=True)
 
         asset_type = "หุ้น"
         if "=X" in symbol:
@@ -221,11 +296,11 @@ if not data.empty:
         above_ma50 = "ใช่" if data["Close"].iloc[-1] > data["MA50"].iloc[-1] else "ไม่ใช่"
         signal = "Strong Buy" if score >= 80 else "Hold/Watch" if score >= 50 else "Avoid"
         price_fmt = f"{current_price:,.4f}" if "=X" in symbol else f"{current_price:,.2f}"
-        change_fmt = f"{price_change:+.4f} ({price_change_pct:+.2f}%)" if "=X" in symbol else f"{price_change:+.2f} ({price_change_pct:+.2f}%)"
+        change_fmt = f"{price_change:+.4f} ({price_change_pct:+.2f}%)" if "=X" in symbol else f"${price_change:+.2f} ({price_change_pct:+.2f}%)"
         reasons_str = ", ".join(reasons)
 
         system_prompt = (
-            "คุณคือ AI Trading Assistant ผู้ช่วยด้านการเทรดและการลงทุนมืออาชีพที่พูดภาษาไทย\n\n"
+            "คุณคือ OpenAI DGV Trading Assistant ผู้ช่วยด้านการเทรดและการลงทุนมืออาชีพที่พูดภาษาไทย\n\n"
             "ข้อมูลสินทรัพย์ที่ผู้ใช้กำลังดูอยู่ตอนนี้:\n"
             f"- Symbol: {symbol} ({asset_type})\n"
             f"- ราคาปัจจุบัน: {price_fmt}\n"
@@ -248,17 +323,27 @@ if not data.empty:
             "- ระบุว่าเป็นการวิเคราะห์เพื่อประกอบการตัดสินใจเท่านั้น"
         )
 
-        chat_container = st.container(height=300)
-        with chat_container:
-            for msg in st.session_state.chat_messages:
-                with st.chat_message(msg["role"]):
-                    st.write(msg["content"])
+        # Render chat bubbles with OpenAI style
+        chat_html = '<div class="chat-wrapper">'
+        for msg in st.session_state.chat_messages:
+            if msg["role"] == "assistant":
+                chat_html += f'''
+                <div class="msg-row">
+                  <div class="avatar ai-av">AI</div>
+                  <div class="bubble ai-bubble">{msg["content"].replace(chr(10), "<br>")}</div>
+                </div>'''
+            else:
+                chat_html += f'''
+                <div class="msg-row user-row">
+                  <div class="avatar user-av">คุณ</div>
+                  <div class="bubble user-bubble">{msg["content"].replace(chr(10), "<br>")}</div>
+                </div>'''
+        chat_html += '</div>'
+        chat_html += '<div class="dgv-disclaimer">OpenAI DGV วิเคราะห์เพื่อประกอบการตัดสินใจเท่านั้น ไม่ใช่คำแนะนำทางการเงิน</div>'
+        st.markdown(chat_html, unsafe_allow_html=True)
 
         if user_query := st.chat_input("ถามเกี่ยวกับหุ้น Forex ทอง คริปโต หรือราคาตลาดโลก..."):
             st.session_state.chat_messages.append({"role": "user", "content": user_query})
-            with chat_container:
-                with st.chat_message("user"):
-                    st.write(user_query)
 
             market_prices = get_market_prices_for_query(user_query)
             full_query = user_query + market_prices if market_prices else user_query
@@ -281,12 +366,10 @@ if not data.empty:
                 ai_reply = response.text
 
             except Exception as e:
-                ai_reply = f" ขออภัย กำลังปรับปรุง {str(e)}"
+                ai_reply = f"ขออภัย กำลังปรับปรุง {str(e)}"
 
             st.session_state.chat_messages.append({"role": "assistant", "content": ai_reply})
-            with chat_container:
-                with st.chat_message("assistant"):
-                    st.write(ai_reply)
+            st.rerun()
 
     time.sleep(10)
     st.rerun()
