@@ -521,8 +521,9 @@ if not data.empty:
             """, unsafe_allow_html=True)
 
             # SMC context for prompt
+            price_str = f"{current_price:,.4f}" if is_fx else f"{current_price:,.2f}"
             smc_ctx = (
-                f"Symbol: {symbol} | ราคา: {current_price:,.4f if is_fx else ',.2f'}\n"
+                f"Symbol: {symbol} | ราคา: {price_str}\n"
                 f"Bullish FVG: {len(bull_fvg)} | Bearish FVG: {len(bear_fvg)}\n"
                 f"Bull OB: {len(bull_ob)} | Bear OB: {len(bear_ob)}\n"
                 f"BOS Events: {len(bos_events)}\n"
