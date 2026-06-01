@@ -10,7 +10,6 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import streamlit as st
 import yfinance as yf
-from scipy import stats
 from google import genai
 
 # ─────────────────────────────────────────────────────────────
@@ -352,11 +351,33 @@ def zscore(series, window=60):
     return (series - roll_mean) / (roll_std + 1e-9)
 
 def linear_trend(prices):
-    """Linear regression slope (annualized %)"""
-    x = np.arange(len(prices))
-    slope, intercept, r_val, p_val, _ = stats.linregress(x, prices.values)
-    annual_slope = slope * 252 / prices.mean() * 100
-    return round(annual_slope, 2), round(r_val**2, 3), round(p_val, 4)
+    """Linear regression slope (annualized %) — numpy only"""
+    x = np.arange(len(prices), dtype=float)
+    y = prices.values.astype(float)
+    # polyfit degree 1
+    coeffs = np.polyfit(x, y, 1)
+    slope  = coeffs[0]
+    # R²
+    y_hat  = np.polyval(coeffs, x)
+    ss_res = np.sum((y - y_hat) ** 2)
+    ss_tot = np.sum((y - y.mean()) ** 2)
+    r2     = 1 - ss_res / (ss_tot + 1e-9)
+    # p-value approximation via t-test
+    n      = len(x)
+    se     = np.sqrt(ss_res / max(n - 2, 1) / (np.sum((x - x.mean())**2) + 1e-9))
+    t_stat = slope / (se + 1e-9)
+    # two-tailed p via normal approx (good enough for n>30)
+    p_val  = 2 * (1 - _norm_cdf(abs(t_stat)))
+    annual_slope = slope * 252 / (prices.mean() + 1e-9) * 100
+    return round(annual_slope, 2), round(r2, 3), round(float(p_val), 4)
+
+def _norm_cdf(x):
+    """Standard normal CDF approximation (Abramowitz & Stegun)"""
+    t = 1 / (1 + 0.2316419 * abs(x))
+    poly = t * (0.319381530 + t * (-0.356563782 + t * (1.781477937
+           + t * (-1.821255978 + t * 1.330274429))))
+    cdf = 1 - (1 / np.sqrt(2 * np.pi)) * np.exp(-0.5 * x**2) * poly
+    return cdf if x >= 0 else 1 - cdf
 
 def momentum_score(prices):
     """Weighted momentum: 1M,3M,6M,12M"""
