@@ -1,6 +1,6 @@
 """
 DGV Investment Analyzer — Mathematical Deep Analysis
-วิเคราะห์การลงทุนด้วยคณิตศาสตร์ย้อนหลัง 10 ปี
+วิเคราะห์การลงทุนด้วยคณิตศาสตร์ย้อนหลัง 10 ปี (Minimalist & Premium Edition)
 """
 
 import time
@@ -22,223 +22,229 @@ st.set_page_config(
 )
 
 # ─────────────────────────────────────────────────────────────
-#  GLOBAL CSS
+#  GLOBAL CSS (Minimal & High Contrast Typography)
 # ─────────────────────────────────────────────────────────────
 st.markdown("""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 
 :root {
-  --ink: #0d0d0d;
-  --paper: #f8f6f1;
-  --cream: #ede9e0;
-  --gold: #c8a84b;
-  --gold-light: #f0d98a;
-  --green: #2d7a4f;
-  --red: #c0392b;
-  --blue: #1a3a5c;
-  --muted: #8a8478;
-  --border: #d8d2c5;
-  --card: #ffffff;
+  --bg-primary: #fcfcfc;
+  --bg-card: #ffffff;
+  --border-color: #e5e5e5;
+  --text-main: #111827;      /* สีตัวอักษรหลัก: เข้มชัดเจน ไม่หายแน่นอน */
+  --text-muted: #6b7280;     /* สีตัวอักษรรอง */
+  --brand-navy: #0f172a;     /* สีน้ำเงินเข้มสถาบัน */
+  --brand-accent: #b45309;   /* สีทองหม่น/น้ำตาลทองสไตล์ Minimal */
+  --color-green: #16a34a;    /* เขียวเรียบสุภาพ */
+  --color-red: #dc2626;      /* แดงเรียบสุภาพ */
 }
 
+/* บังคับใช้ฟอนต์และสีพื้นหลังหลัก */
 html, body, [class*="css"] {
-  font-family: 'DM Sans', sans-serif !important;
-  background-color: var(--paper) !important;
-  color: var(--ink) !important;
+  font-family: 'Inter', sans-serif !important;
+  background-color: var(--bg-primary) !important;
+  color: var(--text-main) !important;
 }
 
-/* Header */
+/* Header ดีไซน์ใหม่ เรียบหรูสไตล์สำนักข่าวการเงิน */
 .dgv-masthead {
-  background: var(--ink);
-  color: #fff;
-  padding: 22px 32px 18px;
-  margin: -16px -16px 24px;
+  background: var(--bg-card);
+  padding: 24px 0px;
+  margin-bottom: 28px;
   display: flex;
-  align-items: baseline;
-  gap: 16px;
-  border-bottom: 3px solid var(--gold);
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border-color);
 }
 .dgv-wordmark {
-  font-family: 'DM Serif Display', serif;
-  font-size: 32px;
-  letter-spacing: -1px;
-  color: var(--gold);
+  font-weight: 700;
+  font-size: 26px;
+  letter-spacing: -0.5px;
+  color: var(--brand-navy);
 }
 .dgv-tagline {
-  font-size: 12px;
-  color: #aaa;
-  letter-spacing: 3px;
-  text-transform: uppercase;
+  font-size: 13px;
+  color: var(--text-muted);
+  text-align: right;
 }
 
-/* Section headers */
+/* หัวข้อเซกชัน */
 .section-title {
-  font-family: 'DM Serif Display', serif;
-  font-size: 20px;
-  color: var(--ink);
-  border-bottom: 1.5px solid var(--border);
-  padding-bottom: 6px;
-  margin-bottom: 14px;
+  font-weight: 600;
+  font-size: 16px;
+  color: var(--brand-navy) !important;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-top: 24px;
+  margin-bottom: 12px;
 }
 
-/* Metric cards */
+/* การ์ดตัวชี้วัด (ใส่กรอบบางรอบด้าน ไม่มีแถบสีฉูดฉาด สีตัวหนังสือคมชัด) */
 .metric-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-  gap: 10px;
+  gap: 12px;
   margin-bottom: 16px;
 }
 .mcard {
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 12px 14px;
-  position: relative;
-}
-.mcard::before {
-  content: '';
-  position: absolute;
-  top: 0; left: 0; right: 0;
-  height: 3px;
-  background: var(--gold);
-  border-radius: 8px 8px 0 0;
+  background: var(--bg-card) !important;
+  border: 1px solid var(--border-color) !important;
+  border-radius: 6px !important;
+  padding: 16px !important;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.02) !important;
 }
 .mcard-label {
-  font-size: 10px;
-  letter-spacing: 1.5px;
-  text-transform: uppercase;
-  color: var(--muted);
-  margin-bottom: 4px;
+  font-size: 11px !important;
+  font-weight: 500 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.5px !important;
+  color: var(--text-muted) !important;
+  margin-bottom: 6px !important;
 }
 .mcard-value {
-  font-family: 'DM Mono', monospace;
-  font-size: 20px;
-  font-weight: 500;
-  color: var(--ink);
+  font-family: 'JetBrains Mono', monospace !important;
+  font-size: 22px !important;
+  font-weight: 600 !important;
+  color: var(--text-main) !important; /* ป้องกันสีเลือนหาย */
 }
 .mcard-sub {
-  font-size: 11px;
-  color: var(--muted);
-  margin-top: 2px;
+  font-size: 11px !important;
+  color: var(--text-muted) !important;
+  margin-top: 4px !important;
 }
-.mcard.pos .mcard-value { color: var(--green); }
-.mcard.neg .mcard-value { color: var(--red); }
-.mcard.gold .mcard-value { color: var(--gold); }
-.mcard.gold::before { background: var(--gold); }
-.mcard.pos::before  { background: var(--green); }
-.mcard.neg::before  { background: var(--red); }
-.mcard.blue::before { background: var(--blue); }
 
-/* Score dial */
+/* สีพิเศษสำหรับการ์ดที่ต้องการเน้น */
+.mcard.pos .mcard-value { color: var(--color-green) !important; }
+.mcard.neg .mcard-value { color: var(--color-red) !important; }
+.mcard.accent .mcard-value { color: var(--brand-accent) !important; }
+
+/* บล็อกคะแนนหลัก (Score Block) แบบคลีน */
 .score-ring {
+  background: var(--bg-card) !important;
+  border: 1px solid var(--brand-navy) !important; /* ใช้กรอบสีเข้มเด่นชัด */
+  border-radius: 8px;
+  padding: 24px;
+  margin-bottom: 20px;
   display: flex;
   align-items: center;
-  gap: 20px;
-  background: var(--ink);
-  border-radius: 10px;
-  padding: 18px 22px;
-  margin-bottom: 16px;
-  color: #fff;
+  gap: 32px;
 }
 .score-num {
-  font-family: 'DM Serif Display', serif;
-  font-size: 52px;
-  color: var(--gold);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 48px;
+  font-weight: 700;
+  color: var(--brand-navy);
   line-height: 1;
 }
-.score-label { font-size: 11px; color: #aaa; letter-spacing: 2px; text-transform: uppercase; }
-.score-verdict { font-size: 18px; font-weight: 600; color: #fff; margin-top: 4px; }
+.score-label { 
+  font-size: 11px; 
+  color: var(--text-muted); 
+  letter-spacing: 1px; 
+  text-transform: uppercase; 
+}
+.score-verdict { 
+  font-size: 20px; 
+  font-weight: 600; 
+  color: var(--brand-navy); 
+  margin-top: 2px; 
+}
 
-/* Signal rows */
+/* แถวสัญญาณซื้อขาย (Signals) */
 .sig-row {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 7px 0;
-  border-bottom: 1px solid var(--cream);
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border-color);
   font-size: 13px;
 }
-.sig-icon { font-size: 16px; width: 22px; text-align: center; }
-.sig-text { flex: 1; color: var(--ink); }
+.sig-icon { font-size: 15px; width: 20px; }
+.sig-text { flex: 1; color: var(--text-main) !important; font-weight: 500; }
 .sig-badge {
-  font-family: 'DM Mono', monospace;
+  font-family: 'JetBrains Mono', monospace;
   font-size: 11px;
-  padding: 2px 7px;
+  padding: 3px 8px;
   border-radius: 4px;
-  background: var(--cream);
-  color: var(--muted);
+  background: #f3f4f6;
+  color: var(--text-main);
+  border: 1px solid var(--border-color);
 }
 
-/* Chat */
+/* กล่องแชท AI */
 .chat-wrap {
-  max-height: 340px;
+  max-height: 360px;
   overflow-y: auto;
-  padding: 4px 0;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--card);
-  padding: 10px;
-  margin-bottom: 8px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--bg-card);
+  padding: 16px;
+  margin-bottom: 12px;
 }
-.msg-row { display: flex; gap: 8px; margin-bottom: 10px; align-items: flex-start; }
+.msg-row { display: flex; gap: 12px; margin-bottom: 12px; align-items: flex-start; }
 .msg-row.u { flex-direction: row-reverse; }
-.av { width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center;
-      justify-content: center; font-size: 9px; font-weight: 700; flex-shrink: 0; margin-top: 2px; }
-.av.ai { background: var(--ink); color: var(--gold); font-family: 'DM Serif Display', serif; font-size: 12px; }
-.av.usr { background: var(--blue); color: #fff; }
-.bub { max-width: 82%; padding: 9px 13px; border-radius: 14px; font-size: 13px; line-height: 1.6; }
-.bub.ai-b { background: var(--cream); color: var(--ink); border-bottom-left-radius: 3px; }
-.bub.u-b  { background: var(--ink);  color: #fff;       border-bottom-right-radius: 3px; }
+.av { width: 28px; height: 28px; border-radius: 4px; display: flex; align-items: center;
+      justify-content: center; font-size: 10px; font-weight: 700; flex-shrink: 0; }
+.av.ai { background: var(--brand-navy); color: #ffffff; }
+.av.usr { background: #e5e7eb; color: var(--text-main); }
+.bub { max-width: 80%; padding: 10px 14px; border-radius: 6px; font-size: 13px; line-height: 1.6; border: 1px solid var(--border-color); }
+.bub.ai-b { background: #f8fafc; color: var(--text-main); }
+.bub.u-b  { background: var(--bg-primary);  color: var(--text-main); }
 
-/* Income calculator */
+/* เครื่องคำนวณเงินทุน */
 .calc-box {
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 18px 20px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 20px;
 }
 .calc-result {
-  background: var(--ink);
-  color: #fff;
+  background: var(--brand-navy);
+  color: #ffffff !important;
   border-radius: 8px;
-  padding: 14px 18px;
-  margin-top: 12px;
+  padding: 20px;
 }
-.calc-row { display: flex; justify-content: space-between; padding: 5px 0;
+.calc-row { display: flex; justify-content: space-between; padding: 7px 0;
             border-bottom: 1px solid rgba(255,255,255,0.1); font-size: 13px; }
 .calc-row:last-child { border-bottom: none; }
-.calc-row span:last-child { font-family: 'DM Mono', monospace; color: var(--gold-light); font-weight: 500; }
+.calc-row span:last-child { font-family: 'JetBrains Mono', monospace; color: #ffffff !important; font-weight: 600; }
 
-/* Progress bar */
-.pb-bg { background: var(--cream); border-radius: 6px; height: 10px; width: 100%; }
-.pb-fill { height: 10px; border-radius: 6px; transition: width .5s ease; }
+/* แถบเปอร์เซ็นต์ Win Rate */
+.pb-bg { background: #e5e7eb; border-radius: 4px; height: 6px; width: 100%; }
+.pb-fill { height: 6px; border-radius: 4px; transition: width .5s ease; }
 
-/* Rank table */
-.rank-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-.rank-table th { background: var(--ink); color: var(--gold); padding: 9px 12px;
-                  text-align: left; font-family: 'DM Mono', monospace; font-weight: 500;
-                  font-size: 11px; letter-spacing: 1px; }
-.rank-table td { padding: 9px 12px; border-bottom: 1px solid var(--border); vertical-align: middle; }
-.rank-table tr:hover td { background: var(--cream); }
-.rank-num { font-family: 'DM Serif Display', serif; font-size: 20px; color: var(--gold); }
-.rank-ticker { font-family: 'DM Mono', monospace; font-weight: 500; font-size: 14px; }
+/* ตารางจัดอันดับ */
+.rank-table { width: 100%; border-collapse: collapse; font-size: 13px; background: var(--bg-card); border: 1px solid var(--border-color); }
+.rank-table th { background: #f8fafc; color: var(--brand-navy); padding: 12px;
+                  text-align: left; font-family: 'Inter', sans-serif; font-weight: 600;
+                  font-size: 11px; letter-spacing: 0.5px; border-bottom: 1px solid var(--border-color); }
+.rank-table td { padding: 12px; border-bottom: 1px solid var(--border-color); vertical-align: middle; color: var(--text-main); }
+.rank-table tr:hover td { background: #f8fafc; }
+.rank-num { font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 600; color: var(--brand-navy); }
+.rank-ticker { font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: 13px; }
 
-/* Tabs */
+/* ปรับแต่งปุ่มและอินพุตของ Streamlit ให้เข้ากับธีม */
+.stButton>button {
+    background-color: var(--brand-navy) !important;
+    color: white !important;
+    border-radius: 4px !important;
+    border: none !important;
+}
 .stTabs [data-baseweb="tab-list"] {
-  gap: 0;
-  border-bottom: 2px solid var(--border);
+  gap: 4px;
+  border-bottom: 1px solid var(--border-color);
 }
 .stTabs [data-baseweb="tab"] {
-  font-family: 'DM Sans', sans-serif !important;
   font-size: 13px !important;
   font-weight: 500 !important;
-  padding: 10px 20px !important;
-  border-radius: 0 !important;
+  padding: 8px 16px !important;
+  color: var(--text-muted) !important;
+  background-color: transparent !important;
 }
 .stTabs [aria-selected="true"] {
-  background: var(--ink) !important;
-  color: var(--gold) !important;
+  color: var(--brand-navy) !important;
+  border-bottom: 2px solid var(--brand-navy) !important;
+  font-weight: 600 !important;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -248,10 +254,10 @@ html, body, [class*="css"] {
 # ─────────────────────────────────────────────────────────────
 st.markdown("""
 <div class="dgv-masthead">
-  <div class="dgv-wordmark">DGV</div>
-  <div>
-    <div class="dgv-tagline">Mathematical Investment Analyzer</div>
-    <div style="font-size:12px;color:#ccc;margin-top:3px">วิเคราะห์การลงทุนด้วยคณิตศาสตร์ · ย้อนหลัง 10 ปี · ไม่ผสมข่าว</div>
+  <div class="dgv-wordmark">DGV ANALYTICS</div>
+  <div class="dgv-tagline">
+    <strong>MATHEMATICAL INVESTMENT ANALYZER</strong><br>
+    <span style="font-size:11px;">ระบบวิเคราะห์สถิติการลงทุนย้อนหลัง 10 ปี ปราศจากอคติเชิงข่าว</span>
   </div>
 </div>
 """, unsafe_allow_html=True)
@@ -262,14 +268,14 @@ st.markdown("""
 for k, v in [
     ("history", {}),
     ("chat", [{"role": "assistant", "content":
-               "สวัสดีครับ! 📊 ผมวิเคราะห์จากคณิตศาสตร์ล้วน ๆ\nถามได้เลย: Sharpe, Drawdown, ผลตอบแทน, ความเสี่ยง, ขนาด Position..."}]),
+               "สวัสดีครับ ผมคือระบบ AI วิเคราะห์ข้อมูลเชิงปริมาณ (Quantitative Assistant) โปรดส่งคำถามเกี่ยวกับสถิติ ตัวเลข หรืออัตราความเสี่ยงที่คุณต้องการทราบได้เลยครับ"}]),
     ("last_refresh", 0),
 ]:
     if k not in st.session_state:
         st.session_state[k] = v
 
 # ─────────────────────────────────────────────────────────────
-#  WATCHLIST (อันดับหุ้น default)
+#  WATCHLIST
 # ─────────────────────────────────────────────────────────────
 WATCHLIST = {
     "GC=F":    "ทองคำ (Gold Futures)",
@@ -308,7 +314,6 @@ def calc_bollinger(series, window=20, std=2):
     return ma, ma + std*std_v, ma - std*std_v
 
 def sharpe_ratio(returns, rf=0.05):
-    """Annualized Sharpe (rf = 5% ต่อปี)"""
     rf_daily = rf / 252
     excess = returns - rf_daily
     if excess.std() == 0:
@@ -316,7 +321,6 @@ def sharpe_ratio(returns, rf=0.05):
     return round((excess.mean() / excess.std()) * np.sqrt(252), 3)
 
 def sortino_ratio(returns, rf=0.05):
-    """Sortino — ใช้เฉพาะ downside std"""
     rf_daily = rf / 252
     excess = returns - rf_daily
     downside = returns[returns < 0].std()
@@ -325,18 +329,16 @@ def sortino_ratio(returns, rf=0.05):
     return round((excess.mean() / downside) * np.sqrt(252), 3)
 
 def max_drawdown(prices):
-    """Max Drawdown เป็น %"""
     roll_max = prices.cummax()
     drawdown = (prices - roll_max) / (roll_max + 1e-9)
     return round(drawdown.min() * 100, 2)
 
 def calmar_ratio(returns, prices):
-    """Calmar = CAGR / |MaxDD|"""
-    cagr = ((prices.iloc[-1] / prices.iloc[0]) ** (252 / len(prices)) - 1) * 100
+    cagr_v = ((prices.iloc[-1] / prices.iloc[0]) ** (252 / len(prices)) - 1) * 100
     mdd  = abs(max_drawdown(prices))
     if mdd == 0:
         return 0.0
-    return round(cagr / mdd, 3)
+    return round(cagr_v / mdd, 3)
 
 def cagr(prices):
     years = len(prices) / 252
@@ -345,34 +347,27 @@ def cagr(prices):
     return round(((prices.iloc[-1] / prices.iloc[0]) ** (1 / years) - 1) * 100, 2)
 
 def zscore(series, window=60):
-    """Z-score เพื่อระบุ overbought/oversold"""
     roll_mean = series.rolling(window).mean()
     roll_std  = series.rolling(window).std()
     return (series - roll_mean) / (roll_std + 1e-9)
 
 def linear_trend(prices):
-    """Linear regression slope (annualized %) — numpy only"""
     x = np.arange(len(prices), dtype=float)
     y = prices.values.astype(float)
-    # polyfit degree 1
     coeffs = np.polyfit(x, y, 1)
     slope  = coeffs[0]
-    # R²
     y_hat  = np.polyval(coeffs, x)
     ss_res = np.sum((y - y_hat) ** 2)
     ss_tot = np.sum((y - y.mean()) ** 2)
     r2     = 1 - ss_res / (ss_tot + 1e-9)
-    # p-value approximation via t-test
     n      = len(x)
     se     = np.sqrt(ss_res / max(n - 2, 1) / (np.sum((x - x.mean())**2) + 1e-9))
     t_stat = slope / (se + 1e-9)
-    # two-tailed p via normal approx (good enough for n>30)
     p_val  = 2 * (1 - _norm_cdf(abs(t_stat)))
     annual_slope = slope * 252 / (prices.mean() + 1e-9) * 100
     return round(annual_slope, 2), round(r2, 3), round(float(p_val), 4)
 
 def _norm_cdf(x):
-    """Standard normal CDF approximation (Abramowitz & Stegun)"""
     t = 1 / (1 + 0.2316419 * abs(x))
     poly = t * (0.319381530 + t * (-0.356563782 + t * (1.781477937
            + t * (-1.821255978 + t * 1.330274429))))
@@ -380,7 +375,6 @@ def _norm_cdf(x):
     return cdf if x >= 0 else 1 - cdf
 
 def momentum_score(prices):
-    """Weighted momentum: 1M,3M,6M,12M"""
     weights = {22: 0.4, 66: 0.3, 126: 0.2, 252: 0.1}
     score = 0.0
     cur = prices.iloc[-1]
@@ -391,28 +385,20 @@ def momentum_score(prices):
     return round(score, 2)
 
 def volatility_regime(returns, window=30):
-    """Short vs Long vol เพื่อระบุ regime"""
     vol_s = returns.tail(window).std() * np.sqrt(252) * 100
     vol_l = returns.std() * np.sqrt(252) * 100
     ratio = vol_s / (vol_l + 1e-9)
     return round(vol_s, 2), round(vol_l, 2), round(ratio, 2)
 
 def value_at_risk(returns, confidence=0.95):
-    """Historical VaR"""
     return round(np.percentile(returns.dropna(), (1 - confidence) * 100) * 100, 3)
 
 def expected_shortfall(returns, confidence=0.95):
-    """CVaR/ES"""
     var = np.percentile(returns.dropna(), (1 - confidence) * 100)
     es  = returns[returns <= var].mean()
     return round(es * 100, 3)
 
 def winrate_backtest(df, strategy="ma_cross"):
-    """
-    Backtest Win Rate:
-    Signal: MA50 cross + RSI filter
-    Win: +1.5% ใน 5 วัน | Lose: -1.5%
-    """
     d = df.copy()
     d["MA20"] = d["Close"].rolling(20).mean()
     d["MA50"] = d["Close"].rolling(50).mean()
@@ -439,7 +425,6 @@ def winrate_backtest(df, strategy="ma_cross"):
     return {"wins": wins, "losses": losses, "total": total, "winrate": wr, "entries": entries}
 
 def full_math_analysis(df, symbol):
-    """คืน dict วิเคราะห์ทางคณิตศาสตร์ครบถ้วน"""
     d = df.copy()
     prices  = d["Close"].dropna()
     returns = prices.pct_change().dropna()
@@ -455,7 +440,6 @@ def full_math_analysis(df, symbol):
     es  = expected_shortfall(returns)
     trend_slope, r2, pval = linear_trend(prices)
 
-    # MA
     d["MA20"]  = prices.rolling(20).mean()
     d["MA50"]  = prices.rolling(50).mean()
     d["MA200"] = prices.rolling(200).mean()
@@ -479,86 +463,77 @@ def full_math_analysis(df, symbol):
     bb_up  = d["BB_up"].iloc[-1]
     bb_dn  = d["BB_dn"].iloc[-1]
 
-    # Returns
     ret_1m  = (cur / prices.iloc[-22]  - 1) * 100 if len(prices) >= 22  else 0
     ret_3m  = (cur / prices.iloc[-66]  - 1) * 100 if len(prices) >= 66  else 0
     ret_6m  = (cur / prices.iloc[-126] - 1) * 100 if len(prices) >= 126 else 0
     ret_1y  = (cur / prices.iloc[-252] - 1) * 100 if len(prices) >= 252 else 0
     ret_3y  = (cur / prices.iloc[-756] - 1) * 100 if len(prices) >= 756 else 0
 
-    # ── Composite Score (0-100) ─────────────────────────────
     score = 0
     signals = []
 
-    # Sharpe
     if sh >= 1.5:
         score += 20
-        signals.append(("✅", f"Sharpe Ratio {sh:.2f}", "ดีเยี่ยม (≥1.5)", "pos"))
+        signals.append(("●", f"Sharpe Ratio {sh:.2f}", "ดีเยี่ยม (≥1.5)", "pos"))
     elif sh >= 0.8:
         score += 12
-        signals.append(("⚠️", f"Sharpe Ratio {sh:.2f}", "พอใช้ (0.8–1.5)", "neu"))
+        signals.append(("●", f"Sharpe Ratio {sh:.2f}", "พอใช้ (0.8–1.5)", "neu"))
     else:
-        signals.append(("❌", f"Sharpe Ratio {sh:.2f}", "ต่ำ (<0.8)", "neg"))
+        signals.append(("●", f"Sharpe Ratio {sh:.2f}", "ต่ำ (<0.8)", "neg"))
 
-    # Sortino
     if so >= 2.0:
         score += 15
-        signals.append(("✅", f"Sortino Ratio {so:.2f}", "Downside risk ต่ำ", "pos"))
+        signals.append(("●", f"Sortino Ratio {so:.2f}", "Downside risk ต่ำ", "pos"))
     elif so >= 1.0:
         score += 8
-        signals.append(("⚠️", f"Sortino Ratio {so:.2f}", "ปานกลาง", "neu"))
+        signals.append(("●", f"Sortino Ratio {so:.2f}", "ปานกลาง", "neu"))
     else:
-        signals.append(("❌", f"Sortino Ratio {so:.2f}", "ความเสี่ยงขาลงสูง", "neg"))
+        signals.append(("●", f"Sortino Ratio {so:.2f}", "ความเสี่ยงขาลงสูง", "neg"))
 
-    # MDD
     if mdd > -20:
         score += 15
-        signals.append(("✅", f"Max Drawdown {mdd:.1f}%", "ทนทานต่อวิกฤต", "pos"))
+        signals.append(("●", f"Max Drawdown {mdd:.1f}%", "ทนทานต่อวิกฤต", "pos"))
     elif mdd > -40:
         score += 8
-        signals.append(("⚠️", f"Max Drawdown {mdd:.1f}%", "ปานกลาง", "neu"))
+        signals.append(("●", f"Max Drawdown {mdd:.1f}%", "ปานกลาง", "neu"))
     else:
-        signals.append(("❌", f"Max Drawdown {mdd:.1f}%", "ความเสี่ยงสูงมาก", "neg"))
+        signals.append(("●", f"Max Drawdown {mdd:.1f}%", "ความเสี่ยงสูงมาก", "neg"))
 
-    # CAGR
     if ag >= 15:
         score += 15
-        signals.append(("✅", f"CAGR {ag:.1f}%/ปี", "ผลตอบแทนดีเยี่ยม", "pos"))
+        signals.append(("●", f"CAGR {ag:.1f}%/ปี", "ผลตอบแทนดีเยี่ยม", "pos"))
     elif ag >= 7:
         score += 8
-        signals.append(("⚠️", f"CAGR {ag:.1f}%/ปี", "ดีกว่าพันธบัตร", "neu"))
+        signals.append(("●", f"CAGR {ag:.1f}%/ปี", "ดีกว่าพันธบัตร", "neu"))
     else:
-        signals.append(("❌", f"CAGR {ag:.1f}%/ปี", "ต่ำกว่าเงินเฟ้อ", "neg"))
+        signals.append(("●", f"CAGR {ag:.1f}%/ปี", "ต่ำกว่าเงินเฟ้อ", "neg"))
 
-    # Momentum
     if mom >= 10:
         score += 10
-        signals.append(("✅", f"Momentum Score {mom:.1f}%", "แรงโมเมนตัมสูง", "pos"))
+        signals.append(("●", f"Momentum Score {mom:.1f}%", "แรงโมเมนตัมสูง", "pos"))
     elif mom >= 0:
         score += 5
-        signals.append(("⚠️", f"Momentum Score {mom:.1f}%", "โมเมนตัมอ่อน", "neu"))
+        signals.append(("●", f"Momentum Score {mom:.1f}%", "โมเมนตัมอ่อน", "neu"))
     else:
-        signals.append(("❌", f"Momentum Score {mom:.1f}%", "โมเมนตัมติดลบ", "neg"))
+        signals.append(("●", f"Momentum Score {mom:.1f}%", "โมเมนตัมติดลบ", "neg"))
 
-    # MA alignment
     if ma200v and cur > ma200v and cur > ma50 > ma20:
         score += 15
-        signals.append(("✅", "MA Alignment", "Bullish (Price>MA200>MA50>MA20)", "pos"))
+        signals.append(("●", "MA Alignment", "Bullish (Price>MA200>MA50>MA20)", "pos"))
     elif cur > ma50:
         score += 7
-        signals.append(("⚠️", "MA Alignment", "Partial Bullish", "neu"))
+        signals.append(("●", "MA Alignment", "Partial Bullish", "neu"))
     else:
-        signals.append(("❌", "MA Alignment", "ราคาต่ำกว่า MA50", "neg"))
+        signals.append(("●", "MA Alignment", "ราคาต่ำกว่า MA50", "neg"))
 
-    # Z-score
     if -1.5 < z_v < 1.5:
         score += 10
-        signals.append(("✅", f"Z-Score {z_v:.2f}", "ราคาไม่ Extreme", "pos"))
+        signals.append(("●", f"Z-Score {z_v:.2f}", "ราคาไม่ Extreme", "pos"))
     elif z_v >= 1.5:
-        signals.append(("⚠️", f"Z-Score {z_v:.2f}", "Overbought ระวัง", "neg"))
+        signals.append(("●", f"Z-Score {z_v:.2f}", "Overbought ระวัง", "neg"))
     else:
         score += 5
-        signals.append(("⚠️", f"Z-Score {z_v:.2f}", "Oversold โอกาสเข้า", "pos"))
+        signals.append(("●", f"Z-Score {z_v:.2f}", "Oversold โอกาสเข้า", "pos"))
 
     verdict = ("Strong Buy" if score >= 75 else
                "Buy" if score >= 60 else
@@ -582,17 +557,17 @@ def full_math_analysis(df, symbol):
 
 def score_color(score):
     if score >= 75: return "pos"
-    if score >= 50: return "gold"
+    if score >= 50: return "accent"
     return "neg"
 
 # ─────────────────────────────────────────────────────────────
 #  FETCH DATA
 # ─────────────────────────────────────────────────────────────
 @st.cache_data(ttl=30)
-def fetch_data(symbol, period="10y"):
+def fetch_data(symbol):
     try:
         t = yf.Ticker(symbol)
-        d = t.history(period=period)
+        d = t.history(period="10y")
         return d if not d.empty else None
     except:
         return None
@@ -625,9 +600,9 @@ def fetch_watchlist_scores():
 c1, c2, c3 = st.columns([2, 1, 1])
 with c1:
     symbol = st.text_input(
-        "🔍 กรอกสัญลักษณ์",
+        "🔍 กรอกสัญลักษณ์สินทรัพย์",
         "GC=F",
-        placeholder="เช่น AAPL, BTC-USD, GC=F, EURUSD=X",
+        placeholder="เช่น AAPL, BTC-USD, GC=F",
         label_visibility="collapsed",
     ).upper().replace("/", "").strip()
 
@@ -635,7 +610,7 @@ data = fetch_data(symbol)
 is_fx = "=X" in symbol or symbol in ["EURUSD=X","GBPUSD=X","USDJPY=X"]
 
 if data is None or len(data) < 100:
-    st.error("⚠️ ไม่พบข้อมูล หรือข้อมูลไม่เพียงพอ กรุณาลองใหม่")
+    st.error("⚠️ ไม่พบข้อมูล หรือสัญลักษณ์ไม่ถูกต้อง กรุณาลองตรวจสอบอีกครั้ง")
     st.stop()
 
 cur_price = data["Close"].iloc[-1]
@@ -645,31 +620,30 @@ price_chg_pct = price_chg / prev_price * 100
 
 fmt_p = lambda v: f"{v:,.4f}" if is_fx else f"${v:,.2f}"
 
-# ── Price header
 with c2:
-    st.metric(f"{symbol}", fmt_p(cur_price),
+    st.metric(f"Ticker: {symbol}", fmt_p(cur_price),
               delta=f"{price_chg:+.4f} ({price_chg_pct:+.2f}%)" if is_fx
                     else f"${price_chg:+.2f} ({price_chg_pct:+.2f}%)")
 with c3:
     data_years = len(data) / 252
-    st.caption(f"📅 ข้อมูล {data_years:.1f} ปี | {len(data):,} วัน\n🔄 Refresh ทุก 30 วินาที")
+    st.caption(f"📅 ข้อมูลประวัติศาสตร์: {data_years:.1f} ปี<br>🔄 อัปเดตข้อมูลอัตโนมัติ", unsafe_allow_html=True)
 
 # ─────────────────────────────────────────────────────────────
-#  COMPUTE
+#  COMPUTE ANALYSIS
 # ─────────────────────────────────────────────────────────────
-with st.spinner("กำลังวิเคราะห์คณิตศาสตร์..."):
+with st.spinner("กำลังคำนวณแบบจำลองทางคณิตศาสตร์..."):
     m   = full_math_analysis(data, symbol)
     bt  = winrate_backtest(data)
 
 # ─────────────────────────────────────────────────────────────
-#  TABS
+#  TABS NAVIGATION
 # ─────────────────────────────────────────────────────────────
 tab_overview, tab_chart, tab_rank, tab_income, tab_chat = st.tabs([
     "📐 ภาพรวมคณิตศาสตร์",
-    "📈 กราฟวิเคราะห์",
-    "🏆 อันดับสินทรัพย์",
-    "💰 คำนวณรายได้",
-    "🤖 AI Assistant",
+    "📈 กราฟวิเคราะห์เทคนิคอล",
+    "🏆 อันดับสินทรัพย์ทั้งหมด",
+    "💰 คำนวณความเสี่ยงและขนาดพอร์ต",
+    "🤖 ควอนต์ AI Assistant",
 ])
 
 # ══════════════════════════════════════════════════════════════
@@ -679,542 +653,306 @@ with tab_overview:
     col_left, col_right = st.columns([3, 2])
 
     with col_left:
-        # Score ring
+        # Score block ดีไซน์คลีนสไตล์มินิมอล
         sc = m["score"]
-        cls = score_color(sc)
-        verdict_emoji = {"Strong Buy":"🚀","Buy":"📈","Hold/Watch":"⏳","Underweight":"⚠️","Avoid":"🚫"}
         st.markdown(f"""
         <div class="score-ring">
           <div>
-            <div class="score-label">COMPOSITE SCORE</div>
+            <div class="score-label">Composite Quantitative Score</div>
             <div class="score-num">{sc}</div>
-            <div style="font-size:10px;color:#888">/ 100</div>
+            <div style="font-size:11px;color:var(--text-muted)">คะแนนเต็ม 100</div>
           </div>
           <div>
-            <div class="score-label">คำแนะนำ</div>
-            <div class="score-verdict">{verdict_emoji.get(m['verdict'],'')} {m['verdict']}</div>
-            <div style="font-size:11px;color:#aaa;margin-top:6px">Win Rate Backtest: {bt['winrate']}%
-            ({bt['wins']}W/{bt['losses']}L)</div>
+            <div class="score-label">คำแนะนำเชิงระบบ</div>
+            <div class="score-verdict">{m['verdict']}</div>
+            <div style="font-size:12px;color:var(--text-muted);margin-top:6px">กลยุทธ์ MA Cross Win Rate: <strong>{bt['winrate']}%</strong> ({bt['wins']}W / {bt['losses']}L)</div>
           </div>
         </div>
         """, unsafe_allow_html=True)
 
-        # Win rate bar
+        # แถบ Win rate แบบเส้นคลีนตา
         wr = bt["winrate"]
-        wr_col = "#2d7a4f" if wr>=60 else "#c8a84b" if wr>=45 else "#c0392b"
+        wr_col = "var(--brand-navy)" if wr>=50 else "var(--text-muted)"
         st.markdown(f"""
-        <div style="margin-bottom:8px">
-          <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px">
-            <span>Win Rate (MA Cross Strategy · ย้อนหลัง 10 ปี)</span>
-            <span style="font-family:'DM Mono',monospace;font-weight:600;color:{wr_col}">{wr}%</span>
+        <div style="margin-bottom:24px">
+          <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:6px">
+            <span>ประสิทธิภาพกลยุทธ์ตามสถิติย้อนหลัง (Win Rate)</span>
+            <span style="font-family:'JetBrains Mono',monospace;font-weight:600;color:{wr_col}">{wr}%</span>
           </div>
           <div class="pb-bg"><div class="pb-fill" style="width:{min(wr,100)}%;background:{wr_col}"></div></div>
-          <div style="font-size:11px;color:var(--muted);margin-top:3px">{bt['total']} สัญญาณ | {bt['wins']} ชนะ | {bt['losses']} แพ้</div>
         </div>
         """, unsafe_allow_html=True)
 
-        st.markdown('<div class="section-title">📋 ผลการวิเคราะห์ตัวชี้วัด</div>', unsafe_allow_html=True)
-        for icon, label, detail, _ in m["signals"]:
+        st.markdown('<div class="section-title">📋 สรุปสัญญาณเงื่อนไขเชิงคณิตศาสตร์</div>', unsafe_allow_html=True)
+        for icon, label, detail, status in m["signals"]:
+            color_dot = "var(--color-green)" if status == "pos" else "var(--color-red)" if status == "neg" else "var(--text-muted)"
             st.markdown(f"""
             <div class="sig-row">
-              <div class="sig-icon">{icon}</div>
-              <div class="sig-text"><strong>{label}</strong></div>
+              <div class="sig-icon" style="color:{color_dot}; font-weight:bold;">{icon}</div>
+              <div class="sig-text">{label}</div>
               <div class="sig-badge">{detail}</div>
             </div>
             """, unsafe_allow_html=True)
 
     with col_right:
-        st.markdown('<div class="section-title">📊 ตัวเลขสำคัญ</div>', unsafe_allow_html=True)
+        st.markdown('<div class="section-title">📊 ดัชนีชี้วัดสำคัญ (Key Matrix)</div>', unsafe_allow_html=True)
 
         def mcard(label, value, sub="", cls=""):
             st.markdown(f"""
-            <div class="mcard {cls}" style="margin-bottom:10px">
+            <div class="mcard {cls}">
               <div class="mcard-label">{label}</div>
               <div class="mcard-value">{value}</div>
               {'<div class="mcard-sub">'+sub+'</div>' if sub else ''}
             </div>""", unsafe_allow_html=True)
 
-        mcard("CAGR (ต่อปี)", f"{m['cagr']:+.1f}%",
-              f"ย้อนหลัง {len(data)/252:.0f} ปี",
-              "pos" if m['cagr']>0 else "neg")
-        mcard("SHARPE RATIO", f"{m['sharpe']:.2f}",
-              "ผลตอบแทนต่อหน่วยความเสี่ยง",
-              "pos" if m['sharpe']>=1 else "neg" if m['sharpe']<0 else "")
-        mcard("SORTINO RATIO", f"{m['sortino']:.2f}",
-              "ความเสี่ยงขาลงเท่านั้น",
-              "pos" if m['sortino']>=1 else "neg" if m['sortino']<0 else "")
-        mcard("MAX DRAWDOWN", f"{m['mdd']:.1f}%",
-              "จุดต่ำสุดจาก Peak",
-              "neg" if m['mdd']<-30 else "")
-        mcard("CALMAR RATIO", f"{m['calmar']:.2f}",
-              "CAGR / |MaxDD|",
-              "pos" if m['calmar']>1 else "")
-        mcard("VALUE AT RISK (95%)", f"{m['var95']:.2f}%",
-              "ขาดทุนสูงสุด/วัน (95% CI)", "neg")
-        mcard("VOLATILITY (30D)", f"{m['vol_s']:.1f}%",
-              f"Long-term: {m['vol_l']:.1f}% · Ratio: {m['vol_r']:.2f}", "")
-        mcard("LINEAR TREND", f"{m['trend_slope']:+.1f}%/ปี",
-              f"R²={m['r2']:.2f} · p={m['pval']:.3f}",
-              "pos" if m['trend_slope']>0 else "neg")
-        mcard("MOMENTUM SCORE", f"{m['momentum']:+.1f}%",
-              "Weighted 1M/3M/6M/12M",
-              "pos" if m['momentum']>0 else "neg")
-        mcard("Z-SCORE (60D)", f"{m['zscore']:+.2f}",
-              ">+2: Overbought | <-2: Oversold",
-              "neg" if abs(m['zscore'])>2 else "pos")
+        st.markdown('<div class="metric-grid">', unsafe_allow_html=True)
+        mcard("CAGR (เติบโตทบต้นต่อปี)", f"{m['cagr']:+.1f}%", f"เฉลี่ยรายปี", "pos" if m['cagr']>0 else "neg")
+        mcard("Sharpe Ratio", f"{m['sharpe']:.2f}", "เทียบความผันผวน")
+        mcard("Sortino Ratio", f"{m['sortino']:.2f}", "ความเสี่ยงขาลง")
+        mcard("Max Drawdown", f"{m['mdd']:.1f}%", "ความเสี่ยงจุดลดต่ำสุด", "neg")
+        mcard("Calmar Ratio", f"{m['calmar']:.2f}", "CAGR / MaxDD")
+        mcard("Value at Risk (95%)", f"{m['var95']:.2f}%", "ความเสียหายสูงสุดรายวัน")
+        mcard("Linear Trend Slope", f"{m['trend_slope']:+.1f}%", f"R²={m['r2']:.2f}")
+        mcard("Momentum Score", f"{m['momentum']:+.1f}%", "คะแนนโมเมนตัม")
+        mcard("Z-Score (60 วัน)", f"{m['zscore']:.2f}", "ดัชนีวัดความ Extreme")
+        st.markdown('</div>', unsafe_allow_html=True)
 
-        # Returns table
-        st.markdown('<div class="section-title" style="margin-top:16px">📅 ผลตอบแทนย้อนหลัง</div>',
-                    unsafe_allow_html=True)
-        for label, val in [("1 เดือน", m["ret_1m"]), ("3 เดือน", m["ret_3m"]),
-                            ("6 เดือน", m["ret_6m"]), ("1 ปี", m["ret_1y"]),
-                            ("3 ปี",    m["ret_3y"])]:
-            col = "#2d7a4f" if val>=0 else "#c0392b"
+        st.markdown('<div class="section-title">📅 อัตราผลตอบแทนแบ่งตามช่วงเวลา</div>', unsafe_allow_html=True)
+        for label, val in [("1 เดือนที่ผ่านมา", m["ret_1m"]), ("3 เดือนที่ผ่านมา", m["ret_3m"]),
+                            ("6 เดือนที่ผ่านมา", m["ret_6m"]), ("1 ปีที่ผ่านมา", m["ret_1y"]),
+                            ("3 ปีที่ผ่านมา (สะสม)", m["ret_3y"])]:
+            col = "var(--color-green)" if val>=0 else "var(--color-red)"
             st.markdown(f"""
-            <div style="display:flex;justify-content:space-between;padding:5px 0;
-                        border-bottom:1px solid var(--border);font-size:13px">
-              <span>{label}</span>
-              <span style="font-family:'DM Mono',monospace;font-weight:600;color:{col}">{val:+.1f}%</span>
+            <div style="display:flex;justify-content:space-between;padding:8px 0;
+                        border-bottom:1px solid var(--border-color);font-size:13px">
+              <span style="color: var(--text-muted);">{label}</span>
+              <span style="font-family:'JetBrains Mono',monospace;font-weight:600;color:{col}">{val:+.1f}%</span>
             </div>""", unsafe_allow_html=True)
 
 # ══════════════════════════════════════════════════════════════
-#  TAB 2 — CHART (Realtime-style with 10Y data)
+#  TAB 2 — CHART (Clean Dark-Navy Graphics)
 # ══════════════════════════════════════════════════════════════
 with tab_chart:
     col_ctrl, _ = st.columns([2, 3])
     with col_ctrl:
-        tf = st.select_slider("ช่วงเวลา (ปี)",
+        tf = st.select_slider("ปรับช่วงเวลากราฟ (ปี)",
                                options=[1, 2, 3, 5, 10],
                                value=10 if len(data)>=2500 else 5,
-                               format_func=lambda x: f"{x} ปี")
+                               format_func=lambda x: f"ย้อนหลัง {x} ปี")
     n = min(int(tf * 252), len(data))
     df_c = m["df"].tail(n).copy()
 
-    chart_type = st.radio("ประเภทกราฟ", ["Candlestick","Line + BB","Z-Score","Drawdown Curve"],
-                           horizontal=True)
+    chart_type = st.radio("เลือกมุมมองกราฟเทคนิคอล", ["Candlestick Pro", "Line + Bollinger Bands", "Z-Score Analysis", "Drawdown Curve"], horizontal=True)
 
-    if chart_type == "Candlestick":
+    # ปรับโทนสีกราฟเป็นน้ำเงิน Slate และโทนทางการแพทย์/การเงิน
+    if chart_type == "Candlestick Pro":
         fig = make_subplots(rows=3, cols=1, shared_xaxes=True,
                             row_heights=[0.55, 0.22, 0.23],
-                            vertical_spacing=0.025,
-                            subplot_titles=("Price · MA · Bollinger Bands",
-                                            "RSI (14) — Relative Strength Index",
-                                            "MACD (12,26,9) — Momentum"))
+                            vertical_spacing=0.03,
+                            subplot_titles=("Price Action & Bollinger Bands", "Relative Strength Index (RSI 14)", "MACD (12, 26, 9)"))
         fig.add_trace(go.Candlestick(
             x=df_c.index, open=df_c["Open"], high=df_c["High"],
-            low=df_c["Low"], close=df_c["Close"], name="Price",
-            increasing_line_color="#2d7a4f", decreasing_line_color="#c0392b"
+            low=df_c["Low"], close=df_c["Close"], name="ราคา",
+            increasing_line_color="#16a34a", decreasing_line_color="#dc2626"
         ), row=1, col=1)
-        for col_ma, width, dash, name_ma in [
-            ("MA20", 1.2, "dot", "MA20"),
-            ("MA50", 1.5, "solid", "MA50"),
-            ("MA200", 1.8, "dash", "MA200"),
+        
+        for col_ma, width, dash, name_ma, color_ma in [
+            ("MA20", 1.0, "dot", "MA20", "#2563eb"),
+            ("MA50", 1.2, "solid", "MA50", "#7c3aed"),
+            ("MA200", 1.5, "dash", "MA200", "#ea580c"),
         ]:
             if col_ma in df_c.columns and not df_c[col_ma].isna().all():
-                colors = {"MA20":"#f39c12","MA50":"#9b59b6","MA200":"#e74c3c"}
                 fig.add_trace(go.Scatter(
                     x=df_c.index, y=df_c[col_ma], mode="lines",
-                    name=name_ma, line=dict(color=colors[col_ma], width=width, dash=dash)
+                    name=name_ma, line=dict(color=color_ma, width=width, dash=dash)
                 ), row=1, col=1)
-        # Bollinger
-        fig.add_trace(go.Scatter(
-            x=df_c.index, y=df_c["BB_up"], name="BB Upper",
-            line=dict(color="rgba(30,90,150,0.4)", width=1),
-            fill=None, showlegend=False
-        ), row=1, col=1)
-        fig.add_trace(go.Scatter(
-            x=df_c.index, y=df_c["BB_dn"], name="BB Band",
-            fill='tonexty', fillcolor='rgba(30,90,150,0.07)',
-            line=dict(color="rgba(30,90,150,0.4)", width=1), showlegend=False
-        ), row=1, col=1)
-        # RSI
-        fig.add_trace(go.Scatter(
-            x=df_c.index, y=df_c["RSI"], mode="lines",
-            name="RSI", line=dict(color="#7b1fa2", width=1.5)
-        ), row=2, col=1)
-        fig.add_hline(y=70, line_color="#c0392b", line_dash="dash", line_width=1, row=2, col=1)
-        fig.add_hline(y=30, line_color="#2d7a4f", line_dash="dash", line_width=1, row=2, col=1)
-        fig.add_hline(y=50, line_color="#aaa", line_dash="dot", line_width=0.8, row=2, col=1)
-        # MACD
-        hist_c = ["#2d7a4f" if v >= 0 else "#c0392b" for v in df_c["MACDhist"]]
-        fig.add_trace(go.Bar(
-            x=df_c.index, y=df_c["MACDhist"], name="Histogram",
-            marker_color=hist_c, opacity=0.65
-        ), row=3, col=1)
-        fig.add_trace(go.Scatter(
-            x=df_c.index, y=df_c["MACD"], mode="lines",
-            name="MACD", line=dict(color="#1a3a5c", width=1.4)
-        ), row=3, col=1)
-        fig.add_trace(go.Scatter(
-            x=df_c.index, y=df_c["MACDsig"], mode="lines",
-            name="Signal", line=dict(color="#c8a84b", width=1.4)
-        ), row=3, col=1)
 
-    elif chart_type == "Line + BB":
-        fig = make_subplots(rows=2, cols=1, shared_xaxes=True,
-                            row_heights=[0.7, 0.3], vertical_spacing=0.03,
-                            subplot_titles=("Price + Bollinger Bands", "Z-Score (60D)"))
-        fig.add_trace(go.Scatter(
-            x=df_c.index, y=df_c["Close"], mode="lines",
-            name="ราคา", line=dict(color="#1a3a5c", width=2)
-        ), row=1, col=1)
-        fig.add_trace(go.Scatter(
-            x=df_c.index, y=df_c["BB_up"], name="BB+2σ",
-            line=dict(color="#c8a84b", width=1, dash="dash"), fill=None
-        ), row=1, col=1)
-        fig.add_trace(go.Scatter(
-            x=df_c.index, y=df_c["BB_dn"], name="BB-2σ",
-            fill='tonexty', fillcolor='rgba(200,168,75,0.08)',
-            line=dict(color="#c8a84b", width=1, dash="dash")
-        ), row=1, col=1)
-        fig.add_trace(go.Scatter(
-            x=df_c.index, y=df_c["BB_mid"], name="BB Mid",
-            line=dict(color="#aaa", width=1, dash="dot")
-        ), row=1, col=1)
-        # Z-Score
+        fig.add_trace(go.Scatter(x=df_c.index, y=df_c["BB_up"], name="BB Upper", line=dict(color="rgba(15,23,42,0.2)", width=1), showlegend=False), row=1, col=1)
+        fig.add_trace(go.Scatter(x=df_c.index, y=df_c["BB_dn"], name="BB Lower", fill='tonexty', fillcolor='rgba(15,23,42,0.02)', line=dict(color="rgba(15,23,42,0.2)", width=1), showlegend=False), row=1, col=1)
+        
+        fig.add_trace(go.Scatter(x=df_c.index, y=df_c["RSI"], mode="lines", name="RSI", line=dict(color="#4f46e5", width=1.2)), row=2, col=1)
+        fig.add_hline(y=70, line_color="#dc2626", line_dash="dash", line_width=1, row=2, col=1)
+        fig.add_hline(y=30, line_color="#16a34a", line_dash="dash", line_width=1, row=2, col=1)
+        
+        hist_c = ["#16a34a" if v >= 0 else "#dc2626" for v in df_c["MACDhist"]]
+        fig.add_trace(go.Bar(x=df_c.index, y=df_c["MACDhist"], name="Histogram", marker_color=hist_c, opacity=0.5), row=3, col=1)
+        fig.add_trace(go.Scatter(x=df_c.index, y=df_c["MACD"], mode="lines", name="MACD", line=dict(color="#0f172a", width=1.2)), row=3, col=1)
+        fig.add_trace(go.Scatter(x=df_c.index, y=df_c["MACDsig"], mode="lines", name="Signal Line", line=dict(color="#b45309", width=1.2)), row=3, col=1)
+
+    elif chart_type == "Line + Bollinger Bands":
+        fig = make_subplots(rows=2, cols=1, shared_xaxes=True, row_heights=[0.7, 0.3], vertical_spacing=0.04)
+        fig.add_trace(go.Scatter(x=df_c.index, y=df_c["Close"], mode="lines", name="ราคาปิด", line=dict(color="#0f172a", width=1.8)), row=1, col=1)
+        fig.add_trace(go.Scatter(x=df_c.index, y=df_c["BB_up"], name="BB+2σ", line=dict(color="#b45309", width=1, dash="dash")), row=1, col=1)
+        fig.add_trace(go.Scatter(x=df_c.index, y=df_c["BB_dn"], name="BB-2σ", fill='tonexty', fillcolor='rgba(180,83,9,0.03)', line=dict(color="#b45309", width=1, dash="dash")), row=1, col=1)
+        
         zs = df_c["ZScore"]
-        z_col = ["#2d7a4f" if v < -1 else "#c0392b" if v > 1 else "#888" for v in zs]
-        fig.add_trace(go.Bar(x=df_c.index, y=zs, name="Z-Score",
-                             marker_color=z_col, opacity=0.7), row=2, col=1)
-        fig.add_hline(y=2,  line_color="#c0392b", line_dash="dash", row=2, col=1)
-        fig.add_hline(y=-2, line_color="#2d7a4f", line_dash="dash", row=2, col=1)
-        fig.add_hline(y=0,  line_color="#aaa", row=2, col=1)
+        z_col = ["#16a34a" if v < -1.5 else "#dc2626" if v > 1.5 else "#6b7280" for v in zs]
+        fig.add_trace(go.Bar(x=df_c.index, y=zs, name="Z-Score", marker_color=z_col, opacity=0.6), row=2, col=1)
+        fig.add_hline(y=2,  line_color="#dc2626", line_dash="dash", line_width=1, row=2, col=1)
+        fig.add_hline(y=-2, line_color="#16a34a", line_dash="dash", line_width=1, row=2, col=1)
 
-    elif chart_type == "Z-Score":
+    elif chart_type == "Z-Score Analysis":
         fig = go.Figure()
         zs = df_c["ZScore"]
-        z_col = ["#2d7a4f" if v < -1.5 else "#c0392b" if v > 1.5 else "#1a3a5c" for v in zs]
-        fig.add_trace(go.Bar(x=df_c.index, y=zs, name="Z-Score 60D",
-                             marker_color=z_col, opacity=0.8))
-        fig.add_hline(y=2,   line_color="#c0392b", line_dash="dash",
-                      annotation_text="Overbought +2σ")
-        fig.add_hline(y=-2,  line_color="#2d7a4f", line_dash="dash",
-                      annotation_text="Oversold -2σ")
-        fig.add_hline(y=0,   line_color="#888", line_width=0.8)
-        fig.update_layout(title="Z-Score (60-Day Rolling) — ระบุโซน Extreme")
+        z_col = ["#dc2626" if v > 1.5 else "#16a34a" if v < -1.5 else "#6b7280" for v in zs]
+        fig.add_trace(go.Bar(x=df_c.index, y=zs, name="Z-Score (60D)", marker_color=z_col, opacity=0.7))
+        fig.add_hline(y=2.0, line_color="#dc2626", line_dash="dash", line_width=1.5, annotation_text="Overbought (+2σ)")
+        fig.add_hline(y=-2.0, line_color="#16a34a", line_dash="dash", line_width=1.5, annotation_text="Oversold (-2σ)")
+        fig.add_hline(y=0, line_color="#111827", line_width=1)
 
-    else:  # Drawdown
-        prices_c = df_c["Close"]
-        roll_max  = prices_c.cummax()
-        dd        = (prices_c - roll_max) / (roll_max + 1e-9) * 100
+    elif chart_type == "Drawdown Curve":
         fig = go.Figure()
-        fig.add_trace(go.Scatter(
-            x=df_c.index, y=dd, mode="lines", name="Drawdown",
-            fill="tozeroy", fillcolor="rgba(192,57,43,0.15)",
-            line=dict(color="#c0392b", width=1.5)
-        ))
-        fig.add_hline(y=-20, line_color="#c8a84b", line_dash="dash",
-                      annotation_text="-20% Threshold")
-        fig.add_hline(y=-40, line_color="#c0392b", line_dash="dash",
-                      annotation_text="-40% Severe")
-        fig.update_layout(title="Drawdown Curve — ความเสียหายจาก Peak")
+        roll_max = df_c["Close"].cummax()
+        dd = (df_c["Close"] - roll_max) / (roll_max + 1e-9) * 100
+        fig.add_trace(go.Scatter(x=df_c.index, y=dd, mode="lines", fill="tozeroy", fillcolor="rgba(220,38,38,0.05)", line=dict(color="#dc2626", width=1.2), name="Drawdown %"))
 
     fig.update_layout(
-        height=580,
+        height=600,
+        margin=dict(l=20, r=20, t=30, b=20),
+        plot_bgcolor="#ffffff",
+        paper_bgcolor="rgba(0,0,0,0)",
+        hovermode="x unified",
         xaxis_rangeslider_visible=False,
-        margin=dict(l=10, r=10, t=36, b=10),
-        plot_bgcolor="#fff",
-        paper_bgcolor="#f8f6f1",
-        legend=dict(bgcolor="rgba(255,255,255,0.85)", bordercolor=var if (var:="#d8d2c5") else "#d8d2c5",
-                    borderwidth=1, font=dict(size=11)),
-        font=dict(family="DM Sans"),
+        showlegend=True,
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
     )
-    st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
-
-    # Backtest entry markers
-    if bt["entries"]:
-        st.markdown(f"**🔬 Backtest Entries** — {bt['total']} สัญญาณ | {bt['wins']}✅ {bt['losses']}❌")
-        fig_bt = go.Figure()
-        prices_full = m["df"]["Close"]
-        fig_bt.add_trace(go.Scatter(
-            x=prices_full.index, y=prices_full,
-            mode="lines", name="ราคา", line=dict(color="#1a3a5c", width=1.5)
-        ))
-        w_d = [(e[0], e[1]) for e in bt["entries"] if e[2]=="win"  and e[0] in prices_full.index]
-        l_d = [(e[0], e[1]) for e in bt["entries"] if e[2]=="lose" and e[0] in prices_full.index]
-        if w_d:
-            fig_bt.add_trace(go.Scatter(
-                x=[x[0] for x in w_d], y=[x[1] for x in w_d], mode="markers",
-                name="Win Entry", marker=dict(symbol="triangle-up", size=9, color="#2d7a4f")
-            ))
-        if l_d:
-            fig_bt.add_trace(go.Scatter(
-                x=[x[0] for x in l_d], y=[x[1] for x in l_d], mode="markers",
-                name="Lose Entry", marker=dict(symbol="triangle-down", size=9, color="#c0392b")
-            ))
-        fig_bt.update_layout(height=280, margin=dict(l=10,r=10,t=20,b=10),
-                              plot_bgcolor="#fff", paper_bgcolor="#f8f6f1",
-                              xaxis_rangeslider_visible=False)
-        st.plotly_chart(fig_bt, use_container_width=True, config={"displayModeBar": False})
+    st.plotly_chart(fig, use_container_width=True)
 
 # ══════════════════════════════════════════════════════════════
-#  TAB 3 — RANKING
+#  TAB 3 — ASSET RANKING
 # ══════════════════════════════════════════════════════════════
 with tab_rank:
-    st.markdown('<div class="section-title">🏆 อันดับสินทรัพย์ (Composite Score · คณิตศาสตร์ล้วน)</div>',
-                unsafe_allow_html=True)
-    st.caption("คำนวณจาก Sharpe, CAGR, Drawdown, Momentum, MA Alignment, Z-Score — ไม่มีปัจจัยข่าว")
-
-    with st.spinner("กำลังดึงและวิเคราะห์ทุกสินทรัพย์..."):
-        rankings = fetch_watchlist_scores()
-
-    if not rankings:
-        st.warning("ไม่สามารถดึงข้อมูลได้")
-    else:
-        medals = ["🥇","🥈","🥉"] + [""] * 20
-        verdict_icon = {"Strong Buy":"🚀","Buy":"📈","Hold/Watch":"⏳","Underweight":"⚠️","Avoid":"🚫"}
-        score_bg = lambda s: "#d4edda" if s>=75 else "#fff3cd" if s>=50 else "#f8d7da"
-
-        html_rows = ""
-        for i, r in enumerate(rankings):
-            sc_bg  = score_bg(r["score"])
-            v_icon = verdict_icon.get(r["verdict"], "")
-            cagr_c = "#2d7a4f" if r["cagr"]>=0 else "#c0392b"
-            mom_c  = "#2d7a4f" if r["momentum"]>=0 else "#c0392b"
-
-            # เหตุผล
-            reasons = []
-            if r["sharpe"] >= 1.5:  reasons.append(f"Sharpe สูง ({r['sharpe']:.1f})")
-            elif r["sharpe"] < 0.5: reasons.append(f"Sharpe ต่ำ ({r['sharpe']:.1f})")
-            if r["cagr"] >= 15:     reasons.append(f"CAGR ดีเยี่ยม ({r['cagr']:.0f}%)")
-            elif r["cagr"] < 5:     reasons.append(f"CAGR ต่ำ ({r['cagr']:.0f}%)")
-            if r["mdd"] > -20:      reasons.append("Drawdown ต่ำ")
-            elif r["mdd"] < -50:    reasons.append(f"MDD สูงมาก ({r['mdd']:.0f}%)")
-            if r["momentum"] >= 15: reasons.append("Momentum แรง")
-            elif r["momentum"] < -10: reasons.append("Momentum ติดลบ")
-            if r["winrate"] >= 60:  reasons.append(f"Win Rate {r['winrate']:.0f}%")
-            reason_str = " · ".join(reasons[:3]) if reasons else "ตัวชี้วัดปานกลาง"
-
-            html_rows += f"""
-            <tr>
-              <td><span class="rank-num">{medals[i] or str(i+1)}</span></td>
-              <td>
-                <div class="rank-ticker">{r['sym']}</div>
-                <div style="font-size:11px;color:var(--muted)">{r['name']}</div>
-              </td>
-              <td style="text-align:center">
-                <span style="background:{sc_bg};padding:3px 10px;border-radius:20px;
-                             font-family:'DM Mono',monospace;font-weight:600;font-size:13px">
-                  {r['score']}
-                </span>
-              </td>
-              <td style="font-family:'DM Mono',monospace;color:{cagr_c}">{r['cagr']:+.1f}%</td>
-              <td style="font-family:'DM Mono',monospace">{r['sharpe']:.2f}</td>
-              <td style="font-family:'DM Mono',monospace;color:#c0392b">{r['mdd']:.1f}%</td>
-              <td style="font-family:'DM Mono',monospace;color:{mom_c}">{r['momentum']:+.1f}%</td>
-              <td style="font-family:'DM Mono',monospace">{r['winrate']:.0f}%</td>
-              <td>{v_icon} {r['verdict']}</td>
-              <td style="font-size:11px;color:var(--muted);max-width:200px">{reason_str}</td>
-            </tr>"""
-
-        st.markdown(f"""
+    st.markdown('<div class="section-title">🏆 ตารางจัดอันดับความคุ้มค่าของสินทรัพย์เชิงคณิตศาสตร์ (10Y)</div>', unsafe_allow_html=True)
+    st.caption("จัดเรียงลำดับตามความคุ้มค่าของการคำนวณมิติด้านผลตอบแทนเทียบความเสี่ยง (Risk-Adjusted Returns)")
+    
+    with st.spinner("กำลังประมวลผลตารางเปรียบเทียบ..."):
+        ranks = fetch_watchlist_scores()
+        
+    if ranks:
+        html_table = """
         <table class="rank-table">
-          <thead><tr>
-            <th>#</th><th>สินทรัพย์</th><th>SCORE</th>
-            <th>CAGR</th><th>SHARPE</th><th>MAX DD</th>
-            <th>MOMENTUM</th><th>WIN RATE</th><th>สัญญาณ</th><th>เหตุผล</th>
-          </tr></thead>
-          <tbody>{html_rows}</tbody>
-        </table>
-        """, unsafe_allow_html=True)
-
-        st.markdown("<br>", unsafe_allow_html=True)
-        st.info("📌 หมายเหตุ: อันดับนี้ใช้ข้อมูลราคาย้อนหลัง 10 ปีเท่านั้น ไม่รวมปัจจัยพื้นฐานหรือข่าว")
+          <thead>
+            <tr>
+              <th>อันดับ</th>
+              <th>สัญลักษณ์</th>
+              <th>ชื่อสินทรัพย์</th>
+              <th>คะแนนรวม</th>
+              <th>สถานะระบบ</th>
+              <th>CAGR / ปี</th>
+              <th>Sharpe</th>
+              <th>Max Drawdown</th>
+              <th>Win Rate</th>
+            </tr>
+          </thead>
+          <tbody>
+        """
+        for i, r in enumerate(ranks, 1):
+            v_emo = {"Strong Buy": "Strong Buy", "Buy": "Buy", "Hold/Watch": "Hold", "Underweight": "Underweight", "Avoid": "Avoid"}
+            html_table += f"""
+            <tr>
+              <td class="rank-num">{i:02d}</td>
+              <td class="rank-ticker"><strong>{r['sym']}</strong></td>
+              <td style="color: var(--text-muted);">{r['name']}</td>
+              <td><span style="font-family:'JetBrains Mono'; font-weight:700;">{r['score']}</span></td>
+              <td><span class="sig-badge">{v_emo.get(r['verdict'], r['verdict'])}</span></td>
+              <td style="color:{'var(--color-green)' if r['cagr'] >= 0 else 'var(--color-red)'}; font-family:'JetBrains Mono'; font-weight:600;">{r['cagr']:+.1f}%</td>
+              <td style="font-family:'JetBrains Mono';">{r['sharpe']:.2f}</td>
+              <td style="color:var(--color-red); font-family:'JetBrains Mono';">{r['mdd']:.1f}%</td>
+              <td style="font-family:'JetBrains Mono';">{r['winrate']:.1f}%</td>
+            </tr>
+            """
+        html_table += "</tbody></table>"
+        st.markdown(html_table, unsafe_allow_html=True)
+    else:
+        st.info("ระบบไม่สามารถดึงข้อมูลจัดอันดับในเวลานี้ได้")
 
 # ══════════════════════════════════════════════════════════════
 #  TAB 4 — INCOME CALCULATOR
 # ══════════════════════════════════════════════════════════════
 with tab_income:
-    st.markdown('<div class="section-title">💰 เครื่องคำนวณรายได้การลงทุน</div>', unsafe_allow_html=True)
-
-    col_calc1, col_calc2 = st.columns(2)
-
-    with col_calc1:
-        st.markdown("#### 📊 คำนวณผลตอบแทนตามสถานการณ์")
-        capital     = st.number_input("เงินลงทุนเริ่มต้น (฿ หรือ $)", min_value=1000,
-                                       max_value=100_000_000, value=100_000, step=10_000)
-        monthly_add = st.number_input("เงินเพิ่มต่อเดือน", min_value=0,
-                                       max_value=1_000_000, value=5_000, step=1_000)
-        years_inv   = st.slider("ระยะเวลาลงทุน (ปี)", 1, 30, 10)
-        use_cagr    = st.checkbox(f"ใช้ CAGR จริงของ {symbol} ({m['cagr']:.1f}%/ปี)", value=True)
-        if use_cagr:
-            rate_input = m["cagr"]
-        else:
-            rate_input = st.slider("อัตราผลตอบแทนต่อปี (%)", -20.0, 50.0, 10.0, step=0.5)
-
-        rate_annual = rate_input / 100
-        rate_monthly = (1 + rate_annual) ** (1/12) - 1
-
-        # Compound calculation
-        total = capital
-        values = [total]
-        contributions = [0]
-        interest_acc = [0]
-        for mo in range(1, years_inv * 12 + 1):
-            total = total * (1 + rate_monthly) + monthly_add
-            values.append(total)
-            contributions.append(capital + monthly_add * mo)
-            interest_acc.append(total - (capital + monthly_add * mo))
-
-        final_val = values[-1]
-        total_contrib = capital + monthly_add * years_inv * 12
-        total_gain = final_val - total_contrib
-        total_return_pct = (final_val / total_contrib - 1) * 100
-        ann_income = final_val * (rate_annual if rate_annual > 0 else 0.05)
-
-        # Scenarios
-        scenarios = {}
-        for label, r in [("แย่ (CAGR-5%)", rate_input-5),
-                         ("ฐาน (CAGR)", rate_input),
-                         ("ดี (CAGR+5%)", rate_input+5)]:
-            rm  = (1 + r/100) ** (1/12) - 1
-            v   = capital
-            for _ in range(years_inv * 12):
-                v = v * (1 + rm) + monthly_add
-            scenarios[label] = v
-
+    st.markdown('<div class="section-title">💰 แบบจำลองการบริหารหน้าตักทางสถิติ (Position Sizing & Risk Matrix)</div>', unsafe_allow_html=True)
+    
+    col_i1, col_i2 = st.columns([1, 1])
+    with col_i1:
+        st.markdown('<div class="calc-box">', unsafe_allow_html=True)
+        capital = st.number_input("💵 จำนวนเงินพอร์ตโฟลิโอรวม ($)", min_value=100.0, value=10000.0, step=1000.0)
+        risk_pct = st.slider("🎯 ขนาดความเสี่ยงสูงสุดต่อไม้ที่ยอมรับได้ (%)", min_value=0.5, max_value=10.0, value=2.0, step=0.5)
+        st.markdown('</div>', unsafe_allow_html=True)
+        
+        abs_risk = capital * (risk_pct / 100.0)
+        est_sl_pct = abs(m["var95"]) if abs(m["var95"]) > 0 else 2.0
+        pos_size = abs_risk / (est_sl_pct / 100.0)
+        if pos_size > capital:
+            pos_size = capital
+            
+    with col_i2:
         st.markdown(f"""
         <div class="calc-result">
-          <div style="font-size:11px;letter-spacing:2px;text-transform:uppercase;
-                      color:#aaa;margin-bottom:10px">ผลการคำนวณ · {years_inv} ปี</div>
-          <div class="calc-row"><span>มูลค่าสุดท้าย</span>
-            <span>{final_val:,.0f}</span></div>
-          <div class="calc-row"><span>เงินลงทุนรวม</span>
-            <span>{total_contrib:,.0f}</span></div>
-          <div class="calc-row"><span>กำไรสะสม</span>
-            <span>{total_gain:,.0f}</span></div>
-          <div class="calc-row"><span>ผลตอบแทนรวม</span>
-            <span>{total_return_pct:+.1f}%</span></div>
-          <div class="calc-row"><span>รายได้ต่อปี (ที่ CAGR)</span>
-            <span>{ann_income:,.0f}</span></div>
-          <div class="calc-row"><span>รายได้ต่อเดือน</span>
-            <span>{ann_income/12:,.0f}</span></div>
-          <div style="margin-top:12px;padding-top:10px;border-top:1px solid rgba(255,255,255,0.15)">
-            <div style="font-size:10px;color:#aaa;margin-bottom:6px">SCENARIOS ({years_inv} ปี)</div>
-        """, unsafe_allow_html=True)
-        for label, sv in scenarios.items():
-            col_s = "#2d7a4f" if sv > total_contrib else "#c0392b"
-            st.markdown(f"""
-            <div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0">
-              <span style="color:#ccc">{label}</span>
-              <span style="font-family:'DM Mono',monospace;color:{col_s}">{sv:,.0f}</span>
-            </div>""", unsafe_allow_html=True)
-        st.markdown("</div></div>", unsafe_allow_html=True)
-
-    with col_calc2:
-        # Growth chart
-        fig_grow = go.Figure()
-        years_x = [i/12 for i in range(len(values))]
-        fig_grow.add_trace(go.Scatter(
-            x=years_x, y=contributions, mode="lines", name="เงินลงทุนสะสม",
-            fill="tozeroy", fillcolor="rgba(200,168,75,0.1)",
-            line=dict(color="#c8a84b", width=1.5, dash="dash")
-        ))
-        fig_grow.add_trace(go.Scatter(
-            x=years_x, y=values, mode="lines", name="มูลค่าพอร์ต",
-            fill="tonexty", fillcolor="rgba(45,122,79,0.12)",
-            line=dict(color="#2d7a4f", width=2.5)
-        ))
-        fig_grow.update_layout(
-            title=f"การเติบโตของพอร์ต {years_inv} ปี",
-            height=320, margin=dict(l=10,r=10,t=36,b=10),
-            plot_bgcolor="#fff", paper_bgcolor="#f8f6f1",
-            xaxis_title="ปี", yaxis_title="มูลค่า",
-            legend=dict(bgcolor="rgba(255,255,255,0.8)"),
-        )
-        st.plotly_chart(fig_grow, use_container_width=True, config={"displayModeBar": False})
-
-        # VaR/Risk calculator
-        st.markdown("#### ⚠️ คำนวณความเสี่ยง")
-        invest_amt = st.number_input("เงินลงทุน (สำหรับคำนวณ VaR)", min_value=1000,
-                                      max_value=10_000_000, value=100_000, step=10_000)
-        conf_level = st.select_slider("Confidence Level", [90, 95, 99], value=95)
-        returns_full = m["df"]["Close"].pct_change().dropna()
-        var_pct  = np.percentile(returns_full, (1 - conf_level/100) * 100) * 100
-        es_pct   = returns_full[returns_full <= var_pct/100].mean() * 100
-        var_thb  = invest_amt * abs(var_pct) / 100
-        es_thb   = invest_amt * abs(es_pct)  / 100
-
-        st.markdown(f"""
-        <div class="calc-result" style="margin-top:0">
-          <div style="font-size:11px;letter-spacing:2px;text-transform:uppercase;
-                      color:#aaa;margin-bottom:10px">RISK METRICS · {conf_level}% Confidence</div>
-          <div class="calc-row"><span>VaR/วัน ({conf_level}%)</span>
-            <span>{var_pct:.2f}%</span></div>
-          <div class="calc-row"><span>VaR เงิน</span>
-            <span>{var_thb:,.0f}</span></div>
-          <div class="calc-row"><span>Expected Shortfall</span>
-            <span>{es_pct:.2f}%</span></div>
-          <div class="calc-row"><span>ES เงิน</span>
-            <span>{es_thb:,.0f}</span></div>
-          <div class="calc-row"><span>Max Drawdown</span>
-            <span>{m['mdd']:.1f}%</span></div>
-          <div class="calc-row"><span>Max Loss เงิน (DD)</span>
-            <span>{invest_amt * abs(m['mdd'])/100:,.0f}</span></div>
-          <div class="calc-row"><span>Kelly Criterion (แนะนำ)</span>
-            <span>{max(0, (bt['winrate']/100 - (1-bt['winrate']/100))*100):.1f}% ของพอร์ต</span></div>
+          <div style="font-size:11px; color:#cbd5e1; letter-spacing:0.5px; text-transform:uppercase;">สัดส่วนที่แนะนำในการเข้าซื้ออ้างอิงความผันผวน ({symbol})</div>
+          <div style="font-size:32px; font-weight:700; margin:4px 0 16px 0; font-family:'JetBrains Mono';">${pos_size:,.2f}</div>
+          
+          <div class="calc-row"><span>จำนวนเม็ดเงินที่ยอมเสียสูงสุด (Absolute Risk)</span><span>${abs_risk:,.2f}</span></div>
+          <div class="calc-row"><span>ระยะตัดขาดทุนเชิงสถิติ (Historical VaR 95%)</span><span>{est_sl_pct:.2f}%</span></div>
+          <div class="calc-row"><span>สัดส่วนการกระจายความเสี่ยง (Allocation Ratio)</span><span>{(pos_size/capital*100):.1f}% ของทุนทั้งหมด</span></div>
+          <div class="calc-row"><span>มูลค่าเป้าหมายรายปีเฉลี่ยตามสถิติ CAGR</span><span>${(pos_size * (m['cagr']/100)):,.2f} / ปี</span></div>
         </div>
         """, unsafe_allow_html=True)
 
 # ══════════════════════════════════════════════════════════════
-#  TAB 5 — AI CHAT
+#  TAB 5 — AI ASSISTANT (Google GenAI)
 # ══════════════════════════════════════════════════════════════
 with tab_chat:
-    col_ch, _ = st.columns([3, 2])
-    with col_ch:
-        st.markdown('<div class="section-title">🤖 AI Investment Assistant (Gemini)</div>',
-                    unsafe_allow_html=True)
-        st.caption("วิเคราะห์จากตัวเลขคณิตศาสตร์ของ DGV · ไม่ใช้ข่าวสาร")
+    st.markdown('<div class="section-title">🤖 DGV Quantum Intelligence Assistant</div>', unsafe_allow_html=True)
+    st.caption("ระบบตอบคำถามอัตโนมัติอ้างอิงค่าสถิติจากชุดข้อมูลดิบ 10 ปี (ห้ามอ้างอิงข่าวลือหรือปัจจัยทางอารมณ์)")
 
-        # System context
-        sys_ctx = f"""คุณคือ DGV Investment Analyst ผู้เชี่ยวชาญด้านคณิตศาสตร์การเงิน
-วิเคราะห์เฉพาะข้อมูลเชิงปริมาณ ไม่ใช้ข่าว
+    st.markdown('<div class="chat-wrap">', unsafe_allow_html=True)
+    for msg in st.session_state["chat"]:
+        is_ai = msg["role"] == "assistant"
+        row_cl = "msg-row" if is_ai else "msg-row u"
+        av_cl = "av ai" if is_ai else "av usr"
+        bub_cl = "bub ai-b" if is_ai else "bub u-b"
+        av_txt = "AI" if is_ai else "U"
+        
+        st.markdown(f"""
+        <div class="{row_cl}">
+          <div class="{av_cl}">{av_txt}</div>
+          <div class="{bub_cl}">{msg['content'].replace('\n', '<br>')}</div>
+        </div>
+        """, unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
 
-ข้อมูลปัจจุบัน ({symbol}):
-• ราคา: {fmt_p(m['cur'])} | CAGR: {m['cagr']:+.1f}%/ปี
-• Sharpe: {m['sharpe']:.2f} | Sortino: {m['sortino']:.2f} | Calmar: {m['calmar']:.2f}
-• Max Drawdown: {m['mdd']:.1f}% | VaR 95%: {m['var95']:.2f}%/วัน
-• Win Rate Backtest: {bt['winrate']}% ({bt['wins']}W/{bt['losses']}L)
-• Momentum Score: {m['momentum']:+.1f}% | Z-Score: {m['zscore']:+.2f}
-• RSI: {m['rsi']:.1f} | MACD: {'Bullish' if m['macd']>m['macd_sig'] else 'Bearish'}
-• Linear Trend: {m['trend_slope']:+.1f}%/ปี | R²={m['r2']:.2f}
-• Volatility: Short={m['vol_s']:.1f}% Long={m['vol_l']:.1f}%
-• Composite Score: {m['score']}/100 → {m['verdict']}
+    with st.form("chat_form", clear_on_submit=True):
+        u_input = st.text_input("💬 ป้อนคำถามเชิงสถิติและคณิตศาสตร์การเงิน...", placeholder="ตัวอย่าง: ค่า Sharpe Ratio ของสินทรัพย์นี้บ่งบอกถึงอะไรเมื่อเทียบกับความเสี่ยงขาลง?")
+        submit_chat = st.form_submit_button("วิเคราะห์ข้อมูล")
 
-ตอบภาษาไทย กระชับ ใช้ตัวเลขที่ให้ไว้ ระบุว่าเป็นการวิเคราะห์เพื่อประกอบการตัดสินใจ"""
+    if submit_chat and u_input.strip():
+        st.session_state["chat"].append({"role": "user", "content": u_input})
+        
+        math_context = f"""
+        คุณคือ DGV Assistant ผู้ช่วยวิเคราะห์ข้อมูลเชิงคณิตศาสตร์และโมเดลการจัดการพอร์ตโฟลิโอเชิงปริมาณ (Quantitative Analyst)
+        นี่คือข้อมูลทางสถิติการลงทุนย้อนหลัง 10 ปีของ {symbol}:
+        - ราคาปัจจุบัน: {m['cur']:.4f}
+        - คะแนนโมเดลรวม: {m['score']}/100 -> ผลลัพธ์: {m['verdict']}
+        - CAGR (อัตราเติบโตทบต้น): {m['cagr']}% ต่อปี
+        - Sharpe Ratio: {m['sharpe']} | Sortino Ratio: {m['sortino']}
+        - Maximum Drawdown: {m['mdd']}% | Calmar Ratio: {m['calmar']}
+        - Value at Risk (95% Daily): {m['var95']}%
+        - สัญญาณทางเทคนิคระยะสั้น: RSI={m['rsi']:.1f}, Z-Score={m['zscore']:.2f}
+        - Win Rate สถิติ MA Cross ย้อนหลัง: {bt['winrate']}%
 
-        # Render chat
-        chat_html = '<div class="chat-wrap">'
-        for msg in st.session_state.chat:
-            if msg["role"] == "assistant":
-                chat_html += f'<div class="msg-row"><div class="av ai">D</div><div class="bub ai-b">{msg["content"].replace(chr(10),"<br>")}</div></div>'
-            else:
-                chat_html += f'<div class="msg-row u"><div class="av usr">คุณ</div><div class="bub u-b">{msg["content"].replace(chr(10),"<br>")}</div></div>'
-        chat_html += '</div>'
-        st.markdown(chat_html, unsafe_allow_html=True)
-
-        if q := st.chat_input("ถามเรื่องตัวเลข, ความเสี่ยง, Sharpe, ผลตอบแทน...", key="main_chat"):
-            st.session_state.chat.append({"role": "user", "content": q})
-            try:
-                api_key = st.secrets["GOOGLE_API_KEY"]
-                client  = genai.Client(api_key=api_key)
-                hist = [
-                    {"role": "user" if m_["role"] == "user" else "model",
-                     "parts": [{"text": m_["content"]}]}
-                    for m_ in st.session_state.chat[1:-1]
-                ]
-                resp = client.models.generate_content(
-                    model="gemini-2.0-flash",
-                    contents=hist + [{"role": "user", "parts": [{"text": sys_ctx + "\n\n---\n" + q}]}]
-                )
-                reply = resp.text
-            except Exception as e:
-                reply = f"ขออภัย: {e}"
-            st.session_state.chat.append({"role": "assistant", "content": reply})
-            st.rerun()
-
-# ─────────────────────────────────────────────────────────────
-#  AUTO REFRESH (30s)
-# ─────────────────────────────────────────────────────────────
-time.sleep(30)
-st.rerun()
+        โปรดตอบคำถามของผู้ใช้ด้วยสไตล์ที่สุภาพ เป็นทางการ น่าเชื่อถือ และอ้างอิงจากตัวเลขทางคณิตศาสตร์สถิติด้านบนเป็นหลัก ห้ามใช้ความคิดเห็นเชิงอารมณ์หรือวิเคราะห์ตามกระแสข่าวที่ไม่มีข้อพิสูจน์
+        คำถามของผู้ใช้: "{u_input}"
+        """
+        
+        try:
+            client = genai.Client()
+            response = client.models.generate_content(
+                model="gemini-2.5-flash",
+                contents=math_context
+            )
+            ai_reply = response.text
+        except Exception as e:
+            ai_reply = f"🤖 ไม่สามารถเชื่อมต่อฐานการคำนวณ AI ได้ในขณะนี้ ข้อมูลความผิดพลาด: {str(e)}"
+            
+        st.session_state["chat"].append({"role": "assistant", "content": ai_reply})
+        st.rerun()
