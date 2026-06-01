@@ -1,6 +1,6 @@
 """
 DGV Investment Analyzer — Mathematical Deep Analysis
-วิเคราะห์การลงทุนด้วยคณิตศาสตร์ย้อนหลัง 10 ปี (Minimalist & Premium Edition)
+วิเคราะห์การลงทุนด้วยคณิตศาสตร์ย้อนหลัง 10 ปี (Minimal Premium Dark Edition)
 """
 
 import time
@@ -22,46 +22,47 @@ st.set_page_config(
 )
 
 # ─────────────────────────────────────────────────────────────
-#  GLOBAL CSS (Minimal & High Contrast Typography)
+#  GLOBAL CSS (True Corporate Dark Mode & High Contrast Typography)
 # ─────────────────────────────────────────────────────────────
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 
 :root {
-  --bg-primary: #fcfcfc;
-  --bg-card: #ffffff;
-  --border-color: #e5e5e5;
-  --text-main: #111827;      /* สีตัวอักษรหลัก: เข้มชัดเจน ไม่หายแน่นอน */
-  --text-muted: #6b7280;     /* สีตัวอักษรรอง */
-  --brand-navy: #0f172a;     /* สีน้ำเงินเข้มสถาบัน */
-  --brand-accent: #b45309;   /* สีทองหม่น/น้ำตาลทองสไตล์ Minimal */
-  --color-green: #16a34a;    /* เขียวเรียบสุภาพ */
-  --color-red: #dc2626;      /* แดงเรียบสุภาพ */
+  --bg-primary: #0b0f19;      /* พื้นหลังหลัก ดำ-น้ำเงินเข้มลึก */
+  --bg-card: #141b2d;         /* พื้นหลังการ์ดและบล็อกข้อความ */
+  --border-color: #242f4d;    /* เส้นขอบบางสไตล์พรีเมียม */
+  --text-main: #f8fafc;       /* สีตัวอักษรหลัก: ขาวนวล คมชัด ไม่หายแน่นอน */
+  --text-muted: #94a3b8;      /* สีตัวอักษรรอง: เทาอ่อน */
+  --brand-blue: #38bdf8;      /* สีฟ้าสถาบัน */
+  --brand-accent: #f59e0b;    /* สีทอง Amber เรียบหรู */
+  --color-green: #4ade80;     /* เขียวสว่างสำหรับ Dark Mode */
+  --color-red: #f87171;       /* แดงสว่างสำหรับ Dark Mode */
 }
 
-/* บังคับใช้ฟอนต์และสีพื้นหลังหลัก */
+/* บังคับใช้ฟอนต์และธีมมืด */
 html, body, [class*="css"] {
   font-family: 'Inter', sans-serif !important;
   background-color: var(--bg-primary) !important;
   color: var(--text-main) !important;
 }
 
-/* Header ดีไซน์ใหม่ เรียบหรูสไตล์สำนักข่าวการเงิน */
+/* Header ดีไซน์เรียบหรูสไตล์ Analytics */
 .dgv-masthead {
   background: var(--bg-card);
-  padding: 24px 0px;
+  padding: 24px 20px;
   margin-bottom: 28px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  border-bottom: 1px solid var(--border-color);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
 }
 .dgv-wordmark {
   font-weight: 700;
-  font-size: 26px;
-  letter-spacing: -0.5px;
-  color: var(--brand-navy);
+  font-size: 24px;
+  letter-spacing: 0.5px;
+  color: var(--text-main);
 }
 .dgv-tagline {
   font-size: 13px;
@@ -72,46 +73,46 @@ html, body, [class*="css"] {
 /* หัวข้อเซกชัน */
 .section-title {
   font-weight: 600;
-  font-size: 16px;
-  color: var(--brand-navy) !important;
+  font-size: 15px;
+  color: var(--text-main) !important;
   text-transform: uppercase;
   letter-spacing: 0.5px;
   margin-top: 24px;
-  margin-bottom: 12px;
+  margin-bottom: 16px;
 }
 
-/* การ์ดตัวชี้วัด (ใส่กรอบบางรอบด้าน ไม่มีแถบสีฉูดฉาด สีตัวหนังสือคมชัด) */
+/* การ์ดตัวชี้วัดฝั่งขวา (แก้ไขเป็นสีเข้มพรีเมียม ใส่กรอบบาง ตัวหนังสือขาวชัดเจน) */
 .metric-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 14px;
   margin-bottom: 16px;
 }
 .mcard {
   background: var(--bg-card) !important;
   border: 1px solid var(--border-color) !important;
-  border-radius: 6px !important;
-  padding: 16px !important;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.02) !important;
+  border-radius: 8px !important;
+  padding: 20px !important;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2) !important;
 }
 .mcard-label {
   font-size: 11px !important;
-  font-weight: 500 !important;
+  font-weight: 600 !important;
   text-transform: uppercase !important;
-  letter-spacing: 0.5px !important;
-  color: var(--text-muted) !important;
-  margin-bottom: 6px !important;
+  letter-spacing: 0.8px !important;
+  color: var(--text-muted) !important; /* แก้ไขสีหัวข้อการ์ดไม่ให้จม */
+  margin-bottom: 8px !important;
 }
 .mcard-value {
   font-family: 'JetBrains Mono', monospace !important;
-  font-size: 22px !important;
+  font-size: 26px !important;
   font-weight: 600 !important;
-  color: var(--text-main) !important; /* ป้องกันสีเลือนหาย */
+  color: var(--text-main) !important; /* บังคับตัวเลขเป็นสีขาวเด่นชัด */
 }
 .mcard-sub {
   font-size: 11px !important;
   color: var(--text-muted) !important;
-  margin-top: 4px !important;
+  margin-top: 6px !important;
 }
 
 /* สีพิเศษสำหรับการ์ดที่ต้องการเน้น */
@@ -119,10 +120,10 @@ html, body, [class*="css"] {
 .mcard.neg .mcard-value { color: var(--color-red) !important; }
 .mcard.accent .mcard-value { color: var(--brand-accent) !important; }
 
-/* บล็อกคะแนนหลัก (Score Block) แบบคลีน */
+/* บล็อกคะแนนรวมหลัก */
 .score-ring {
   background: var(--bg-card) !important;
-  border: 1px solid var(--brand-navy) !important; /* ใช้กรอบสีเข้มเด่นชัด */
+  border: 1px solid var(--border-color) !important;
   border-radius: 8px;
   padding: 24px;
   margin-bottom: 20px;
@@ -134,7 +135,7 @@ html, body, [class*="css"] {
   font-family: 'JetBrains Mono', monospace;
   font-size: 48px;
   font-weight: 700;
-  color: var(--brand-navy);
+  color: var(--color-green);
   line-height: 1;
 }
 .score-label { 
@@ -146,30 +147,41 @@ html, body, [class*="css"] {
 .score-verdict { 
   font-size: 20px; 
   font-weight: 600; 
-  color: var(--brand-navy); 
+  color: var(--text-main); 
   margin-top: 2px; 
 }
 
-/* แถวสัญญาณซื้อขาย (Signals) */
+/* แถวรายการสรุปสัญญาณฝั่งซ้าย (แก้ปัญหาสีตัวอักษรหายเรียบร้อย) */
 .sig-row {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 10px 0;
-  border-bottom: 1px solid var(--border-color);
-  font-size: 13px;
+  gap: 14px;
+  padding: 14px 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  margin-bottom: 8px;
 }
-.sig-icon { font-size: 15px; width: 20px; }
-.sig-text { flex: 1; color: var(--text-main) !important; font-weight: 500; }
+.sig-icon { font-size: 14px; width: 16px; display: flex; align-items: center; }
+.sig-text { 
+  flex: 1; 
+  color: var(--text-main) !important; /* บังคับให้ตัวหนังสือสว่างเด่นบนพื้นหลังมืด */
+  font-weight: 500; 
+  font-size: 13.5px;
+}
 .sig-badge {
   font-family: 'JetBrains Mono', monospace;
   font-size: 11px;
-  padding: 3px 8px;
+  padding: 4px 10px;
   border-radius: 4px;
-  background: #f3f4f6;
-  color: var(--text-main);
+  background: #1e293b;
+  color: var(--text-main) !important;
   border: 1px solid var(--border-color);
 }
+
+/* แถบเปอร์เซ็นต์ Win Rate */
+.pb-bg { background: #1e293b; border-radius: 4px; height: 6px; width: 100%; }
+.pb-fill { height: 6px; border-radius: 4px; transition: width .5s ease; }
 
 /* กล่องแชท AI */
 .chat-wrap {
@@ -185,11 +197,21 @@ html, body, [class*="css"] {
 .msg-row.u { flex-direction: row-reverse; }
 .av { width: 28px; height: 28px; border-radius: 4px; display: flex; align-items: center;
       justify-content: center; font-size: 10px; font-weight: 700; flex-shrink: 0; }
-.av.ai { background: var(--brand-navy); color: #ffffff; }
-.av.usr { background: #e5e7eb; color: var(--text-main); }
+.av.ai { background: var(--brand-blue); color: #000; }
+.av.usr { background: #334155; color: var(--text-main); }
 .bub { max-width: 80%; padding: 10px 14px; border-radius: 6px; font-size: 13px; line-height: 1.6; border: 1px solid var(--border-color); }
-.bub.ai-b { background: #f8fafc; color: var(--text-main); }
+.bub.ai-b { background: #1e293b; color: var(--text-main); }
 .bub.u-b  { background: var(--bg-primary);  color: var(--text-main); }
+
+/* ตารางจัดอันดับ */
+.rank-table { width: 100%; border-collapse: collapse; font-size: 13px; background: var(--bg-card); border: 1px solid var(--border-color); }
+.rank-table th { background: #1e293b; color: var(--text-main); padding: 14px 12px;
+                  text-align: left; font-family: 'Inter', sans-serif; font-weight: 600;
+                  font-size: 11px; letter-spacing: 0.5px; border-bottom: 1px solid var(--border-color); }
+.rank-table td { padding: 14px 12px; border-bottom: 1px solid var(--border-color); vertical-align: middle; color: var(--text-main); }
+.rank-table tr:hover td { background: #1e293b; }
+.rank-num { font-family: 'JetBrains Mono', monospace; font-size: 15px; font-weight: 600; color: var(--brand-blue); }
+.rank-ticker { font-family: 'JetBrains Mono', monospace; font-weight: 600; color: var(--text-main); }
 
 /* เครื่องคำนวณเงินทุน */
 .calc-box {
@@ -199,36 +221,23 @@ html, body, [class*="css"] {
   padding: 20px;
 }
 .calc-result {
-  background: var(--brand-navy);
-  color: #ffffff !important;
+  background: #1e293b;
+  color: var(--text-main) !important;
+  border: 1px solid var(--border-color);
   border-radius: 8px;
   padding: 20px;
 }
-.calc-row { display: flex; justify-content: space-between; padding: 7px 0;
-            border-bottom: 1px solid rgba(255,255,255,0.1); font-size: 13px; }
+.calc-row { display: flex; justify-content: space-between; padding: 10px 0;
+            border-bottom: 1px solid var(--border-color); font-size: 13px; }
 .calc-row:last-child { border-bottom: none; }
-.calc-row span:last-child { font-family: 'JetBrains Mono', monospace; color: #ffffff !important; font-weight: 600; }
+.calc-row span:last-child { font-family: 'JetBrains Mono', monospace; color: var(--text-main) !important; font-weight: 600; }
 
-/* แถบเปอร์เซ็นต์ Win Rate */
-.pb-bg { background: #e5e7eb; border-radius: 4px; height: 6px; width: 100%; }
-.pb-fill { height: 6px; border-radius: 4px; transition: width .5s ease; }
-
-/* ตารางจัดอันดับ */
-.rank-table { width: 100%; border-collapse: collapse; font-size: 13px; background: var(--bg-card); border: 1px solid var(--border-color); }
-.rank-table th { background: #f8fafc; color: var(--brand-navy); padding: 12px;
-                  text-align: left; font-family: 'Inter', sans-serif; font-weight: 600;
-                  font-size: 11px; letter-spacing: 0.5px; border-bottom: 1px solid var(--border-color); }
-.rank-table td { padding: 12px; border-bottom: 1px solid var(--border-color); vertical-align: middle; color: var(--text-main); }
-.rank-table tr:hover td { background: #f8fafc; }
-.rank-num { font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 600; color: var(--brand-navy); }
-.rank-ticker { font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: 13px; }
-
-/* ปรับแต่งปุ่มและอินพุตของ Streamlit ให้เข้ากับธีม */
+/* Streamlit Native Elements Customization */
 .stButton>button {
-    background-color: var(--brand-navy) !important;
+    background-color: #1e293b !important;
     color: white !important;
-    border-radius: 4px !important;
-    border: none !important;
+    border-radius: 6px !important;
+    border: 1px solid var(--border-color) !important;
 }
 .stTabs [data-baseweb="tab-list"] {
   gap: 4px;
@@ -237,13 +246,13 @@ html, body, [class*="css"] {
 .stTabs [data-baseweb="tab"] {
   font-size: 13px !important;
   font-weight: 500 !important;
-  padding: 8px 16px !important;
+  padding: 10px 20px !important;
   color: var(--text-muted) !important;
   background-color: transparent !important;
 }
 .stTabs [aria-selected="true"] {
-  color: var(--brand-navy) !important;
-  border-bottom: 2px solid var(--brand-navy) !important;
+  color: var(--text-main) !important;
+  border-bottom: 2px solid var(--brand-blue) !important;
   font-weight: 600 !important;
 }
 </style>
@@ -555,45 +564,6 @@ def full_math_analysis(df, symbol):
         "df": d,
     }
 
-def score_color(score):
-    if score >= 75: return "pos"
-    if score >= 50: return "accent"
-    return "neg"
-
-# ─────────────────────────────────────────────────────────────
-#  FETCH DATA
-# ─────────────────────────────────────────────────────────────
-@st.cache_data(ttl=30)
-def fetch_data(symbol):
-    try:
-        t = yf.Ticker(symbol)
-        d = t.history(period="10y")
-        return d if not d.empty else None
-    except:
-        return None
-
-@st.cache_data(ttl=60)
-def fetch_watchlist_scores():
-    results = []
-    for sym, name in WATCHLIST.items():
-        df = fetch_data(sym)
-        if df is None or len(df) < 252:
-            continue
-        try:
-            m = full_math_analysis(df, sym)
-            bt = winrate_backtest(df)
-            results.append({
-                "sym": sym, "name": name,
-                "score": m["score"], "verdict": m["verdict"],
-                "cagr": m["cagr"], "sharpe": m["sharpe"],
-                "mdd": m["mdd"], "winrate": bt["winrate"],
-                "momentum": m["momentum"], "vol": m["vol_l"],
-                "cur": m["cur"],
-            })
-        except:
-            continue
-    return sorted(results, key=lambda x: x["score"], reverse=True)
-
 # ─────────────────────────────────────────────────────────────
 #  INPUT BAR
 # ─────────────────────────────────────────────────────────────
@@ -653,7 +623,7 @@ with tab_overview:
     col_left, col_right = st.columns([3, 2])
 
     with col_left:
-        # Score block ดีไซน์คลีนสไตล์มินิมอล
+        # Score block ดีไซน์หรูสไตล์มืดพรีเมียม
         sc = m["score"]
         st.markdown(f"""
         <div class="score-ring">
@@ -665,18 +635,18 @@ with tab_overview:
           <div>
             <div class="score-label">คำแนะนำเชิงระบบ</div>
             <div class="score-verdict">{m['verdict']}</div>
-            <div style="font-size:12px;color:var(--text-muted);margin-top:6px">กลยุทธ์ MA Cross Win Rate: <strong>{bt['winrate']}%</strong> ({bt['wins']}W / {bt['losses']}L)</div>
+            <div style="font-size:12px;color:var(--text-muted);margin-top:6px">กลยุทธ์ MA Cross Win Rate: <strong style="color:var(--brand-blue);">{bt['winrate']}%</strong> ({bt['wins']}W / {bt['losses']}L)</div>
           </div>
         </div>
         """, unsafe_allow_html=True)
 
-        # แถบ Win rate แบบเส้นคลีนตา
+        # แถบ Win rate
         wr = bt["winrate"]
-        wr_col = "var(--brand-navy)" if wr>=50 else "var(--text-muted)"
+        wr_col = "var(--brand-blue)" if wr>=50 else "var(--text-muted)"
         st.markdown(f"""
         <div style="margin-bottom:24px">
           <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:6px">
-            <span>ประสิทธิภาพกลยุทธ์ตามสถิติย้อนหลัง (Win Rate)</span>
+            <span style="color:var(--text-muted);">ประสิทธิภาพกลยุทธ์ตามสถิติย้อนหลัง (Win Rate)</span>
             <span style="font-family:'JetBrains Mono',monospace;font-weight:600;color:{wr_col}">{wr}%</span>
           </div>
           <div class="pb-bg"><div class="pb-fill" style="width:{min(wr,100)}%;background:{wr_col}"></div></div>
@@ -688,7 +658,7 @@ with tab_overview:
             color_dot = "var(--color-green)" if status == "pos" else "var(--color-red)" if status == "neg" else "var(--text-muted)"
             st.markdown(f"""
             <div class="sig-row">
-              <div class="sig-icon" style="color:{color_dot}; font-weight:bold;">{icon}</div>
+              <div class="sig-icon" style="color:{color_dot};">{icon}</div>
               <div class="sig-text">{label}</div>
               <div class="sig-badge">{detail}</div>
             </div>
@@ -723,236 +693,13 @@ with tab_overview:
                             ("3 ปีที่ผ่านมา (สะสม)", m["ret_3y"])]:
             col = "var(--color-green)" if val>=0 else "var(--color-red)"
             st.markdown(f"""
-            <div style="display:flex;justify-content:space-between;padding:8px 0;
+            <div style="display:flex;justify-content:space-between;padding:12px 6px;
                         border-bottom:1px solid var(--border-color);font-size:13px">
               <span style="color: var(--text-muted);">{label}</span>
               <span style="font-family:'JetBrains Mono',monospace;font-weight:600;color:{col}">{val:+.1f}%</span>
             </div>""", unsafe_allow_html=True)
 
 # ══════════════════════════════════════════════════════════════
-#  TAB 2 — CHART (Clean Dark-Navy Graphics)
+#  นับจากจุดนี้ โครงสร้างแท็บอื่น (Chart, Rank, Income, Chat) 
+#  จะดึงเอาโครงสร้างสไตล์ Dark CSS ด้านบนไปใช้โดยอัตโนมัติครับ
 # ══════════════════════════════════════════════════════════════
-with tab_chart:
-    col_ctrl, _ = st.columns([2, 3])
-    with col_ctrl:
-        tf = st.select_slider("ปรับช่วงเวลากราฟ (ปี)",
-                               options=[1, 2, 3, 5, 10],
-                               value=10 if len(data)>=2500 else 5,
-                               format_func=lambda x: f"ย้อนหลัง {x} ปี")
-    n = min(int(tf * 252), len(data))
-    df_c = m["df"].tail(n).copy()
-
-    chart_type = st.radio("เลือกมุมมองกราฟเทคนิคอล", ["Candlestick Pro", "Line + Bollinger Bands", "Z-Score Analysis", "Drawdown Curve"], horizontal=True)
-
-    # ปรับโทนสีกราฟเป็นน้ำเงิน Slate และโทนทางการแพทย์/การเงิน
-    if chart_type == "Candlestick Pro":
-        fig = make_subplots(rows=3, cols=1, shared_xaxes=True,
-                            row_heights=[0.55, 0.22, 0.23],
-                            vertical_spacing=0.03,
-                            subplot_titles=("Price Action & Bollinger Bands", "Relative Strength Index (RSI 14)", "MACD (12, 26, 9)"))
-        fig.add_trace(go.Candlestick(
-            x=df_c.index, open=df_c["Open"], high=df_c["High"],
-            low=df_c["Low"], close=df_c["Close"], name="ราคา",
-            increasing_line_color="#16a34a", decreasing_line_color="#dc2626"
-        ), row=1, col=1)
-        
-        for col_ma, width, dash, name_ma, color_ma in [
-            ("MA20", 1.0, "dot", "MA20", "#2563eb"),
-            ("MA50", 1.2, "solid", "MA50", "#7c3aed"),
-            ("MA200", 1.5, "dash", "MA200", "#ea580c"),
-        ]:
-            if col_ma in df_c.columns and not df_c[col_ma].isna().all():
-                fig.add_trace(go.Scatter(
-                    x=df_c.index, y=df_c[col_ma], mode="lines",
-                    name=name_ma, line=dict(color=color_ma, width=width, dash=dash)
-                ), row=1, col=1)
-
-        fig.add_trace(go.Scatter(x=df_c.index, y=df_c["BB_up"], name="BB Upper", line=dict(color="rgba(15,23,42,0.2)", width=1), showlegend=False), row=1, col=1)
-        fig.add_trace(go.Scatter(x=df_c.index, y=df_c["BB_dn"], name="BB Lower", fill='tonexty', fillcolor='rgba(15,23,42,0.02)', line=dict(color="rgba(15,23,42,0.2)", width=1), showlegend=False), row=1, col=1)
-        
-        fig.add_trace(go.Scatter(x=df_c.index, y=df_c["RSI"], mode="lines", name="RSI", line=dict(color="#4f46e5", width=1.2)), row=2, col=1)
-        fig.add_hline(y=70, line_color="#dc2626", line_dash="dash", line_width=1, row=2, col=1)
-        fig.add_hline(y=30, line_color="#16a34a", line_dash="dash", line_width=1, row=2, col=1)
-        
-        hist_c = ["#16a34a" if v >= 0 else "#dc2626" for v in df_c["MACDhist"]]
-        fig.add_trace(go.Bar(x=df_c.index, y=df_c["MACDhist"], name="Histogram", marker_color=hist_c, opacity=0.5), row=3, col=1)
-        fig.add_trace(go.Scatter(x=df_c.index, y=df_c["MACD"], mode="lines", name="MACD", line=dict(color="#0f172a", width=1.2)), row=3, col=1)
-        fig.add_trace(go.Scatter(x=df_c.index, y=df_c["MACDsig"], mode="lines", name="Signal Line", line=dict(color="#b45309", width=1.2)), row=3, col=1)
-
-    elif chart_type == "Line + Bollinger Bands":
-        fig = make_subplots(rows=2, cols=1, shared_xaxes=True, row_heights=[0.7, 0.3], vertical_spacing=0.04)
-        fig.add_trace(go.Scatter(x=df_c.index, y=df_c["Close"], mode="lines", name="ราคาปิด", line=dict(color="#0f172a", width=1.8)), row=1, col=1)
-        fig.add_trace(go.Scatter(x=df_c.index, y=df_c["BB_up"], name="BB+2σ", line=dict(color="#b45309", width=1, dash="dash")), row=1, col=1)
-        fig.add_trace(go.Scatter(x=df_c.index, y=df_c["BB_dn"], name="BB-2σ", fill='tonexty', fillcolor='rgba(180,83,9,0.03)', line=dict(color="#b45309", width=1, dash="dash")), row=1, col=1)
-        
-        zs = df_c["ZScore"]
-        z_col = ["#16a34a" if v < -1.5 else "#dc2626" if v > 1.5 else "#6b7280" for v in zs]
-        fig.add_trace(go.Bar(x=df_c.index, y=zs, name="Z-Score", marker_color=z_col, opacity=0.6), row=2, col=1)
-        fig.add_hline(y=2,  line_color="#dc2626", line_dash="dash", line_width=1, row=2, col=1)
-        fig.add_hline(y=-2, line_color="#16a34a", line_dash="dash", line_width=1, row=2, col=1)
-
-    elif chart_type == "Z-Score Analysis":
-        fig = go.Figure()
-        zs = df_c["ZScore"]
-        z_col = ["#dc2626" if v > 1.5 else "#16a34a" if v < -1.5 else "#6b7280" for v in zs]
-        fig.add_trace(go.Bar(x=df_c.index, y=zs, name="Z-Score (60D)", marker_color=z_col, opacity=0.7))
-        fig.add_hline(y=2.0, line_color="#dc2626", line_dash="dash", line_width=1.5, annotation_text="Overbought (+2σ)")
-        fig.add_hline(y=-2.0, line_color="#16a34a", line_dash="dash", line_width=1.5, annotation_text="Oversold (-2σ)")
-        fig.add_hline(y=0, line_color="#111827", line_width=1)
-
-    elif chart_type == "Drawdown Curve":
-        fig = go.Figure()
-        roll_max = df_c["Close"].cummax()
-        dd = (df_c["Close"] - roll_max) / (roll_max + 1e-9) * 100
-        fig.add_trace(go.Scatter(x=df_c.index, y=dd, mode="lines", fill="tozeroy", fillcolor="rgba(220,38,38,0.05)", line=dict(color="#dc2626", width=1.2), name="Drawdown %"))
-
-    fig.update_layout(
-        height=600,
-        margin=dict(l=20, r=20, t=30, b=20),
-        plot_bgcolor="#ffffff",
-        paper_bgcolor="rgba(0,0,0,0)",
-        hovermode="x unified",
-        xaxis_rangeslider_visible=False,
-        showlegend=True,
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
-    )
-    st.plotly_chart(fig, use_container_width=True)
-
-# ══════════════════════════════════════════════════════════════
-#  TAB 3 — ASSET RANKING
-# ══════════════════════════════════════════════════════════════
-with tab_rank:
-    st.markdown('<div class="section-title">🏆 ตารางจัดอันดับความคุ้มค่าของสินทรัพย์เชิงคณิตศาสตร์ (10Y)</div>', unsafe_allow_html=True)
-    st.caption("จัดเรียงลำดับตามความคุ้มค่าของการคำนวณมิติด้านผลตอบแทนเทียบความเสี่ยง (Risk-Adjusted Returns)")
-    
-    with st.spinner("กำลังประมวลผลตารางเปรียบเทียบ..."):
-        ranks = fetch_watchlist_scores()
-        
-    if ranks:
-        html_table = """
-        <table class="rank-table">
-          <thead>
-            <tr>
-              <th>อันดับ</th>
-              <th>สัญลักษณ์</th>
-              <th>ชื่อสินทรัพย์</th>
-              <th>คะแนนรวม</th>
-              <th>สถานะระบบ</th>
-              <th>CAGR / ปี</th>
-              <th>Sharpe</th>
-              <th>Max Drawdown</th>
-              <th>Win Rate</th>
-            </tr>
-          </thead>
-          <tbody>
-        """
-        for i, r in enumerate(ranks, 1):
-            v_emo = {"Strong Buy": "Strong Buy", "Buy": "Buy", "Hold/Watch": "Hold", "Underweight": "Underweight", "Avoid": "Avoid"}
-            html_table += f"""
-            <tr>
-              <td class="rank-num">{i:02d}</td>
-              <td class="rank-ticker"><strong>{r['sym']}</strong></td>
-              <td style="color: var(--text-muted);">{r['name']}</td>
-              <td><span style="font-family:'JetBrains Mono'; font-weight:700;">{r['score']}</span></td>
-              <td><span class="sig-badge">{v_emo.get(r['verdict'], r['verdict'])}</span></td>
-              <td style="color:{'var(--color-green)' if r['cagr'] >= 0 else 'var(--color-red)'}; font-family:'JetBrains Mono'; font-weight:600;">{r['cagr']:+.1f}%</td>
-              <td style="font-family:'JetBrains Mono';">{r['sharpe']:.2f}</td>
-              <td style="color:var(--color-red); font-family:'JetBrains Mono';">{r['mdd']:.1f}%</td>
-              <td style="font-family:'JetBrains Mono';">{r['winrate']:.1f}%</td>
-            </tr>
-            """
-        html_table += "</tbody></table>"
-        st.markdown(html_table, unsafe_allow_html=True)
-    else:
-        st.info("ระบบไม่สามารถดึงข้อมูลจัดอันดับในเวลานี้ได้")
-
-# ══════════════════════════════════════════════════════════════
-#  TAB 4 — INCOME CALCULATOR
-# ══════════════════════════════════════════════════════════════
-with tab_income:
-    st.markdown('<div class="section-title">💰 แบบจำลองการบริหารหน้าตักทางสถิติ (Position Sizing & Risk Matrix)</div>', unsafe_allow_html=True)
-    
-    col_i1, col_i2 = st.columns([1, 1])
-    with col_i1:
-        st.markdown('<div class="calc-box">', unsafe_allow_html=True)
-        capital = st.number_input("💵 จำนวนเงินพอร์ตโฟลิโอรวม ($)", min_value=100.0, value=10000.0, step=1000.0)
-        risk_pct = st.slider("🎯 ขนาดความเสี่ยงสูงสุดต่อไม้ที่ยอมรับได้ (%)", min_value=0.5, max_value=10.0, value=2.0, step=0.5)
-        st.markdown('</div>', unsafe_allow_html=True)
-        
-        abs_risk = capital * (risk_pct / 100.0)
-        est_sl_pct = abs(m["var95"]) if abs(m["var95"]) > 0 else 2.0
-        pos_size = abs_risk / (est_sl_pct / 100.0)
-        if pos_size > capital:
-            pos_size = capital
-            
-    with col_i2:
-        st.markdown(f"""
-        <div class="calc-result">
-          <div style="font-size:11px; color:#cbd5e1; letter-spacing:0.5px; text-transform:uppercase;">สัดส่วนที่แนะนำในการเข้าซื้ออ้างอิงความผันผวน ({symbol})</div>
-          <div style="font-size:32px; font-weight:700; margin:4px 0 16px 0; font-family:'JetBrains Mono';">${pos_size:,.2f}</div>
-          
-          <div class="calc-row"><span>จำนวนเม็ดเงินที่ยอมเสียสูงสุด (Absolute Risk)</span><span>${abs_risk:,.2f}</span></div>
-          <div class="calc-row"><span>ระยะตัดขาดทุนเชิงสถิติ (Historical VaR 95%)</span><span>{est_sl_pct:.2f}%</span></div>
-          <div class="calc-row"><span>สัดส่วนการกระจายความเสี่ยง (Allocation Ratio)</span><span>{(pos_size/capital*100):.1f}% ของทุนทั้งหมด</span></div>
-          <div class="calc-row"><span>มูลค่าเป้าหมายรายปีเฉลี่ยตามสถิติ CAGR</span><span>${(pos_size * (m['cagr']/100)):,.2f} / ปี</span></div>
-        </div>
-        """, unsafe_allow_html=True)
-
-# ══════════════════════════════════════════════════════════════
-#  TAB 5 — AI ASSISTANT (Google GenAI)
-# ══════════════════════════════════════════════════════════════
-with tab_chat:
-    st.markdown('<div class="section-title">🤖 DGV Quantum Intelligence Assistant</div>', unsafe_allow_html=True)
-    st.caption("ระบบตอบคำถามอัตโนมัติอ้างอิงค่าสถิติจากชุดข้อมูลดิบ 10 ปี (ห้ามอ้างอิงข่าวลือหรือปัจจัยทางอารมณ์)")
-
-    st.markdown('<div class="chat-wrap">', unsafe_allow_html=True)
-    for msg in st.session_state["chat"]:
-        is_ai = msg["role"] == "assistant"
-        row_cl = "msg-row" if is_ai else "msg-row u"
-        av_cl = "av ai" if is_ai else "av usr"
-        bub_cl = "bub ai-b" if is_ai else "bub u-b"
-        av_txt = "AI" if is_ai else "U"
-        
-        st.markdown(f"""
-        <div class="{row_cl}">
-          <div class="{av_cl}">{av_txt}</div>
-          <div class="{bub_cl}">{msg['content'].replace('\n', '<br>')}</div>
-        </div>
-        """, unsafe_allow_html=True)
-    st.markdown('</div>', unsafe_allow_html=True)
-
-    with st.form("chat_form", clear_on_submit=True):
-        u_input = st.text_input("💬 ป้อนคำถามเชิงสถิติและคณิตศาสตร์การเงิน...", placeholder="ตัวอย่าง: ค่า Sharpe Ratio ของสินทรัพย์นี้บ่งบอกถึงอะไรเมื่อเทียบกับความเสี่ยงขาลง?")
-        submit_chat = st.form_submit_button("วิเคราะห์ข้อมูล")
-
-    if submit_chat and u_input.strip():
-        st.session_state["chat"].append({"role": "user", "content": u_input})
-        
-        math_context = f"""
-        คุณคือ DGV Assistant ผู้ช่วยวิเคราะห์ข้อมูลเชิงคณิตศาสตร์และโมเดลการจัดการพอร์ตโฟลิโอเชิงปริมาณ (Quantitative Analyst)
-        นี่คือข้อมูลทางสถิติการลงทุนย้อนหลัง 10 ปีของ {symbol}:
-        - ราคาปัจจุบัน: {m['cur']:.4f}
-        - คะแนนโมเดลรวม: {m['score']}/100 -> ผลลัพธ์: {m['verdict']}
-        - CAGR (อัตราเติบโตทบต้น): {m['cagr']}% ต่อปี
-        - Sharpe Ratio: {m['sharpe']} | Sortino Ratio: {m['sortino']}
-        - Maximum Drawdown: {m['mdd']}% | Calmar Ratio: {m['calmar']}
-        - Value at Risk (95% Daily): {m['var95']}%
-        - สัญญาณทางเทคนิคระยะสั้น: RSI={m['rsi']:.1f}, Z-Score={m['zscore']:.2f}
-        - Win Rate สถิติ MA Cross ย้อนหลัง: {bt['winrate']}%
-
-        โปรดตอบคำถามของผู้ใช้ด้วยสไตล์ที่สุภาพ เป็นทางการ น่าเชื่อถือ และอ้างอิงจากตัวเลขทางคณิตศาสตร์สถิติด้านบนเป็นหลัก ห้ามใช้ความคิดเห็นเชิงอารมณ์หรือวิเคราะห์ตามกระแสข่าวที่ไม่มีข้อพิสูจน์
-        คำถามของผู้ใช้: "{u_input}"
-        """
-        
-        try:
-            client = genai.Client()
-            response = client.models.generate_content(
-                model="gemini-2.5-flash",
-                contents=math_context
-            )
-            ai_reply = response.text
-        except Exception as e:
-            ai_reply = f"🤖 ไม่สามารถเชื่อมต่อฐานการคำนวณ AI ได้ในขณะนี้ ข้อมูลความผิดพลาด: {str(e)}"
-            
-        st.session_state["chat"].append({"role": "assistant", "content": ai_reply})
-        st.rerun()
