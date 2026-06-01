@@ -1217,14 +1217,19 @@ with tab_chat:
 #  AUTO REFRESH (30s)
 # ─────────────────────────────────────────────────────────────
 time.sleep(30)
-st.rerun().section-title {
-  font-family: 'DM Serif Display', serif;
-  font-size: 20px;
-  color: var(--ink);
-  border-bottom: 1.5px solid var(--border);
-  padding-bottom: 6px;
-  margin-bottom: 14px;
-}
+st.markdown(
+    """
+    <style>
+    .section-title {
+        font-family: 'DM Serif Display', serif;
+        font-size: 20px;
+        color: var(--ink);
+        border-bottom: 1.5px solid var(--border);
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
 
 /* Metric cards */
 .metric-grid {
