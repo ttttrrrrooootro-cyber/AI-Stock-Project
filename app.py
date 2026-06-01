@@ -1,820 +1,1199 @@
+"""
+DGV Investment Analyzer — Mathematical Deep Analysis
+วิเคราะห์การลงทุนด้วยคณิตศาสตร์ย้อนหลัง 10 ปี
+"""
+
 import time
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 import streamlit as st
 import yfinance as yf
+from scipy import stats
 from google import genai
 
-st.set_page_config(page_title="OpenAI DGV", layout="wide")
+# ─────────────────────────────────────────────────────────────
+#  PAGE CONFIG
+# ─────────────────────────────────────────────────────────────
+st.set_page_config(
+    page_title="DGV · Investment Analyzer",
+    layout="wide",
+    initial_sidebar_state="collapsed",
+)
 
-# ───────────────────────── HEADER ─────────────────────────
-OPENAI_SVG = """<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M22.2819 9.8211a5.9847 5.9847 0 0 0-.5157-4.9108 6.0462 6.0462 0 0 0-6.5098-2.9A6.0651 6.0651 0 0 0 4.9807 4.1818a5.9847 5.9847 0 0 0-3.9977 2.9 6.0462 6.0462 0 0 0 .7427 7.0966 5.98 5.98 0 0 0 .511 4.9107 6.051 6.051 0 0 0 6.5146 2.9001A5.9847 5.9847 0 0 0 13.2599 24a6.0557 6.0557 0 0 0 5.7718-4.2058 5.9894 5.9894 0 0 0 3.9977-2.9001 6.0557 6.0557 0 0 0-.7475-7.0729zm-9.022 12.6081a4.4755 4.4755 0 0 1-2.8764-1.0408l.1419-.0804 4.7783-2.7582a.7948.7948 0 0 0 .3927-.6813v-6.7369l2.02 1.1686a.071.071 0 0 1 .038.052v5.5826a4.504 4.504 0 0 1-4.4945 4.4944zm-9.6607-4.1254a4.4708 4.4708 0 0 1-.5346-3.0137l.142.0852 4.783 2.7582a.7712.7712 0 0 0 .7806 0l5.8428-3.3685v2.3324a.0804.0804 0 0 1-.0332.0615L9.74 19.9502a4.4992 4.4992 0 0 1-6.1408-1.6464zM2.3408 7.8956a4.485 4.485 0 0 1 2.3655-1.9728V11.6a.7664.7664 0 0 0 .3879.6765l5.8144 3.3543-2.0201 1.1685a.0757.0757 0 0 1-.071 0l-4.8303-2.7865A4.504 4.504 0 0 1 2.3408 7.872zm16.5963 3.8558L13.1038 8.364 15.1192 7.2a.0757.0757 0 0 1 .071 0l4.8303 2.7913a4.4944 4.4944 0 0 1-.6765 8.1042v-5.6772a.79.79 0 0 0-.407-.667zm2.0107-3.0231l-.142-.0852-4.7735-2.7818a.7759.7759 0 0 0-.7854 0L9.409 9.2297V6.8974a.0662.0662 0 0 1 .0284-.0615l4.8303-2.7866a4.4992 4.4992 0 0 1 6.6802 4.66zM8.3065 12.863l-2.02-1.1638a.0804.0804 0 0 1-.038-.0567V6.0742a4.4992 4.4992 0 0 1 7.3757-3.4537l-.142.0805L8.704 5.459a.7948.7948 0 0 0-.3927.6813zm1.0976-2.3654l2.602-1.4998 2.6069 1.4998v2.9994l-2.5974 1.4997-2.6067-1.4997Z"/></svg>"""
-
-st.markdown(f"""
+# ─────────────────────────────────────────────────────────────
+#  GLOBAL CSS
+# ─────────────────────────────────────────────────────────────
+st.markdown("""
 <style>
-.dgv-header{{display:flex;align-items:center;gap:12px;padding:6px 0 2px 0;margin-bottom:6px}}
-.dgv-logo{{width:34px;height:34px;background:#000;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#fff;flex-shrink:0}}
-.dgv-title{{font-size:21px;font-weight:700;color:#111;letter-spacing:-.5px}}
-.dgv-title span{{color:#777;font-weight:400}}
-.dgv-sub{{font-size:12px;color:#999;margin-top:1px}}
-.tab-badge{{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600;margin-left:6px}}
-.trade-badge{{background:#fff3cd;color:#856404}}
-.invest-badge{{background:#d1e7dd;color:#0a5132}}
-/* chat */
-.chat-wrapper{{max-height:360px;overflow-y:auto;padding:6px 0}}
-.msg-row{{display:flex;gap:9px;margin-bottom:12px;align-items:flex-start}}
-.msg-row.user-row{{flex-direction:row-reverse}}
-.av{{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0;margin-top:2px}}
-.av.ai-av{{background:#000;color:#fff}}
-.av.u-av{{background:#e8f0fe;color:#1a56db}}
-.bub{{max-width:80%;padding:9px 13px;border-radius:15px;font-size:13px;line-height:1.6}}
-.bub.ai-b{{background:#f4f4f4;color:#111;border-bottom-left-radius:3px}}
-.bub.u-b{{background:#000;color:#fff;border-bottom-right-radius:3px}}
-.dsc{{font-size:11px;color:#ccc;text-align:center;margin-top:5px}}
-/* win rate bar */
-.wr-bar-bg{{background:#e9ecef;border-radius:8px;height:14px;width:100%;margin-top:4px}}
-.wr-bar-fill{{height:14px;border-radius:8px;transition:width .4s}}
+@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap');
+
+:root {
+  --ink: #0d0d0d;
+  --paper: #f8f6f1;
+  --cream: #ede9e0;
+  --gold: #c8a84b;
+  --gold-light: #f0d98a;
+  --green: #2d7a4f;
+  --red: #c0392b;
+  --blue: #1a3a5c;
+  --muted: #8a8478;
+  --border: #d8d2c5;
+  --card: #ffffff;
+}
+
+html, body, [class*="css"] {
+  font-family: 'DM Sans', sans-serif !important;
+  background-color: var(--paper) !important;
+  color: var(--ink) !important;
+}
+
+/* Header */
+.dgv-masthead {
+  background: var(--ink);
+  color: #fff;
+  padding: 22px 32px 18px;
+  margin: -16px -16px 24px;
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+  border-bottom: 3px solid var(--gold);
+}
+.dgv-wordmark {
+  font-family: 'DM Serif Display', serif;
+  font-size: 32px;
+  letter-spacing: -1px;
+  color: var(--gold);
+}
+.dgv-tagline {
+  font-size: 12px;
+  color: #aaa;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+}
+
+/* Section headers */
+.section-title {
+  font-family: 'DM Serif Display', serif;
+  font-size: 20px;
+  color: var(--ink);
+  border-bottom: 1.5px solid var(--border);
+  padding-bottom: 6px;
+  margin-bottom: 14px;
+}
+
+/* Metric cards */
+.metric-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.mcard {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 14px;
+  position: relative;
+}
+.mcard::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  background: var(--gold);
+  border-radius: 8px 8px 0 0;
+}
+.mcard-label {
+  font-size: 10px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+.mcard-value {
+  font-family: 'DM Mono', monospace;
+  font-size: 20px;
+  font-weight: 500;
+  color: var(--ink);
+}
+.mcard-sub {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+.mcard.pos .mcard-value { color: var(--green); }
+.mcard.neg .mcard-value { color: var(--red); }
+.mcard.gold .mcard-value { color: var(--gold); }
+.mcard.gold::before { background: var(--gold); }
+.mcard.pos::before  { background: var(--green); }
+.mcard.neg::before  { background: var(--red); }
+.mcard.blue::before { background: var(--blue); }
+
+/* Score dial */
+.score-ring {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  background: var(--ink);
+  border-radius: 10px;
+  padding: 18px 22px;
+  margin-bottom: 16px;
+  color: #fff;
+}
+.score-num {
+  font-family: 'DM Serif Display', serif;
+  font-size: 52px;
+  color: var(--gold);
+  line-height: 1;
+}
+.score-label { font-size: 11px; color: #aaa; letter-spacing: 2px; text-transform: uppercase; }
+.score-verdict { font-size: 18px; font-weight: 600; color: #fff; margin-top: 4px; }
+
+/* Signal rows */
+.sig-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--cream);
+  font-size: 13px;
+}
+.sig-icon { font-size: 16px; width: 22px; text-align: center; }
+.sig-text { flex: 1; color: var(--ink); }
+.sig-badge {
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: var(--cream);
+  color: var(--muted);
+}
+
+/* Chat */
+.chat-wrap {
+  max-height: 340px;
+  overflow-y: auto;
+  padding: 4px 0;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--card);
+  padding: 10px;
+  margin-bottom: 8px;
+}
+.msg-row { display: flex; gap: 8px; margin-bottom: 10px; align-items: flex-start; }
+.msg-row.u { flex-direction: row-reverse; }
+.av { width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center;
+      justify-content: center; font-size: 9px; font-weight: 700; flex-shrink: 0; margin-top: 2px; }
+.av.ai { background: var(--ink); color: var(--gold); font-family: 'DM Serif Display', serif; font-size: 12px; }
+.av.usr { background: var(--blue); color: #fff; }
+.bub { max-width: 82%; padding: 9px 13px; border-radius: 14px; font-size: 13px; line-height: 1.6; }
+.bub.ai-b { background: var(--cream); color: var(--ink); border-bottom-left-radius: 3px; }
+.bub.u-b  { background: var(--ink);  color: #fff;       border-bottom-right-radius: 3px; }
+
+/* Income calculator */
+.calc-box {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 18px 20px;
+}
+.calc-result {
+  background: var(--ink);
+  color: #fff;
+  border-radius: 8px;
+  padding: 14px 18px;
+  margin-top: 12px;
+}
+.calc-row { display: flex; justify-content: space-between; padding: 5px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.1); font-size: 13px; }
+.calc-row:last-child { border-bottom: none; }
+.calc-row span:last-child { font-family: 'DM Mono', monospace; color: var(--gold-light); font-weight: 500; }
+
+/* Progress bar */
+.pb-bg { background: var(--cream); border-radius: 6px; height: 10px; width: 100%; }
+.pb-fill { height: 10px; border-radius: 6px; transition: width .5s ease; }
+
+/* Rank table */
+.rank-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.rank-table th { background: var(--ink); color: var(--gold); padding: 9px 12px;
+                  text-align: left; font-family: 'DM Mono', monospace; font-weight: 500;
+                  font-size: 11px; letter-spacing: 1px; }
+.rank-table td { padding: 9px 12px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+.rank-table tr:hover td { background: var(--cream); }
+.rank-num { font-family: 'DM Serif Display', serif; font-size: 20px; color: var(--gold); }
+.rank-ticker { font-family: 'DM Mono', monospace; font-weight: 500; font-size: 14px; }
+
+/* Tabs */
+.stTabs [data-baseweb="tab-list"] {
+  gap: 0;
+  border-bottom: 2px solid var(--border);
+}
+.stTabs [data-baseweb="tab"] {
+  font-family: 'DM Sans', sans-serif !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  padding: 10px 20px !important;
+  border-radius: 0 !important;
+}
+.stTabs [aria-selected="true"] {
+  background: var(--ink) !important;
+  color: var(--gold) !important;
+}
 </style>
-<div class="dgv-header">
-  <div class="dgv-logo">{OPENAI_SVG}</div>
+""", unsafe_allow_html=True)
+
+# ─────────────────────────────────────────────────────────────
+#  MASTHEAD
+# ─────────────────────────────────────────────────────────────
+st.markdown("""
+<div class="dgv-masthead">
+  <div class="dgv-wordmark">DGV</div>
   <div>
-    <div class="dgv-title">OpenAI <span>DGV</span></div>
-    <div class="dgv-sub">วิเคราะห์การลงทุน · หุ้น · Forex · ทองคำ · คริปโต · สินทรัพย์ที่คุณสนใจ</div>
+    <div class="dgv-tagline">Mathematical Investment Analyzer</div>
+    <div style="font-size:12px;color:#ccc;margin-top:3px">วิเคราะห์การลงทุนด้วยคณิตศาสตร์ · ย้อนหลัง 10 ปี · ไม่ผสมข่าว</div>
   </div>
 </div>
 """, unsafe_allow_html=True)
 
-# ───────────────────────── SESSION STATE ─────────────────────────
-for key, val in [
-    ("search_history", []),
-    ("trade_chat", [{"role":"assistant","content":"สวัสดีครับ! 📊 โซนเทรด SMC พร้อมแล้ว\nถามได้เลย: Entry point, SL/TP, FVG, OB, BOS, Liquidity sweep..."}]),
-    ("invest_chat", [{"role":"assistant","content":"สวัสดีครับ! 📈 โซนลงทุนพร้อมแล้ว\nถามได้เลย: แนวโน้มระยะยาว, win rate, fundamental, portfolio..."}]),
+# ─────────────────────────────────────────────────────────────
+#  SESSION STATE
+# ─────────────────────────────────────────────────────────────
+for k, v in [
+    ("history", {}),
+    ("chat", [{"role": "assistant", "content":
+               "สวัสดีครับ! 📊 ผมวิเคราะห์จากคณิตศาสตร์ล้วน ๆ\nถามได้เลย: Sharpe, Drawdown, ผลตอบแทน, ความเสี่ยง, ขนาด Position..."}]),
+    ("last_refresh", 0),
 ]:
-    if key not in st.session_state:
-        st.session_state[key] = val
+    if k not in st.session_state:
+        st.session_state[k] = v
 
-# ───────────────────────── HELPER FUNCTIONS ─────────────────────────
-def fetch_price(sym):
-    try:
-        t = yf.Ticker(sym)
-        d = t.history(period="5d")
-        if not d.empty:
-            return {
-                "price": round(d["Close"].iloc[-1], 4),
-                "change": round(d["Close"].iloc[-1] - d["Close"].iloc[-2], 4),
-                "change_pct": round(((d["Close"].iloc[-1] - d["Close"].iloc[-2]) / d["Close"].iloc[-2]) * 100, 2),
-            }
-    except:
-        pass
-    return None
-
-MARKET_SYMBOLS = {
-    "gold":"GC=F","ทอง":"GC=F","xauusd":"GC=F","silver":"SI=F","xagusd":"SI=F",
-    "platinum":"PL=F","แพลทินัม":"PL=F","btc":"BTC-USD","bitcoin":"BTC-USD",
-    "บิทคอยน์":"BTC-USD","eth":"ETH-USD","ethereum":"ETH-USD","อีเธอเรียม":"ETH-USD",
-    "eurusd":"EURUSD=X","gbpusd":"GBPUSD=X","usdjpy":"USDJPY=X",
-    "audusd":"AUDUSD=X","usdthb":"USDTHB=X","oil":"CL=F","น้ำมัน":"CL=F",
-    "sp500":"^GSPC","nasdaq":"^IXIC","dow":"^DJI",
-    "aapl":"AAPL","tsla":"TSLA","nvda":"NVDA","msft":"MSFT",
-    "google":"GOOGL","meta":"META","amazon":"AMZN",
+# ─────────────────────────────────────────────────────────────
+#  WATCHLIST (อันดับหุ้น default)
+# ─────────────────────────────────────────────────────────────
+WATCHLIST = {
+    "GC=F":    "ทองคำ (Gold Futures)",
+    "BTC-USD": "Bitcoin",
+    "NVDA":    "NVIDIA",
+    "AAPL":    "Apple",
+    "MSFT":    "Microsoft",
+    "TSLA":    "Tesla",
+    "AMZN":    "Amazon",
+    "META":    "Meta Platforms",
+    "GOOGL":   "Alphabet (Google)",
+    "^GSPC":   "S&P 500 Index",
 }
 
-def detect_symbols(q):
-    ql = q.lower(); found = []
-    for k,v in MARKET_SYMBOLS.items():
-        if k in ql and v not in found: found.append(v)
-    return found[:3]
-
-def get_market_ctx(query):
-    syms = detect_symbols(query)
-    if not syms: return ""
-    rows = []
-    for s in syms:
-        info = fetch_price(s)
-        if info:
-            sign = "+" if info["change"] >= 0 else ""
-            rows.append(f"{s}: {info['price']:,} ({sign}{info['change_pct']}%)")
-    return ("\n\n[ราคาตลาดปัจจุบัน]\n" + "\n".join(rows)) if rows else ""
-
+# ─────────────────────────────────────────────────────────────
+#  MATH FUNCTIONS
+# ─────────────────────────────────────────────────────────────
 def calc_rsi(series, period=14):
     delta = series.diff()
     gain = delta.clip(lower=0).rolling(period).mean()
     loss = (-delta.clip(upper=0)).rolling(period).mean()
-    rs = gain / loss
+    rs = gain / (loss + 1e-9)
     return 100 - (100 / (1 + rs))
 
-# ───────────────────────── SMC DETECTION ─────────────────────────
-def detect_swing_highs(highs, order=5):
-    idxs = []
-    for i in range(order, len(highs) - order):
-        if highs[i] == max(highs[i-order:i+order+1]):
-            idxs.append(i)
-    return idxs
+def calc_macd(series, fast=12, slow=26, signal=9):
+    ema_f = series.ewm(span=fast).mean()
+    ema_s = series.ewm(span=slow).mean()
+    macd  = ema_f - ema_s
+    sig   = macd.ewm(span=signal).mean()
+    hist  = macd - sig
+    return macd, sig, hist
 
-def detect_swing_lows(lows, order=5):
-    idxs = []
-    for i in range(order, len(lows) - order):
-        if lows[i] == min(lows[i-order:i+order+1]):
-            idxs.append(i)
-    return idxs
+def calc_bollinger(series, window=20, std=2):
+    ma  = series.rolling(window).mean()
+    std_v = series.rolling(window).std()
+    return ma, ma + std*std_v, ma - std*std_v
 
-def detect_fvg(df, lookback=80):
-    """Fair Value Gaps (3-candle pattern): bullish & bearish"""
-    bullish, bearish = [], []
-    d = df.tail(lookback).reset_index()
-    for i in range(2, len(d)):
-        # Bullish FVG: low[i] > high[i-2]
-        if d["Low"].iloc[i] > d["High"].iloc[i-2]:
-            bullish.append({"top": d["Low"].iloc[i], "bot": d["High"].iloc[i-2],
-                            "date": d["Datetime"].iloc[i] if "Datetime" in d.columns else d["Date"].iloc[i] if "Date" in d.columns else d.index[i]})
-        # Bearish FVG: high[i] < low[i-2]
-        if d["High"].iloc[i] < d["Low"].iloc[i-2]:
-            bearish.append({"top": d["Low"].iloc[i-2], "bot": d["High"].iloc[i],
-                            "date": d["Datetime"].iloc[i] if "Datetime" in d.columns else d["Date"].iloc[i] if "Date" in d.columns else d.index[i]})
-    return bullish[-3:], bearish[-3:]
+def sharpe_ratio(returns, rf=0.05):
+    """Annualized Sharpe (rf = 5% ต่อปี)"""
+    rf_daily = rf / 252
+    excess = returns - rf_daily
+    if excess.std() == 0:
+        return 0.0
+    return round((excess.mean() / excess.std()) * np.sqrt(252), 3)
 
-def detect_ob(df, swing_highs_idx, swing_lows_idx, order=5):
-    """Order Blocks: candle just before swing high/low"""
-    bullish_ob, bearish_ob = [], []
-    closes = df["Close"].values
-    highs  = df["High"].values
-    lows   = df["Low"].values
-    opens  = df["Open"].values
-    idx_arr = df.index
+def sortino_ratio(returns, rf=0.05):
+    """Sortino — ใช้เฉพาะ downside std"""
+    rf_daily = rf / 252
+    excess = returns - rf_daily
+    downside = returns[returns < 0].std()
+    if downside == 0:
+        return 0.0
+    return round((excess.mean() / downside) * np.sqrt(252), 3)
 
-    for i in swing_lows_idx:
-        if i > 0:
-            # Bearish candle before swing low → Bullish OB
-            j = i - 1
-            if closes[j] < opens[j]:
-                bullish_ob.append({"top": opens[j], "bot": lows[j], "date": idx_arr[j]})
+def max_drawdown(prices):
+    """Max Drawdown เป็น %"""
+    roll_max = prices.cummax()
+    drawdown = (prices - roll_max) / (roll_max + 1e-9)
+    return round(drawdown.min() * 100, 2)
 
-    for i in swing_highs_idx:
-        if i > 0:
-            # Bullish candle before swing high → Bearish OB
-            j = i - 1
-            if closes[j] > opens[j]:
-                bearish_ob.append({"top": highs[j], "bot": opens[j], "date": idx_arr[j]})
+def calmar_ratio(returns, prices):
+    """Calmar = CAGR / |MaxDD|"""
+    cagr = ((prices.iloc[-1] / prices.iloc[0]) ** (252 / len(prices)) - 1) * 100
+    mdd  = abs(max_drawdown(prices))
+    if mdd == 0:
+        return 0.0
+    return round(cagr / mdd, 3)
 
-    return bullish_ob[-3:], bearish_ob[-3:]
+def cagr(prices):
+    years = len(prices) / 252
+    if years == 0 or prices.iloc[0] == 0:
+        return 0.0
+    return round(((prices.iloc[-1] / prices.iloc[0]) ** (1 / years) - 1) * 100, 2)
 
-def detect_bos_choch(df, swing_highs_idx, swing_lows_idx):
-    """Break of Structure (BOS) & Change of Character (CHoCH)"""
-    events = []
-    closes = df["Close"].values
-    highs  = df["High"].values
-    lows   = df["Low"].values
-    idx_arr = df.index
+def zscore(series, window=60):
+    """Z-score เพื่อระบุ overbought/oversold"""
+    roll_mean = series.rolling(window).mean()
+    roll_std  = series.rolling(window).std()
+    return (series - roll_mean) / (roll_std + 1e-9)
 
-    # BOS Bullish: price breaks above previous swing high
-    for k, i in enumerate(swing_highs_idx[:-1]):
-        next_i = swing_highs_idx[k+1]
-        level = highs[i]
-        for j in range(i+1, min(next_i+1, len(closes))):
-            if closes[j] > level:
-                events.append({"type":"BOS Bull","price":level,"date":idx_arr[j],"color":"#26a69a"})
-                break
+def linear_trend(prices):
+    """Linear regression slope (annualized %)"""
+    x = np.arange(len(prices))
+    slope, intercept, r_val, p_val, _ = stats.linregress(x, prices.values)
+    annual_slope = slope * 252 / prices.mean() * 100
+    return round(annual_slope, 2), round(r_val**2, 3), round(p_val, 4)
 
-    # BOS Bearish: price breaks below previous swing low
-    for k, i in enumerate(swing_lows_idx[:-1]):
-        next_i = swing_lows_idx[k+1]
-        level = lows[i]
-        for j in range(i+1, min(next_i+1, len(closes))):
-            if closes[j] < level:
-                events.append({"type":"BOS Bear","price":level,"date":idx_arr[j],"color":"#ef5350"})
-                break
+def momentum_score(prices):
+    """Weighted momentum: 1M,3M,6M,12M"""
+    weights = {22: 0.4, 66: 0.3, 126: 0.2, 252: 0.1}
+    score = 0.0
+    cur = prices.iloc[-1]
+    for d, w in weights.items():
+        if len(prices) > d:
+            ret = (cur / prices.iloc[-d] - 1) * 100
+            score += w * ret
+    return round(score, 2)
 
-    return events[-6:]
+def volatility_regime(returns, window=30):
+    """Short vs Long vol เพื่อระบุ regime"""
+    vol_s = returns.tail(window).std() * np.sqrt(252) * 100
+    vol_l = returns.std() * np.sqrt(252) * 100
+    ratio = vol_s / (vol_l + 1e-9)
+    return round(vol_s, 2), round(vol_l, 2), round(ratio, 2)
 
-# ───────────────────────── WIN RATE BACKTEST ─────────────────────────
-def backtest_winrate(df):
+def value_at_risk(returns, confidence=0.95):
+    """Historical VaR"""
+    return round(np.percentile(returns.dropna(), (1 - confidence) * 100) * 100, 3)
+
+def expected_shortfall(returns, confidence=0.95):
+    """CVaR/ES"""
+    var = np.percentile(returns.dropna(), (1 - confidence) * 100)
+    es  = returns[returns <= var].mean()
+    return round(es * 100, 3)
+
+def winrate_backtest(df, strategy="ma_cross"):
     """
-    Simple backtest: ทดสอบ Signal ย้อนหลัง 1 ปี
-    - Signal: ราคาต่ำกว่า MA50 แล้ว bounce ขึ้น (entry = close วันนั้น)
-    - Win: ราคาขึ้น >1% ใน 5 วันถัดไป
-    - Lose: ราคาลง >1% ใน 5 วันถัดไป
-    คืน dict: wins, losses, total, winrate
+    Backtest Win Rate:
+    Signal: MA50 cross + RSI filter
+    Win: +1.5% ใน 5 วัน | Lose: -1.5%
     """
     d = df.copy()
+    d["MA20"] = d["Close"].rolling(20).mean()
     d["MA50"] = d["Close"].rolling(50).mean()
     d["RSI"]  = calc_rsi(d["Close"], 14)
-
     wins = losses = 0
     entries = []
-
-    for i in range(50, len(d) - 5):
-        prev_below = d["Close"].iloc[i-1] < d["MA50"].iloc[i-1]
-        curr_above = d["Close"].iloc[i]   >= d["MA50"].iloc[i]
-        rsi_ok     = d["RSI"].iloc[i] < 55
-
-        if prev_below and curr_above and rsi_ok:
+    for i in range(50, len(d) - 10):
+        cross_up = (d["MA20"].iloc[i-1] <= d["MA50"].iloc[i-1]) and \
+                   (d["MA20"].iloc[i]    >  d["MA50"].iloc[i])
+        rsi_ok   = 35 < d["RSI"].iloc[i] < 65
+        if cross_up and rsi_ok:
             entry = d["Close"].iloc[i]
-            future_max = d["Close"].iloc[i+1:i+6].max()
-            future_min = d["Close"].iloc[i+1:i+6].min()
-            chg_max = (future_max - entry) / entry * 100
-            chg_min = (future_min - entry) / entry * 100
-
-            if chg_max >= 1.0:
+            fwd   = d["Close"].iloc[i+1:i+11]
+            max_r = (fwd.max() - entry) / entry * 100
+            min_r = (fwd.min() - entry) / entry * 100
+            if max_r >= 1.5:
                 wins += 1
-                entries.append({"date": d.index[i], "result":"win"})
-            elif chg_min <= -1.0:
+                entries.append((d.index[i], entry, "win"))
+            elif min_r <= -1.5:
                 losses += 1
-                entries.append({"date": d.index[i], "result":"lose"})
-
+                entries.append((d.index[i], entry, "lose"))
     total = wins + losses
-    winrate = round((wins / total * 100), 1) if total > 0 else 0
-    return {"wins": wins, "losses": losses, "total": total, "winrate": winrate, "entries": entries}
+    wr = round(wins / total * 100, 1) if total else 0
+    return {"wins": wins, "losses": losses, "total": total, "winrate": wr, "entries": entries}
 
-# ───────────────────────── INVEST ANALYSIS ─────────────────────────
-def full_invest_analysis(df, symbol):
-    """คืน dict ที่มีตัวชี้วัดการลงทุนครบถ้วน"""
+def full_math_analysis(df, symbol):
+    """คืน dict วิเคราะห์ทางคณิตศาสตร์ครบถ้วน"""
     d = df.copy()
-    d["MA20"]  = d["Close"].rolling(20).mean()
-    d["MA50"]  = d["Close"].rolling(50).mean()
-    d["MA200"] = d["Close"].rolling(200).mean()
-    d["RSI"]   = calc_rsi(d["Close"], 14)
+    prices  = d["Close"].dropna()
+    returns = prices.pct_change().dropna()
 
-    # MACD
-    ema12 = d["Close"].ewm(span=12).mean()
-    ema26 = d["Close"].ewm(span=26).mean()
-    d["MACD"] = ema12 - ema26
-    d["Signal"] = d["MACD"].ewm(span=9).mean()
+    sh  = sharpe_ratio(returns)
+    so  = sortino_ratio(returns)
+    mdd = max_drawdown(prices)
+    cal = calmar_ratio(returns, prices)
+    ag  = cagr(prices)
+    mom = momentum_score(prices)
+    vol_s, vol_l, vol_r = volatility_regime(returns)
+    vr  = value_at_risk(returns)
+    es  = expected_shortfall(returns)
+    trend_slope, r2, pval = linear_trend(prices)
 
-    cur   = d["Close"].iloc[-1]
-    ma20  = d["MA20"].iloc[-1]
-    ma50  = d["MA50"].iloc[-1]
-    ma200 = d["MA200"].iloc[-1] if len(d) >= 200 else None
-    rsi   = d["RSI"].iloc[-1]
-    macd  = d["MACD"].iloc[-1]
-    sig   = d["Signal"].iloc[-1]
+    # MA
+    d["MA20"]  = prices.rolling(20).mean()
+    d["MA50"]  = prices.rolling(50).mean()
+    d["MA200"] = prices.rolling(200).mean()
+    d["MA20"]  = d["MA20"].reindex(d.index)
+    d["MA50"]  = d["MA50"].reindex(d.index)
+    d["MA200"] = d["MA200"].reindex(d.index)
 
-    ret_1m = (cur / d["Close"].iloc[-22] - 1) * 100  if len(d) >= 22  else 0
-    ret_3m = (cur / d["Close"].iloc[-66] - 1) * 100  if len(d) >= 66  else 0
-    ret_6m = (cur / d["Close"].iloc[-126]- 1) * 100  if len(d) >= 126 else 0
-    vol_30 = d["Close"].pct_change().tail(30).std() * 100
+    d["RSI"]           = calc_rsi(d["Close"], 14)
+    d["MACD"], d["MACDsig"], d["MACDhist"] = calc_macd(d["Close"])
+    d["BB_mid"], d["BB_up"], d["BB_dn"]    = calc_bollinger(d["Close"])
+    d["ZScore"]        = zscore(d["Close"])
 
+    cur    = prices.iloc[-1]
+    ma20   = d["MA20"].iloc[-1]
+    ma50   = d["MA50"].iloc[-1]
+    ma200v = d["MA200"].iloc[-1] if not pd.isna(d["MA200"].iloc[-1]) else None
+    rsi_v  = d["RSI"].iloc[-1]
+    macd_v = d["MACD"].iloc[-1]
+    sig_v  = d["MACDsig"].iloc[-1]
+    z_v    = d["ZScore"].iloc[-1]
+    bb_up  = d["BB_up"].iloc[-1]
+    bb_dn  = d["BB_dn"].iloc[-1]
+
+    # Returns
+    ret_1m  = (cur / prices.iloc[-22]  - 1) * 100 if len(prices) >= 22  else 0
+    ret_3m  = (cur / prices.iloc[-66]  - 1) * 100 if len(prices) >= 66  else 0
+    ret_6m  = (cur / prices.iloc[-126] - 1) * 100 if len(prices) >= 126 else 0
+    ret_1y  = (cur / prices.iloc[-252] - 1) * 100 if len(prices) >= 252 else 0
+    ret_3y  = (cur / prices.iloc[-756] - 1) * 100 if len(prices) >= 756 else 0
+
+    # ── Composite Score (0-100) ─────────────────────────────
     score = 0
     signals = []
-    if cur > ma50:  score += 20; signals.append(("✅","ราคาอยู่เหนือ MA50"))
-    else:           signals.append(("❌","ราคาต่ำกว่า MA50"))
-    if ma200 and cur > ma200: score += 20; signals.append(("✅","ราคาอยู่เหนือ MA200 (Bullish)"))
-    elif ma200:               signals.append(("❌","ราคาต่ำกว่า MA200 (Bearish)"))
-    if rsi < 70 and rsi > 40: score += 15; signals.append(("✅",f"RSI {rsi:.1f} อยู่ในโซนสมดุล"))
-    elif rsi <= 40:            score += 10; signals.append(("⚠️",f"RSI {rsi:.1f} Oversold (อาจ Bounce)"))
-    else:                                   signals.append(("❌",f"RSI {rsi:.1f} Overbought"))
-    if macd > sig:  score += 15; signals.append(("✅","MACD อยู่เหนือ Signal line (Bullish)"))
-    else:           signals.append(("❌","MACD ต่ำกว่า Signal line (Bearish)"))
-    if ret_6m > 0:  score += 15; signals.append(("✅",f"ผลตอบแทน 6 เดือน +{ret_6m:.1f}%"))
-    else:           signals.append(("❌",f"ผลตอบแทน 6 เดือน {ret_6m:.1f}%"))
-    if vol_30 < 2.5:score += 15; signals.append(("✅",f"ความผันผวน {vol_30:.1f}% (ต่ำ)"))
-    else:           signals.append(("⚠️",f"ความผันผวน {vol_30:.1f}% (สูง)"))
+
+    # Sharpe
+    if sh >= 1.5:
+        score += 20
+        signals.append(("✅", f"Sharpe Ratio {sh:.2f}", "ดีเยี่ยม (≥1.5)", "pos"))
+    elif sh >= 0.8:
+        score += 12
+        signals.append(("⚠️", f"Sharpe Ratio {sh:.2f}", "พอใช้ (0.8–1.5)", "neu"))
+    else:
+        signals.append(("❌", f"Sharpe Ratio {sh:.2f}", "ต่ำ (<0.8)", "neg"))
+
+    # Sortino
+    if so >= 2.0:
+        score += 15
+        signals.append(("✅", f"Sortino Ratio {so:.2f}", "Downside risk ต่ำ", "pos"))
+    elif so >= 1.0:
+        score += 8
+        signals.append(("⚠️", f"Sortino Ratio {so:.2f}", "ปานกลาง", "neu"))
+    else:
+        signals.append(("❌", f"Sortino Ratio {so:.2f}", "ความเสี่ยงขาลงสูง", "neg"))
+
+    # MDD
+    if mdd > -20:
+        score += 15
+        signals.append(("✅", f"Max Drawdown {mdd:.1f}%", "ทนทานต่อวิกฤต", "pos"))
+    elif mdd > -40:
+        score += 8
+        signals.append(("⚠️", f"Max Drawdown {mdd:.1f}%", "ปานกลาง", "neu"))
+    else:
+        signals.append(("❌", f"Max Drawdown {mdd:.1f}%", "ความเสี่ยงสูงมาก", "neg"))
+
+    # CAGR
+    if ag >= 15:
+        score += 15
+        signals.append(("✅", f"CAGR {ag:.1f}%/ปี", "ผลตอบแทนดีเยี่ยม", "pos"))
+    elif ag >= 7:
+        score += 8
+        signals.append(("⚠️", f"CAGR {ag:.1f}%/ปี", "ดีกว่าพันธบัตร", "neu"))
+    else:
+        signals.append(("❌", f"CAGR {ag:.1f}%/ปี", "ต่ำกว่าเงินเฟ้อ", "neg"))
+
+    # Momentum
+    if mom >= 10:
+        score += 10
+        signals.append(("✅", f"Momentum Score {mom:.1f}%", "แรงโมเมนตัมสูง", "pos"))
+    elif mom >= 0:
+        score += 5
+        signals.append(("⚠️", f"Momentum Score {mom:.1f}%", "โมเมนตัมอ่อน", "neu"))
+    else:
+        signals.append(("❌", f"Momentum Score {mom:.1f}%", "โมเมนตัมติดลบ", "neg"))
+
+    # MA alignment
+    if ma200v and cur > ma200v and cur > ma50 > ma20:
+        score += 15
+        signals.append(("✅", "MA Alignment", "Bullish (Price>MA200>MA50>MA20)", "pos"))
+    elif cur > ma50:
+        score += 7
+        signals.append(("⚠️", "MA Alignment", "Partial Bullish", "neu"))
+    else:
+        signals.append(("❌", "MA Alignment", "ราคาต่ำกว่า MA50", "neg"))
+
+    # Z-score
+    if -1.5 < z_v < 1.5:
+        score += 10
+        signals.append(("✅", f"Z-Score {z_v:.2f}", "ราคาไม่ Extreme", "pos"))
+    elif z_v >= 1.5:
+        signals.append(("⚠️", f"Z-Score {z_v:.2f}", "Overbought ระวัง", "neg"))
+    else:
+        score += 5
+        signals.append(("⚠️", f"Z-Score {z_v:.2f}", "Oversold โอกาสเข้า", "pos"))
+
+    verdict = ("Strong Buy" if score >= 75 else
+               "Buy" if score >= 60 else
+               "Hold/Watch" if score >= 45 else
+               "Underweight" if score >= 30 else "Avoid")
 
     return {
-        "score": score, "signals": signals, "rsi": rsi, "macd": macd, "sig": sig,
-        "ma20": ma20, "ma50": ma50, "ma200": ma200, "cur": cur,
-        "ret_1m": ret_1m, "ret_3m": ret_3m, "ret_6m": ret_6m, "vol_30": vol_30,
-        "df": d
+        "score": score, "verdict": verdict, "signals": signals,
+        "sharpe": sh, "sortino": so, "mdd": mdd, "calmar": cal,
+        "cagr": ag, "momentum": mom,
+        "vol_s": vol_s, "vol_l": vol_l, "vol_r": vol_r,
+        "var95": vr, "es95": es,
+        "trend_slope": trend_slope, "r2": r2, "pval": pval,
+        "cur": cur, "ma20": ma20, "ma50": ma50, "ma200": ma200v,
+        "rsi": rsi_v, "macd": macd_v, "macd_sig": sig_v,
+        "zscore": z_v, "bb_up": bb_up, "bb_dn": bb_dn,
+        "ret_1m": ret_1m, "ret_3m": ret_3m, "ret_6m": ret_6m,
+        "ret_1y": ret_1y, "ret_3y": ret_3y,
+        "df": d,
     }
 
-# ───────────────────────── DATA FETCH ─────────────────────────
-col_input, col_info = st.columns([1, 2])
-with col_input:
-    symbol = (
-        st.text_input("🔍 กรอกสัญลักษณ์ (เช่น AAPL, EURUSD=X, GC=F, BTC-USD)", "GC=F")
-        .upper().replace("/", "")
+def score_color(score):
+    if score >= 75: return "pos"
+    if score >= 50: return "gold"
+    return "neg"
+
+# ─────────────────────────────────────────────────────────────
+#  FETCH DATA
+# ─────────────────────────────────────────────────────────────
+@st.cache_data(ttl=30)
+def fetch_data(symbol, period="10y"):
+    try:
+        t = yf.Ticker(symbol)
+        d = t.history(period=period)
+        return d if not d.empty else None
+    except:
+        return None
+
+@st.cache_data(ttl=60)
+def fetch_watchlist_scores():
+    results = []
+    for sym, name in WATCHLIST.items():
+        df = fetch_data(sym)
+        if df is None or len(df) < 252:
+            continue
+        try:
+            m = full_math_analysis(df, sym)
+            bt = winrate_backtest(df)
+            results.append({
+                "sym": sym, "name": name,
+                "score": m["score"], "verdict": m["verdict"],
+                "cagr": m["cagr"], "sharpe": m["sharpe"],
+                "mdd": m["mdd"], "winrate": bt["winrate"],
+                "momentum": m["momentum"], "vol": m["vol_l"],
+                "cur": m["cur"],
+            })
+        except:
+            continue
+    return sorted(results, key=lambda x: x["score"], reverse=True)
+
+# ─────────────────────────────────────────────────────────────
+#  INPUT BAR
+# ─────────────────────────────────────────────────────────────
+c1, c2, c3 = st.columns([2, 1, 1])
+with c1:
+    symbol = st.text_input(
+        "🔍 กรอกสัญลักษณ์",
+        "GC=F",
+        placeholder="เช่น AAPL, BTC-USD, GC=F, EURUSD=X",
+        label_visibility="collapsed",
+    ).upper().replace("/", "").strip()
+
+data = fetch_data(symbol)
+is_fx = "=X" in symbol or symbol in ["EURUSD=X","GBPUSD=X","USDJPY=X"]
+
+if data is None or len(data) < 100:
+    st.error("⚠️ ไม่พบข้อมูล หรือข้อมูลไม่เพียงพอ กรุณาลองใหม่")
+    st.stop()
+
+cur_price = data["Close"].iloc[-1]
+prev_price = data["Close"].iloc[-2]
+price_chg  = cur_price - prev_price
+price_chg_pct = price_chg / prev_price * 100
+
+fmt_p = lambda v: f"{v:,.4f}" if is_fx else f"${v:,.2f}"
+
+# ── Price header
+with c2:
+    st.metric(f"{symbol}", fmt_p(cur_price),
+              delta=f"{price_chg:+.4f} ({price_chg_pct:+.2f}%)" if is_fx
+                    else f"${price_chg:+.2f} ({price_chg_pct:+.2f}%)")
+with c3:
+    data_years = len(data) / 252
+    st.caption(f"📅 ข้อมูล {data_years:.1f} ปี | {len(data):,} วัน\n🔄 Refresh ทุก 30 วินาที")
+
+# ─────────────────────────────────────────────────────────────
+#  COMPUTE
+# ─────────────────────────────────────────────────────────────
+with st.spinner("กำลังวิเคราะห์คณิตศาสตร์..."):
+    m   = full_math_analysis(data, symbol)
+    bt  = winrate_backtest(data)
+
+# ─────────────────────────────────────────────────────────────
+#  TABS
+# ─────────────────────────────────────────────────────────────
+tab_overview, tab_chart, tab_rank, tab_income, tab_chat = st.tabs([
+    "📐 ภาพรวมคณิตศาสตร์",
+    "📈 กราฟวิเคราะห์",
+    "🏆 อันดับสินทรัพย์",
+    "💰 คำนวณรายได้",
+    "🤖 AI Assistant",
+])
+
+# ══════════════════════════════════════════════════════════════
+#  TAB 1 — OVERVIEW
+# ══════════════════════════════════════════════════════════════
+with tab_overview:
+    col_left, col_right = st.columns([3, 2])
+
+    with col_left:
+        # Score ring
+        sc = m["score"]
+        cls = score_color(sc)
+        verdict_emoji = {"Strong Buy":"🚀","Buy":"📈","Hold/Watch":"⏳","Underweight":"⚠️","Avoid":"🚫"}
+        st.markdown(f"""
+        <div class="score-ring">
+          <div>
+            <div class="score-label">COMPOSITE SCORE</div>
+            <div class="score-num">{sc}</div>
+            <div style="font-size:10px;color:#888">/ 100</div>
+          </div>
+          <div>
+            <div class="score-label">คำแนะนำ</div>
+            <div class="score-verdict">{verdict_emoji.get(m['verdict'],'')} {m['verdict']}</div>
+            <div style="font-size:11px;color:#aaa;margin-top:6px">Win Rate Backtest: {bt['winrate']}%
+            ({bt['wins']}W/{bt['losses']}L)</div>
+          </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        # Win rate bar
+        wr = bt["winrate"]
+        wr_col = "#2d7a4f" if wr>=60 else "#c8a84b" if wr>=45 else "#c0392b"
+        st.markdown(f"""
+        <div style="margin-bottom:8px">
+          <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px">
+            <span>Win Rate (MA Cross Strategy · ย้อนหลัง 10 ปี)</span>
+            <span style="font-family:'DM Mono',monospace;font-weight:600;color:{wr_col}">{wr}%</span>
+          </div>
+          <div class="pb-bg"><div class="pb-fill" style="width:{min(wr,100)}%;background:{wr_col}"></div></div>
+          <div style="font-size:11px;color:var(--muted);margin-top:3px">{bt['total']} สัญญาณ | {bt['wins']} ชนะ | {bt['losses']} แพ้</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        st.markdown('<div class="section-title">📋 ผลการวิเคราะห์ตัวชี้วัด</div>', unsafe_allow_html=True)
+        for icon, label, detail, _ in m["signals"]:
+            st.markdown(f"""
+            <div class="sig-row">
+              <div class="sig-icon">{icon}</div>
+              <div class="sig-text"><strong>{label}</strong></div>
+              <div class="sig-badge">{detail}</div>
+            </div>
+            """, unsafe_allow_html=True)
+
+    with col_right:
+        st.markdown('<div class="section-title">📊 ตัวเลขสำคัญ</div>', unsafe_allow_html=True)
+
+        def mcard(label, value, sub="", cls=""):
+            st.markdown(f"""
+            <div class="mcard {cls}" style="margin-bottom:10px">
+              <div class="mcard-label">{label}</div>
+              <div class="mcard-value">{value}</div>
+              {'<div class="mcard-sub">'+sub+'</div>' if sub else ''}
+            </div>""", unsafe_allow_html=True)
+
+        mcard("CAGR (ต่อปี)", f"{m['cagr']:+.1f}%",
+              f"ย้อนหลัง {len(data)/252:.0f} ปี",
+              "pos" if m['cagr']>0 else "neg")
+        mcard("SHARPE RATIO", f"{m['sharpe']:.2f}",
+              "ผลตอบแทนต่อหน่วยความเสี่ยง",
+              "pos" if m['sharpe']>=1 else "neg" if m['sharpe']<0 else "")
+        mcard("SORTINO RATIO", f"{m['sortino']:.2f}",
+              "ความเสี่ยงขาลงเท่านั้น",
+              "pos" if m['sortino']>=1 else "neg" if m['sortino']<0 else "")
+        mcard("MAX DRAWDOWN", f"{m['mdd']:.1f}%",
+              "จุดต่ำสุดจาก Peak",
+              "neg" if m['mdd']<-30 else "")
+        mcard("CALMAR RATIO", f"{m['calmar']:.2f}",
+              "CAGR / |MaxDD|",
+              "pos" if m['calmar']>1 else "")
+        mcard("VALUE AT RISK (95%)", f"{m['var95']:.2f}%",
+              "ขาดทุนสูงสุด/วัน (95% CI)", "neg")
+        mcard("VOLATILITY (30D)", f"{m['vol_s']:.1f}%",
+              f"Long-term: {m['vol_l']:.1f}% · Ratio: {m['vol_r']:.2f}", "")
+        mcard("LINEAR TREND", f"{m['trend_slope']:+.1f}%/ปี",
+              f"R²={m['r2']:.2f} · p={m['pval']:.3f}",
+              "pos" if m['trend_slope']>0 else "neg")
+        mcard("MOMENTUM SCORE", f"{m['momentum']:+.1f}%",
+              "Weighted 1M/3M/6M/12M",
+              "pos" if m['momentum']>0 else "neg")
+        mcard("Z-SCORE (60D)", f"{m['zscore']:+.2f}",
+              ">+2: Overbought | <-2: Oversold",
+              "neg" if abs(m['zscore'])>2 else "pos")
+
+        # Returns table
+        st.markdown('<div class="section-title" style="margin-top:16px">📅 ผลตอบแทนย้อนหลัง</div>',
+                    unsafe_allow_html=True)
+        for label, val in [("1 เดือน", m["ret_1m"]), ("3 เดือน", m["ret_3m"]),
+                            ("6 เดือน", m["ret_6m"]), ("1 ปี", m["ret_1y"]),
+                            ("3 ปี",    m["ret_3y"])]:
+            col = "#2d7a4f" if val>=0 else "#c0392b"
+            st.markdown(f"""
+            <div style="display:flex;justify-content:space-between;padding:5px 0;
+                        border-bottom:1px solid var(--border);font-size:13px">
+              <span>{label}</span>
+              <span style="font-family:'DM Mono',monospace;font-weight:600;color:{col}">{val:+.1f}%</span>
+            </div>""", unsafe_allow_html=True)
+
+# ══════════════════════════════════════════════════════════════
+#  TAB 2 — CHART (Realtime-style with 10Y data)
+# ══════════════════════════════════════════════════════════════
+with tab_chart:
+    col_ctrl, _ = st.columns([2, 3])
+    with col_ctrl:
+        tf = st.select_slider("ช่วงเวลา (ปี)",
+                               options=[1, 2, 3, 5, 10],
+                               value=10 if len(data)>=2500 else 5,
+                               format_func=lambda x: f"{x} ปี")
+    n = min(int(tf * 252), len(data))
+    df_c = m["df"].tail(n).copy()
+
+    chart_type = st.radio("ประเภทกราฟ", ["Candlestick","Line + BB","Z-Score","Drawdown Curve"],
+                           horizontal=True)
+
+    if chart_type == "Candlestick":
+        fig = make_subplots(rows=3, cols=1, shared_xaxes=True,
+                            row_heights=[0.55, 0.22, 0.23],
+                            vertical_spacing=0.025,
+                            subplot_titles=("Price · MA · Bollinger Bands",
+                                            "RSI (14) — Relative Strength Index",
+                                            "MACD (12,26,9) — Momentum"))
+        fig.add_trace(go.Candlestick(
+            x=df_c.index, open=df_c["Open"], high=df_c["High"],
+            low=df_c["Low"], close=df_c["Close"], name="Price",
+            increasing_line_color="#2d7a4f", decreasing_line_color="#c0392b"
+        ), row=1, col=1)
+        for col_ma, width, dash, name_ma in [
+            ("MA20", 1.2, "dot", "MA20"),
+            ("MA50", 1.5, "solid", "MA50"),
+            ("MA200", 1.8, "dash", "MA200"),
+        ]:
+            if col_ma in df_c.columns and not df_c[col_ma].isna().all():
+                colors = {"MA20":"#f39c12","MA50":"#9b59b6","MA200":"#e74c3c"}
+                fig.add_trace(go.Scatter(
+                    x=df_c.index, y=df_c[col_ma], mode="lines",
+                    name=name_ma, line=dict(color=colors[col_ma], width=width, dash=dash)
+                ), row=1, col=1)
+        # Bollinger
+        fig.add_trace(go.Scatter(
+            x=df_c.index, y=df_c["BB_up"], name="BB Upper",
+            line=dict(color="rgba(30,90,150,0.4)", width=1),
+            fill=None, showlegend=False
+        ), row=1, col=1)
+        fig.add_trace(go.Scatter(
+            x=df_c.index, y=df_c["BB_dn"], name="BB Band",
+            fill='tonexty', fillcolor='rgba(30,90,150,0.07)',
+            line=dict(color="rgba(30,90,150,0.4)", width=1), showlegend=False
+        ), row=1, col=1)
+        # RSI
+        fig.add_trace(go.Scatter(
+            x=df_c.index, y=df_c["RSI"], mode="lines",
+            name="RSI", line=dict(color="#7b1fa2", width=1.5)
+        ), row=2, col=1)
+        fig.add_hline(y=70, line_color="#c0392b", line_dash="dash", line_width=1, row=2, col=1)
+        fig.add_hline(y=30, line_color="#2d7a4f", line_dash="dash", line_width=1, row=2, col=1)
+        fig.add_hline(y=50, line_color="#aaa", line_dash="dot", line_width=0.8, row=2, col=1)
+        # MACD
+        hist_c = ["#2d7a4f" if v >= 0 else "#c0392b" for v in df_c["MACDhist"]]
+        fig.add_trace(go.Bar(
+            x=df_c.index, y=df_c["MACDhist"], name="Histogram",
+            marker_color=hist_c, opacity=0.65
+        ), row=3, col=1)
+        fig.add_trace(go.Scatter(
+            x=df_c.index, y=df_c["MACD"], mode="lines",
+            name="MACD", line=dict(color="#1a3a5c", width=1.4)
+        ), row=3, col=1)
+        fig.add_trace(go.Scatter(
+            x=df_c.index, y=df_c["MACDsig"], mode="lines",
+            name="Signal", line=dict(color="#c8a84b", width=1.4)
+        ), row=3, col=1)
+
+    elif chart_type == "Line + BB":
+        fig = make_subplots(rows=2, cols=1, shared_xaxes=True,
+                            row_heights=[0.7, 0.3], vertical_spacing=0.03,
+                            subplot_titles=("Price + Bollinger Bands", "Z-Score (60D)"))
+        fig.add_trace(go.Scatter(
+            x=df_c.index, y=df_c["Close"], mode="lines",
+            name="ราคา", line=dict(color="#1a3a5c", width=2)
+        ), row=1, col=1)
+        fig.add_trace(go.Scatter(
+            x=df_c.index, y=df_c["BB_up"], name="BB+2σ",
+            line=dict(color="#c8a84b", width=1, dash="dash"), fill=None
+        ), row=1, col=1)
+        fig.add_trace(go.Scatter(
+            x=df_c.index, y=df_c["BB_dn"], name="BB-2σ",
+            fill='tonexty', fillcolor='rgba(200,168,75,0.08)',
+            line=dict(color="#c8a84b", width=1, dash="dash")
+        ), row=1, col=1)
+        fig.add_trace(go.Scatter(
+            x=df_c.index, y=df_c["BB_mid"], name="BB Mid",
+            line=dict(color="#aaa", width=1, dash="dot")
+        ), row=1, col=1)
+        # Z-Score
+        zs = df_c["ZScore"]
+        z_col = ["#2d7a4f" if v < -1 else "#c0392b" if v > 1 else "#888" for v in zs]
+        fig.add_trace(go.Bar(x=df_c.index, y=zs, name="Z-Score",
+                             marker_color=z_col, opacity=0.7), row=2, col=1)
+        fig.add_hline(y=2,  line_color="#c0392b", line_dash="dash", row=2, col=1)
+        fig.add_hline(y=-2, line_color="#2d7a4f", line_dash="dash", row=2, col=1)
+        fig.add_hline(y=0,  line_color="#aaa", row=2, col=1)
+
+    elif chart_type == "Z-Score":
+        fig = go.Figure()
+        zs = df_c["ZScore"]
+        z_col = ["#2d7a4f" if v < -1.5 else "#c0392b" if v > 1.5 else "#1a3a5c" for v in zs]
+        fig.add_trace(go.Bar(x=df_c.index, y=zs, name="Z-Score 60D",
+                             marker_color=z_col, opacity=0.8))
+        fig.add_hline(y=2,   line_color="#c0392b", line_dash="dash",
+                      annotation_text="Overbought +2σ")
+        fig.add_hline(y=-2,  line_color="#2d7a4f", line_dash="dash",
+                      annotation_text="Oversold -2σ")
+        fig.add_hline(y=0,   line_color="#888", line_width=0.8)
+        fig.update_layout(title="Z-Score (60-Day Rolling) — ระบุโซน Extreme")
+
+    else:  # Drawdown
+        prices_c = df_c["Close"]
+        roll_max  = prices_c.cummax()
+        dd        = (prices_c - roll_max) / (roll_max + 1e-9) * 100
+        fig = go.Figure()
+        fig.add_trace(go.Scatter(
+            x=df_c.index, y=dd, mode="lines", name="Drawdown",
+            fill="tozeroy", fillcolor="rgba(192,57,43,0.15)",
+            line=dict(color="#c0392b", width=1.5)
+        ))
+        fig.add_hline(y=-20, line_color="#c8a84b", line_dash="dash",
+                      annotation_text="-20% Threshold")
+        fig.add_hline(y=-40, line_color="#c0392b", line_dash="dash",
+                      annotation_text="-40% Severe")
+        fig.update_layout(title="Drawdown Curve — ความเสียหายจาก Peak")
+
+    fig.update_layout(
+        height=580,
+        xaxis_rangeslider_visible=False,
+        margin=dict(l=10, r=10, t=36, b=10),
+        plot_bgcolor="#fff",
+        paper_bgcolor="#f8f6f1",
+        legend=dict(bgcolor="rgba(255,255,255,0.85)", bordercolor=var if (var:="#d8d2c5") else "#d8d2c5",
+                    borderwidth=1, font=dict(size=11)),
+        font=dict(family="DM Sans"),
     )
+    st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
 
-try:
-    ticker = yf.Ticker(symbol)
-    data   = ticker.history(period="1y")
-    if not data.empty:
-        current_price   = data["Close"].iloc[-1]
-        previous_close  = data["Close"].iloc[-2] if len(data) > 1 else current_price
-        price_change    = current_price - previous_close
-        price_change_pct= (price_change / previous_close) * 100
+    # Backtest entry markers
+    if bt["entries"]:
+        st.markdown(f"**🔬 Backtest Entries** — {bt['total']} สัญญาณ | {bt['wins']}✅ {bt['losses']}❌")
+        fig_bt = go.Figure()
+        prices_full = m["df"]["Close"]
+        fig_bt.add_trace(go.Scatter(
+            x=prices_full.index, y=prices_full,
+            mode="lines", name="ราคา", line=dict(color="#1a3a5c", width=1.5)
+        ))
+        w_d = [(e[0], e[1]) for e in bt["entries"] if e[2]=="win"  and e[0] in prices_full.index]
+        l_d = [(e[0], e[1]) for e in bt["entries"] if e[2]=="lose" and e[0] in prices_full.index]
+        if w_d:
+            fig_bt.add_trace(go.Scatter(
+                x=[x[0] for x in w_d], y=[x[1] for x in w_d], mode="markers",
+                name="Win Entry", marker=dict(symbol="triangle-up", size=9, color="#2d7a4f")
+            ))
+        if l_d:
+            fig_bt.add_trace(go.Scatter(
+                x=[x[0] for x in l_d], y=[x[1] for x in l_d], mode="markers",
+                name="Lose Entry", marker=dict(symbol="triangle-down", size=9, color="#c0392b")
+            ))
+        fig_bt.update_layout(height=280, margin=dict(l=10,r=10,t=20,b=10),
+                              plot_bgcolor="#fff", paper_bgcolor="#f8f6f1",
+                              xaxis_rangeslider_visible=False)
+        st.plotly_chart(fig_bt, use_container_width=True, config={"displayModeBar": False})
+
+# ══════════════════════════════════════════════════════════════
+#  TAB 3 — RANKING
+# ══════════════════════════════════════════════════════════════
+with tab_rank:
+    st.markdown('<div class="section-title">🏆 อันดับสินทรัพย์ (Composite Score · คณิตศาสตร์ล้วน)</div>',
+                unsafe_allow_html=True)
+    st.caption("คำนวณจาก Sharpe, CAGR, Drawdown, Momentum, MA Alignment, Z-Score — ไม่มีปัจจัยข่าว")
+
+    with st.spinner("กำลังดึงและวิเคราะห์ทุกสินทรัพย์..."):
+        rankings = fetch_watchlist_scores()
+
+    if not rankings:
+        st.warning("ไม่สามารถดึงข้อมูลได้")
     else:
-        current_price = 0
-except Exception as e:
-    st.error(f"เกิดข้อผิดพลาด: {e}")
-    data = pd.DataFrame()
+        medals = ["🥇","🥈","🥉"] + [""] * 20
+        verdict_icon = {"Strong Buy":"🚀","Buy":"📈","Hold/Watch":"⏳","Underweight":"⚠️","Avoid":"🚫"}
+        score_bg = lambda s: "#d4edda" if s>=75 else "#fff3cd" if s>=50 else "#f8d7da"
 
-if not data.empty:
-    # ── Price header
-    st.markdown("### 🔴 ราคาตลาดปัจจุบัน")
-    mc1, mc2 = st.columns([1, 3])
-    with mc1:
-        is_fx = "=X" in symbol
-        st.metric(
-            label=f"ราคาล่าสุด {symbol}",
-            value=f"{current_price:,.4f}" if is_fx else f"${current_price:,.2f}",
-            delta=f"{price_change:+.4f} ({price_change_pct:+.2f}%)" if is_fx
-                  else f"${price_change:+.2f} ({price_change_pct:+.2f}%)"
+        html_rows = ""
+        for i, r in enumerate(rankings):
+            sc_bg  = score_bg(r["score"])
+            v_icon = verdict_icon.get(r["verdict"], "")
+            cagr_c = "#2d7a4f" if r["cagr"]>=0 else "#c0392b"
+            mom_c  = "#2d7a4f" if r["momentum"]>=0 else "#c0392b"
+
+            # เหตุผล
+            reasons = []
+            if r["sharpe"] >= 1.5:  reasons.append(f"Sharpe สูง ({r['sharpe']:.1f})")
+            elif r["sharpe"] < 0.5: reasons.append(f"Sharpe ต่ำ ({r['sharpe']:.1f})")
+            if r["cagr"] >= 15:     reasons.append(f"CAGR ดีเยี่ยม ({r['cagr']:.0f}%)")
+            elif r["cagr"] < 5:     reasons.append(f"CAGR ต่ำ ({r['cagr']:.0f}%)")
+            if r["mdd"] > -20:      reasons.append("Drawdown ต่ำ")
+            elif r["mdd"] < -50:    reasons.append(f"MDD สูงมาก ({r['mdd']:.0f}%)")
+            if r["momentum"] >= 15: reasons.append("Momentum แรง")
+            elif r["momentum"] < -10: reasons.append("Momentum ติดลบ")
+            if r["winrate"] >= 60:  reasons.append(f"Win Rate {r['winrate']:.0f}%")
+            reason_str = " · ".join(reasons[:3]) if reasons else "ตัวชี้วัดปานกลาง"
+
+            html_rows += f"""
+            <tr>
+              <td><span class="rank-num">{medals[i] or str(i+1)}</span></td>
+              <td>
+                <div class="rank-ticker">{r['sym']}</div>
+                <div style="font-size:11px;color:var(--muted)">{r['name']}</div>
+              </td>
+              <td style="text-align:center">
+                <span style="background:{sc_bg};padding:3px 10px;border-radius:20px;
+                             font-family:'DM Mono',monospace;font-weight:600;font-size:13px">
+                  {r['score']}
+                </span>
+              </td>
+              <td style="font-family:'DM Mono',monospace;color:{cagr_c}">{r['cagr']:+.1f}%</td>
+              <td style="font-family:'DM Mono',monospace">{r['sharpe']:.2f}</td>
+              <td style="font-family:'DM Mono',monospace;color:#c0392b">{r['mdd']:.1f}%</td>
+              <td style="font-family:'DM Mono',monospace;color:{mom_c}">{r['momentum']:+.1f}%</td>
+              <td style="font-family:'DM Mono',monospace">{r['winrate']:.0f}%</td>
+              <td>{v_icon} {r['verdict']}</td>
+              <td style="font-size:11px;color:var(--muted);max-width:200px">{reason_str}</td>
+            </tr>"""
+
+        st.markdown(f"""
+        <table class="rank-table">
+          <thead><tr>
+            <th>#</th><th>สินทรัพย์</th><th>SCORE</th>
+            <th>CAGR</th><th>SHARPE</th><th>MAX DD</th>
+            <th>MOMENTUM</th><th>WIN RATE</th><th>สัญญาณ</th><th>เหตุผล</th>
+          </tr></thead>
+          <tbody>{html_rows}</tbody>
+        </table>
+        """, unsafe_allow_html=True)
+
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.info("📌 หมายเหตุ: อันดับนี้ใช้ข้อมูลราคาย้อนหลัง 10 ปีเท่านั้น ไม่รวมปัจจัยพื้นฐานหรือข่าว")
+
+# ══════════════════════════════════════════════════════════════
+#  TAB 4 — INCOME CALCULATOR
+# ══════════════════════════════════════════════════════════════
+with tab_income:
+    st.markdown('<div class="section-title">💰 เครื่องคำนวณรายได้การลงทุน</div>', unsafe_allow_html=True)
+
+    col_calc1, col_calc2 = st.columns(2)
+
+    with col_calc1:
+        st.markdown("#### 📊 คำนวณผลตอบแทนตามสถานการณ์")
+        capital     = st.number_input("เงินลงทุนเริ่มต้น (฿ หรือ $)", min_value=1000,
+                                       max_value=100_000_000, value=100_000, step=10_000)
+        monthly_add = st.number_input("เงินเพิ่มต่อเดือน", min_value=0,
+                                       max_value=1_000_000, value=5_000, step=1_000)
+        years_inv   = st.slider("ระยะเวลาลงทุน (ปี)", 1, 30, 10)
+        use_cagr    = st.checkbox(f"ใช้ CAGR จริงของ {symbol} ({m['cagr']:.1f}%/ปี)", value=True)
+        if use_cagr:
+            rate_input = m["cagr"]
+        else:
+            rate_input = st.slider("อัตราผลตอบแทนต่อปี (%)", -20.0, 50.0, 10.0, step=0.5)
+
+        rate_annual = rate_input / 100
+        rate_monthly = (1 + rate_annual) ** (1/12) - 1
+
+        # Compound calculation
+        total = capital
+        values = [total]
+        contributions = [0]
+        interest_acc = [0]
+        for mo in range(1, years_inv * 12 + 1):
+            total = total * (1 + rate_monthly) + monthly_add
+            values.append(total)
+            contributions.append(capital + monthly_add * mo)
+            interest_acc.append(total - (capital + monthly_add * mo))
+
+        final_val = values[-1]
+        total_contrib = capital + monthly_add * years_inv * 12
+        total_gain = final_val - total_contrib
+        total_return_pct = (final_val / total_contrib - 1) * 100
+        ann_income = final_val * (rate_annual if rate_annual > 0 else 0.05)
+
+        # Scenarios
+        scenarios = {}
+        for label, r in [("แย่ (CAGR-5%)", rate_input-5),
+                         ("ฐาน (CAGR)", rate_input),
+                         ("ดี (CAGR+5%)", rate_input+5)]:
+            rm  = (1 + r/100) ** (1/12) - 1
+            v   = capital
+            for _ in range(years_inv * 12):
+                v = v * (1 + rm) + monthly_add
+            scenarios[label] = v
+
+        st.markdown(f"""
+        <div class="calc-result">
+          <div style="font-size:11px;letter-spacing:2px;text-transform:uppercase;
+                      color:#aaa;margin-bottom:10px">ผลการคำนวณ · {years_inv} ปี</div>
+          <div class="calc-row"><span>มูลค่าสุดท้าย</span>
+            <span>{final_val:,.0f}</span></div>
+          <div class="calc-row"><span>เงินลงทุนรวม</span>
+            <span>{total_contrib:,.0f}</span></div>
+          <div class="calc-row"><span>กำไรสะสม</span>
+            <span>{total_gain:,.0f}</span></div>
+          <div class="calc-row"><span>ผลตอบแทนรวม</span>
+            <span>{total_return_pct:+.1f}%</span></div>
+          <div class="calc-row"><span>รายได้ต่อปี (ที่ CAGR)</span>
+            <span>{ann_income:,.0f}</span></div>
+          <div class="calc-row"><span>รายได้ต่อเดือน</span>
+            <span>{ann_income/12:,.0f}</span></div>
+          <div style="margin-top:12px;padding-top:10px;border-top:1px solid rgba(255,255,255,0.15)">
+            <div style="font-size:10px;color:#aaa;margin-bottom:6px">SCENARIOS ({years_inv} ปี)</div>
+        """, unsafe_allow_html=True)
+        for label, sv in scenarios.items():
+            col_s = "#2d7a4f" if sv > total_contrib else "#c0392b"
+            st.markdown(f"""
+            <div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0">
+              <span style="color:#ccc">{label}</span>
+              <span style="font-family:'DM Mono',monospace;color:{col_s}">{sv:,.0f}</span>
+            </div>""", unsafe_allow_html=True)
+        st.markdown("</div></div>", unsafe_allow_html=True)
+
+    with col_calc2:
+        # Growth chart
+        fig_grow = go.Figure()
+        years_x = [i/12 for i in range(len(values))]
+        fig_grow.add_trace(go.Scatter(
+            x=years_x, y=contributions, mode="lines", name="เงินลงทุนสะสม",
+            fill="tozeroy", fillcolor="rgba(200,168,75,0.1)",
+            line=dict(color="#c8a84b", width=1.5, dash="dash")
+        ))
+        fig_grow.add_trace(go.Scatter(
+            x=years_x, y=values, mode="lines", name="มูลค่าพอร์ต",
+            fill="tonexty", fillcolor="rgba(45,122,79,0.12)",
+            line=dict(color="#2d7a4f", width=2.5)
+        ))
+        fig_grow.update_layout(
+            title=f"การเติบโตของพอร์ต {years_inv} ปี",
+            height=320, margin=dict(l=10,r=10,t=36,b=10),
+            plot_bgcolor="#fff", paper_bgcolor="#f8f6f1",
+            xaxis_title="ปี", yaxis_title="มูลค่า",
+            legend=dict(bgcolor="rgba(255,255,255,0.8)"),
         )
-    with col_info:
-        st.caption("🔄 อัปเดตอัตโนมัติทุก 10 วินาที")
+        st.plotly_chart(fig_grow, use_container_width=True, config={"displayModeBar": False})
 
-    # ── Compute invest analysis & backtest (shared)
-    inv = full_invest_analysis(data, symbol)
-    bt  = backtest_winrate(data)
+        # VaR/Risk calculator
+        st.markdown("#### ⚠️ คำนวณความเสี่ยง")
+        invest_amt = st.number_input("เงินลงทุน (สำหรับคำนวณ VaR)", min_value=1000,
+                                      max_value=10_000_000, value=100_000, step=10_000)
+        conf_level = st.select_slider("Confidence Level", [90, 95, 99], value=95)
+        returns_full = m["df"]["Close"].pct_change().dropna()
+        var_pct  = np.percentile(returns_full, (1 - conf_level/100) * 100) * 100
+        es_pct   = returns_full[returns_full <= var_pct/100].mean() * 100
+        var_thb  = invest_amt * abs(var_pct) / 100
+        es_thb   = invest_amt * abs(es_pct)  / 100
 
-    # ── Search history
-    hist_dict = {x["Ticker"]: x for x in st.session_state.search_history}
-    hist_dict[symbol] = {
-        "Ticker": symbol,
-        "Invest Score": inv["score"],
-        "Win Rate": f"{bt['winrate']}%",
-        "ราคา": f"{current_price:,.4f}" if is_fx else f"{current_price:,.2f}",
-        "สัญญาณ": "Strong Buy" if inv["score"]>=80 else "Hold/Watch" if inv["score"]>=50 else "Avoid",
-    }
-    st.session_state.search_history = list(hist_dict.values())
+        st.markdown(f"""
+        <div class="calc-result" style="margin-top:0">
+          <div style="font-size:11px;letter-spacing:2px;text-transform:uppercase;
+                      color:#aaa;margin-bottom:10px">RISK METRICS · {conf_level}% Confidence</div>
+          <div class="calc-row"><span>VaR/วัน ({conf_level}%)</span>
+            <span>{var_pct:.2f}%</span></div>
+          <div class="calc-row"><span>VaR เงิน</span>
+            <span>{var_thb:,.0f}</span></div>
+          <div class="calc-row"><span>Expected Shortfall</span>
+            <span>{es_pct:.2f}%</span></div>
+          <div class="calc-row"><span>ES เงิน</span>
+            <span>{es_thb:,.0f}</span></div>
+          <div class="calc-row"><span>Max Drawdown</span>
+            <span>{m['mdd']:.1f}%</span></div>
+          <div class="calc-row"><span>Max Loss เงิน (DD)</span>
+            <span>{invest_amt * abs(m['mdd'])/100:,.0f}</span></div>
+          <div class="calc-row"><span>Kelly Criterion (แนะนำ)</span>
+            <span>{max(0, (bt['winrate']/100 - (1-bt['winrate']/100))*100):.1f}% ของพอร์ต</span></div>
+        </div>
+        """, unsafe_allow_html=True)
 
-    # ════════════════════════════════════════════════
-    #  TAB: โซนเทรด vs โซนลงทุน
-    # ════════════════════════════════════════════════
-    tab_trade, tab_invest = st.tabs(["⚡ โซนเทรด (SMC)", "📊 โซนลงทุน (Investment)"])
+# ══════════════════════════════════════════════════════════════
+#  TAB 5 — AI CHAT
+# ══════════════════════════════════════════════════════════════
+with tab_chat:
+    col_ch, _ = st.columns([3, 2])
+    with col_ch:
+        st.markdown('<div class="section-title">🤖 AI Investment Assistant (Gemini)</div>',
+                    unsafe_allow_html=True)
+        st.caption("วิเคราะห์จากตัวเลขคณิตศาสตร์ของ DGV · ไม่ใช้ข่าวสาร")
 
-    # ──────────────────────────────────────────────
-    #  TAB 1 : โซนเทรด — SMC Chart + Chat
-    # ──────────────────────────────────────────────
-    with tab_trade:
-        col_chart, col_tchat = st.columns([3, 2])
+        # System context
+        sys_ctx = f"""คุณคือ DGV Investment Analyst ผู้เชี่ยวชาญด้านคณิตศาสตร์การเงิน
+วิเคราะห์เฉพาะข้อมูลเชิงปริมาณ ไม่ใช้ข่าว
 
-        with col_chart:
-            st.subheader(f"📈 SMC Chart — {symbol}")
+ข้อมูลปัจจุบัน ({symbol}):
+• ราคา: {fmt_p(m['cur'])} | CAGR: {m['cagr']:+.1f}%/ปี
+• Sharpe: {m['sharpe']:.2f} | Sortino: {m['sortino']:.2f} | Calmar: {m['calmar']:.2f}
+• Max Drawdown: {m['mdd']:.1f}% | VaR 95%: {m['var95']:.2f}%/วัน
+• Win Rate Backtest: {bt['winrate']}% ({bt['wins']}W/{bt['losses']}L)
+• Momentum Score: {m['momentum']:+.1f}% | Z-Score: {m['zscore']:+.2f}
+• RSI: {m['rsi']:.1f} | MACD: {'Bullish' if m['macd']>m['macd_sig'] else 'Bearish'}
+• Linear Trend: {m['trend_slope']:+.1f}%/ปี | R²={m['r2']:.2f}
+• Volatility: Short={m['vol_s']:.1f}% Long={m['vol_l']:.1f}%
+• Composite Score: {m['score']}/100 → {m['verdict']}
 
-            tf_opts = {"3 เดือน": 63, "6 เดือน": 126, "1 ปี": 252}
-            tf_sel  = st.radio("Timeframe:", list(tf_opts.keys()), horizontal=True, key="tf_smc")
-            n_bars  = tf_opts[tf_sel]
-            d_smc   = data.tail(n_bars).copy()
+ตอบภาษาไทย กระชับ ใช้ตัวเลขที่ให้ไว้ ระบุว่าเป็นการวิเคราะห์เพื่อประกอบการตัดสินใจ"""
 
-            show_fvg = st.checkbox("แสดง FVG (Fair Value Gap)", value=True, key="cb_fvg")
-            show_ob  = st.checkbox("แสดง OB (Order Block)",     value=True, key="cb_ob")
-            show_bos = st.checkbox("แสดง BOS / CHoCH",          value=True, key="cb_bos")
-            show_liq = st.checkbox("แสดง Liquidity Levels",     value=True, key="cb_liq")
-
-            # Detect SMC structures
-            highs_arr = d_smc["High"].values
-            lows_arr  = d_smc["Low"].values
-            sh_idx = detect_swing_highs(highs_arr, order=4)
-            sl_idx = detect_swing_lows(lows_arr,  order=4)
-
-            bull_fvg, bear_fvg = detect_fvg(d_smc)
-            bull_ob,  bear_ob  = detect_ob(d_smc, sh_idx, sl_idx)
-            bos_events          = detect_bos_choch(d_smc, sh_idx, sl_idx)
-
-            from plotly.subplots import make_subplots
-
-            # คำนวณ RSI + MACD สำหรับ SMC chart
-            d_smc["RSI"] = calc_rsi(d_smc["Close"], 14)
-            ema12_s = d_smc["Close"].ewm(span=12).mean()
-            ema26_s = d_smc["Close"].ewm(span=26).mean()
-            d_smc["MACD"]   = ema12_s - ema26_s
-            d_smc["MACDsig"]= d_smc["MACD"].ewm(span=9).mean()
-            d_smc["MACDhist"]= d_smc["MACD"] - d_smc["MACDsig"]
-
-            fig_smc = make_subplots(
-                rows=3, cols=1,
-                shared_xaxes=True,
-                row_heights=[0.6, 0.2, 0.2],
-                vertical_spacing=0.03,
-                subplot_titles=("SMC Price", "RSI (14)", "MACD (12,26,9)")
-            )
-
-            # Candlestick (row 1)
-            fig_smc.add_trace(go.Candlestick(
-                x=d_smc.index,
-                open=d_smc["Open"], high=d_smc["High"],
-                low=d_smc["Low"],   close=d_smc["Close"],
-                name="Price", increasing_line_color="#26a69a", decreasing_line_color="#ef5350"
-            ), row=1, col=1)
-
-            # MA50 (row 1)
-            d_smc["MA50"] = d_smc["Close"].rolling(50).mean()
-            fig_smc.add_trace(go.Scatter(
-                x=d_smc.index, y=d_smc["MA50"],
-                mode="lines", name="MA50",
-                line=dict(color="#ff9800", width=1.2, dash="dot")
-            ), row=1, col=1)
-
-            # Swing Highs / Lows (Liquidity)
-            if show_liq and sh_idx:
-                sh_dates = [d_smc.index[i] for i in sh_idx]
-                sh_vals  = [highs_arr[i]   for i in sh_idx]
-                fig_smc.add_trace(go.Scatter(
-                    x=sh_dates, y=sh_vals, mode="markers",
-                    marker=dict(symbol="triangle-down", size=9, color="#ef5350"),
-                    name="Swing High (Liq.)"
-                ), row=1, col=1)
-                sl_dates = [d_smc.index[i] for i in sl_idx]
-                sl_vals  = [lows_arr[i]    for i in sl_idx]
-                fig_smc.add_trace(go.Scatter(
-                    x=sl_dates, y=sl_vals, mode="markers",
-                    marker=dict(symbol="triangle-up", size=9, color="#26a69a"),
-                    name="Swing Low (Liq.)"
-                ), row=1, col=1)
-
-            x_start = d_smc.index[0]
-            x_end   = d_smc.index[-1]
-
-            # FVG zones
-            if show_fvg:
-                shapes_fvg = []
-                for fvg in bull_fvg:
-                    shapes_fvg.append(dict(
-                        type="rect", xref="x", yref="y",
-                        x0=fvg["date"], x1=x_end,
-                        y0=fvg["bot"],  y1=fvg["top"],
-                        fillcolor="rgba(38,166,154,0.15)",
-                        line=dict(color="rgba(38,166,154,0.5)", width=1),
-                    ))
-                for fvg in bear_fvg:
-                    shapes_fvg.append(dict(
-                        type="rect", xref="x", yref="y",
-                        x0=fvg["date"], x1=x_end,
-                        y0=fvg["bot"],  y1=fvg["top"],
-                        fillcolor="rgba(239,83,80,0.15)",
-                        line=dict(color="rgba(239,83,80,0.5)", width=1),
-                    ))
-                # แนบ annotation label FVG
-                annots_fvg = []
-                for fvg in bull_fvg:
-                    annots_fvg.append(dict(
-                        x=x_end, y=(fvg["top"]+fvg["bot"])/2,
-                        xref="x", yref="y", text="FVG🟢", showarrow=False,
-                        font=dict(size=10, color="#26a69a"), xanchor="right"
-                    ))
-                for fvg in bear_fvg:
-                    annots_fvg.append(dict(
-                        x=x_end, y=(fvg["top"]+fvg["bot"])/2,
-                        xref="x", yref="y", text="FVG🔴", showarrow=False,
-                        font=dict(size=10, color="#ef5350"), xanchor="right"
-                    ))
+        # Render chat
+        chat_html = '<div class="chat-wrap">'
+        for msg in st.session_state.chat:
+            if msg["role"] == "assistant":
+                chat_html += f'<div class="msg-row"><div class="av ai">D</div><div class="bub ai-b">{msg["content"].replace(chr(10),"<br>")}</div></div>'
             else:
-                shapes_fvg, annots_fvg = [], []
+                chat_html += f'<div class="msg-row u"><div class="av usr">คุณ</div><div class="bub u-b">{msg["content"].replace(chr(10),"<br>")}</div></div>'
+        chat_html += '</div>'
+        st.markdown(chat_html, unsafe_allow_html=True)
 
-            # OB zones
-            if show_ob:
-                shapes_ob = []
-                annots_ob = []
-                for ob in bull_ob:
-                    shapes_ob.append(dict(
-                        type="rect", xref="x", yref="y",
-                        x0=ob["date"], x1=x_end,
-                        y0=ob["bot"],  y1=ob["top"],
-                        fillcolor="rgba(38,166,154,0.22)",
-                        line=dict(color="#26a69a", width=1.5, dash="dash"),
-                    ))
-                    annots_ob.append(dict(
-                        x=x_end, y=(ob["top"]+ob["bot"])/2,
-                        xref="x", yref="y", text="Bull OB", showarrow=False,
-                        font=dict(size=10, color="#26a69a"), xanchor="right"
-                    ))
-                for ob in bear_ob:
-                    shapes_ob.append(dict(
-                        type="rect", xref="x", yref="y",
-                        x0=ob["date"], x1=x_end,
-                        y0=ob["bot"],  y1=ob["top"],
-                        fillcolor="rgba(239,83,80,0.22)",
-                        line=dict(color="#ef5350", width=1.5, dash="dash"),
-                    ))
-                    annots_ob.append(dict(
-                        x=x_end, y=(ob["top"]+ob["bot"])/2,
-                        xref="x", yref="y", text="Bear OB", showarrow=False,
-                        font=dict(size=10, color="#ef5350"), xanchor="right"
-                    ))
-            else:
-                shapes_ob, annots_ob = [], []
+        if q := st.chat_input("ถามเรื่องตัวเลข, ความเสี่ยง, Sharpe, ผลตอบแทน...", key="main_chat"):
+            st.session_state.chat.append({"role": "user", "content": q})
+            try:
+                api_key = st.secrets["GOOGLE_API_KEY"]
+                client  = genai.Client(api_key=api_key)
+                hist = [
+                    {"role": "user" if m_["role"] == "user" else "model",
+                     "parts": [{"text": m_["content"]}]}
+                    for m_ in st.session_state.chat[1:-1]
+                ]
+                resp = client.models.generate_content(
+                    model="gemini-2.0-flash",
+                    contents=hist + [{"role": "user", "parts": [{"text": sys_ctx + "\n\n---\n" + q}]}]
+                )
+                reply = resp.text
+            except Exception as e:
+                reply = f"ขออภัย: {e}"
+            st.session_state.chat.append({"role": "assistant", "content": reply})
+            st.rerun()
 
-            # BOS lines
-            if show_bos:
-                shapes_bos = []
-                annots_bos = []
-                for ev in bos_events:
-                    shapes_bos.append(dict(
-                        type="line", xref="x", yref="y",
-                        x0=x_start, x1=x_end,
-                        y0=ev["price"], y1=ev["price"],
-                        line=dict(color=ev["color"], width=1.2, dash="dot"),
-                    ))
-                    annots_bos.append(dict(
-                        x=x_start, y=ev["price"],
-                        xref="x", yref="y",
-                        text=ev["type"], showarrow=False,
-                        font=dict(size=10, color=ev["color"]), xanchor="left"
-                    ))
-            else:
-                shapes_bos, annots_bos = [], []
-
-            # RSI subplot (row 2)
-            fig_smc.add_trace(go.Scatter(
-                x=d_smc.index, y=d_smc["RSI"],
-                mode="lines", name="RSI", line=dict(color="#7b1fa2", width=1.5)
-            ), row=2, col=1)
-            fig_smc.add_hline(y=70, line=dict(color="#ef5350", width=1, dash="dash"), row=2, col=1)
-            fig_smc.add_hline(y=30, line=dict(color="#26a69a", width=1, dash="dash"), row=2, col=1)
-
-            # MACD subplot (row 3)
-            macd_colors = ["#26a69a" if v >= 0 else "#ef5350" for v in d_smc["MACDhist"]]
-            fig_smc.add_trace(go.Bar(
-                x=d_smc.index, y=d_smc["MACDhist"],
-                name="MACD Hist", marker_color=macd_colors, opacity=0.7
-            ), row=3, col=1)
-            fig_smc.add_trace(go.Scatter(
-                x=d_smc.index, y=d_smc["MACD"],
-                mode="lines", name="MACD", line=dict(color="#1976d2", width=1.2)
-            ), row=3, col=1)
-            fig_smc.add_trace(go.Scatter(
-                x=d_smc.index, y=d_smc["MACDsig"],
-                mode="lines", name="Signal", line=dict(color="#ff9800", width=1.2)
-            ), row=3, col=1)
-
-            fig_smc.update_layout(
-                shapes=shapes_fvg + shapes_ob + shapes_bos,
-                annotations=annots_fvg + annots_ob + annots_bos,
-                xaxis_rangeslider_visible=False,
-                height=680,
-                margin=dict(l=10, r=10, t=30, b=10),
-                legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01, bgcolor="rgba(255,255,255,0.7)"),
-                plot_bgcolor="white",
-                paper_bgcolor="white",
-            )
-            fig_smc.update_yaxes(title_text="ราคา", row=1, col=1)
-            fig_smc.update_yaxes(title_text="RSI", range=[0,100], row=2, col=1)
-            fig_smc.update_yaxes(title_text="MACD", row=3, col=1)
-            fig_smc.update_xaxes(rangeslider_visible=False)
-            st.plotly_chart(fig_smc, use_container_width=True)
-
-            # SMC Summary
-            st.markdown("**📋 สรุป SMC Zones ที่ตรวจพบ**")
-            c1, c2, c3, c4 = st.columns(4)
-            c1.metric("Bullish FVG", len(bull_fvg))
-            c2.metric("Bearish FVG", len(bear_fvg))
-            c3.metric("Bull OB",     len(bull_ob))
-            c4.metric("Bear OB",     len(bear_ob))
-
-        with col_tchat:
-            # ── Trade Chat (SMC Assistant)
-            st.markdown(f"""
-            <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
-              <div style="width:22px;height:22px;background:#000;border-radius:5px;display:flex;align-items:center;justify-content:center;color:#fff">{OPENAI_SVG.replace('width="18" height="18"','width="13" height="13"')}</div>
-              <span style="font-size:14px;font-weight:700">OpenAI DGV</span>
-              <span style="font-size:11px;color:#999">SMC Trade Assistant</span>
-            </div>
-            """, unsafe_allow_html=True)
-
-            # SMC context for prompt
-            price_str = f"{current_price:,.4f}" if is_fx else f"{current_price:,.2f}"
-            smc_ctx = (
-                f"Symbol: {symbol} | ราคา: {price_str}\n"
-                f"Bullish FVG: {len(bull_fvg)} | Bearish FVG: {len(bear_fvg)}\n"
-                f"Bull OB: {len(bull_ob)} | Bear OB: {len(bear_ob)}\n"
-                f"BOS Events: {len(bos_events)}\n"
-                f"Swing Highs: {len(sh_idx)} | Swing Lows: {len(sl_idx)}\n"
-            )
-            if bull_fvg:
-                smc_ctx += f"Bullish FVG ล่าสุด: {bull_fvg[-1]['bot']:.4f} - {bull_fvg[-1]['top']:.4f}\n"
-            if bear_fvg:
-                smc_ctx += f"Bearish FVG ล่าสุด: {bear_fvg[-1]['bot']:.4f} - {bear_fvg[-1]['top']:.4f}\n"
-            if bull_ob:
-                smc_ctx += f"Bull OB ล่าสุด: {bull_ob[-1]['bot']:.4f} - {bull_ob[-1]['top']:.4f}\n"
-            if bear_ob:
-                smc_ctx += f"Bear OB ล่าสุด: {bear_ob[-1]['bot']:.4f} - {bear_ob[-1]['top']:.4f}\n"
-
-            trade_system = (
-                "คุณคือ OpenAI DGV SMC Trade Assistant ผู้เชี่ยวชาญ Smart Money Concept\n\n"
-                f"ข้อมูล SMC ที่วิเคราะห์ได้:\n{smc_ctx}\n"
-                "ตอบภาษาไทย กระชับ ระบุ Entry/SL/TP เป็นตัวเลขเสมอถ้าถาม\n"
-                "ใช้ FVG/OB/BOS/Liquidity ในการวิเคราะห์ ระบุว่าเป็นการวิเคราะห์เท่านั้น"
-            )
-
-            # Render bubbles
-            trade_html = '<div class="chat-wrapper">'
-            for m in st.session_state.trade_chat:
-                if m["role"] == "assistant":
-                    trade_html += f'<div class="msg-row"><div class="av ai-av">AI</div><div class="bub ai-b">{m["content"].replace(chr(10),"<br>")}</div></div>'
-                else:
-                    trade_html += f'<div class="msg-row user-row"><div class="av u-av">คุณ</div><div class="bub u-b">{m["content"].replace(chr(10),"<br>")}</div></div>'
-            trade_html += '</div><div class="dsc">วิเคราะห์เพื่อประกอบการตัดสินใจเท่านั้น</div>'
-            st.markdown(trade_html, unsafe_allow_html=True)
-
-            if q := st.chat_input("ถามเรื่อง Entry, SL/TP, FVG, OB...", key="trade_input"):
-                st.session_state.trade_chat.append({"role":"user","content":q})
-                mkt = get_market_ctx(q)
-                full_q = q + mkt
-                try:
-                    api_key = st.secrets["GOOGLE_API_KEY"]
-                    client  = genai.Client(api_key=api_key)
-                    hist = [{"role":"user" if m["role"]=="user" else "model",
-                             "parts":[{"text":m["content"]}]}
-                            for m in st.session_state.trade_chat[1:-1]]
-                    resp = client.models.generate_content(
-                        model="gemini-2.0-flash",
-                        contents=hist + [{"role":"user","parts":[{"text": trade_system+"\n\n---\n"+full_q}]}]
-                    )
-                    reply = resp.text
-                except Exception as e:
-                    reply = f"ขออภัย: {e}"
-                st.session_state.trade_chat.append({"role":"assistant","content":reply})
-                st.rerun()
-
-    # ──────────────────────────────────────────────
-    #  TAB 2 : โซนลงทุน — Full Analysis + Win Rate + Chat
-    # ──────────────────────────────────────────────
-    with tab_invest:
-        col_inv, col_ichat = st.columns([3, 2])
-
-        with col_inv:
-            st.subheader(f"📊 การวิเคราะห์การลงทุน — {symbol}")
-
-            # ── Invest Score + Win Rate metrics
-            m1, m2, m3, m4 = st.columns(4)
-            m1.metric("Invest Score",   f"{inv['score']} / 100")
-            m2.metric("Win Rate (Backtest)", f"{bt['winrate']}%")
-            m3.metric("สัญญาณ (1 เดือน)",  f"{inv['ret_1m']:+.1f}%")
-            m4.metric("ความผันผวน 30วัน",  f"{inv['vol_30']:.1f}%")
-
-            # Signal label
-            if inv["score"] >= 80:
-                st.success("🔥 Strong Buy — น่าลงทุนสูงมาก")
-            elif inv["score"] >= 55:
-                st.warning("⏳ Hold/Watch — รอจังหวะหรือทยอยสะสม")
-            else:
-                st.error("🚨 Avoid — ความเสี่ยงสูง ชะลอการลงทุน")
-
-            # Win rate bar
-            wr = bt["winrate"]
-            wr_color = "#198754" if wr >= 60 else "#ffc107" if wr >= 45 else "#dc3545"
-            st.markdown(f"""
-            <div style="margin:10px 0 4px">
-              <span style="font-size:13px;font-weight:600">Win Rate จาก Backtest ย้อนหลัง 1 ปี</span>
-              <span style="font-size:12px;color:#888;margin-left:8px">({bt['wins']}W / {bt['losses']}L จาก {bt['total']} Signals)</span>
-            </div>
-            <div class="wr-bar-bg">
-              <div class="wr-bar-fill" style="width:{min(wr,100)}%;background:{wr_color}"></div>
-            </div>
-            <div style="font-size:13px;font-weight:700;color:{wr_color};margin-top:4px">{wr}% โอกาสที่การวิเคราะห์จะถูกต้อง</div>
-            """, unsafe_allow_html=True)
-
-            st.markdown("---")
-
-            # ── Signal checklist
-            st.markdown("**🔍 ผลการวิเคราะห์ตัวชี้วัด**")
-            for icon, txt in inv["signals"]:
-                st.markdown(f"{icon} {txt}")
-
-            st.markdown("---")
-
-            # ── Return summary
-            st.markdown("**📅 ผลตอบแทนย้อนหลัง**")
-            r1, r2, r3 = st.columns(3)
-            r1.metric("1 เดือน",  f"{inv['ret_1m']:+.1f}%")
-            r2.metric("3 เดือน",  f"{inv['ret_3m']:+.1f}%")
-            r3.metric("6 เดือน",  f"{inv['ret_6m']:+.1f}%")
-
-            # ── Invest chart with RSI + MACD subplots
-            from plotly.subplots import make_subplots as _msp
-            fig_inv = _msp(
-                rows=3, cols=1,
-                shared_xaxes=True,
-                row_heights=[0.6, 0.2, 0.2],
-                vertical_spacing=0.03,
-                subplot_titles=("Price & MA", "RSI (14)", "MACD (12,26,9)")
-            )
-
-            # Price + MA (row 1)
-            fig_inv.add_trace(go.Scatter(
-                x=inv["df"].index, y=inv["df"]["Close"],
-                mode="lines", name="ราคาปิด", line=dict(color="#1976d2", width=2)
-            ), row=1, col=1)
-            fig_inv.add_trace(go.Scatter(
-                x=inv["df"].index, y=inv["df"]["MA20"],
-                mode="lines", name="MA20", line=dict(color="#ff9800", width=1, dash="dot")
-            ), row=1, col=1)
-            fig_inv.add_trace(go.Scatter(
-                x=inv["df"].index, y=inv["df"]["MA50"],
-                mode="lines", name="MA50", line=dict(color="#9c27b0", width=1.2)
-            ), row=1, col=1)
-            if inv["ma200"]:
-                fig_inv.add_trace(go.Scatter(
-                    x=inv["df"].index, y=inv["df"]["MA200"],
-                    mode="lines", name="MA200", line=dict(color="#f44336", width=1.5, dash="dash")
-                ), row=1, col=1)
-
-            # Backtest entries (row 1)
-            if bt["entries"]:
-                win_dates  = [e["date"] for e in bt["entries"] if e["result"]=="win"]
-                lose_dates = [e["date"] for e in bt["entries"] if e["result"]=="lose"]
-                win_prices = [inv["df"]["Close"].get(d, None) for d in win_dates if d in inv["df"].index]
-                lose_prices= [inv["df"]["Close"].get(d, None) for d in lose_dates if d in inv["df"].index]
-                if win_prices:
-                    fig_inv.add_trace(go.Scatter(
-                        x=[d for d in win_dates if d in inv["df"].index],
-                        y=win_prices, mode="markers", name="Entry Win",
-                        marker=dict(symbol="triangle-up", size=10, color="#26a69a")
-                    ), row=1, col=1)
-                if lose_prices:
-                    fig_inv.add_trace(go.Scatter(
-                        x=[d for d in lose_dates if d in inv["df"].index],
-                        y=lose_prices, mode="markers", name="Entry Lose",
-                        marker=dict(symbol="triangle-down", size=10, color="#ef5350")
-                    ), row=1, col=1)
-
-            # RSI (row 2)
-            fig_inv.add_trace(go.Scatter(
-                x=inv["df"].index, y=inv["df"]["RSI"],
-                mode="lines", name="RSI", line=dict(color="#7b1fa2", width=1.5)
-            ), row=2, col=1)
-            fig_inv.add_hline(y=70, line=dict(color="#ef5350", width=1, dash="dash"), row=2, col=1)
-            fig_inv.add_hline(y=30, line=dict(color="#26a69a", width=1, dash="dash"), row=2, col=1)
-
-            # MACD (row 3)
-            inv["df"]["MACDhist"] = inv["df"]["MACD"] - inv["df"]["Signal"]
-            hist_colors = ["#26a69a" if v >= 0 else "#ef5350" for v in inv["df"]["MACDhist"]]
-            fig_inv.add_trace(go.Bar(
-                x=inv["df"].index, y=inv["df"]["MACDhist"],
-                name="MACD Hist", marker_color=hist_colors, opacity=0.7
-            ), row=3, col=1)
-            fig_inv.add_trace(go.Scatter(
-                x=inv["df"].index, y=inv["df"]["MACD"],
-                mode="lines", name="MACD Line", line=dict(color="#1976d2", width=1.2)
-            ), row=3, col=1)
-            fig_inv.add_trace(go.Scatter(
-                x=inv["df"].index, y=inv["df"]["Signal"],
-                mode="lines", name="Signal", line=dict(color="#ff9800", width=1.2)
-            ), row=3, col=1)
-
-            fig_inv.update_layout(
-                height=680,
-                xaxis_rangeslider_visible=False,
-                margin=dict(l=10, r=10, t=30, b=10),
-                legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01, bgcolor="rgba(255,255,255,0.8)"),
-                plot_bgcolor="white", paper_bgcolor="white"
-            )
-            fig_inv.update_yaxes(title_text="ราคา", row=1, col=1)
-            fig_inv.update_yaxes(title_text="RSI", range=[0,100], row=2, col=1)
-            fig_inv.update_yaxes(title_text="MACD", row=3, col=1)
-            fig_inv.update_xaxes(rangeslider_visible=False)
-            st.plotly_chart(fig_inv, use_container_width=True)
-
-            # ── Asset ranking table
-            st.subheader("🏆 อันดับสินทรัพย์ทั้งหมด")
-            df_rank = pd.DataFrame(st.session_state.search_history)
-            if not df_rank.empty:
-                df_rank = df_rank.sort_values("Invest Score", ascending=False).reset_index(drop=True)
-                st.dataframe(df_rank, use_container_width=True)
-
-        with col_ichat:
-            # ── Invest Chat
-            st.markdown(f"""
-            <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
-              <div style="width:22px;height:22px;background:#000;border-radius:5px;display:flex;align-items:center;justify-content:center;color:#fff">{OPENAI_SVG.replace('width="18" height="18"','width="13" height="13"')}</div>
-              <span style="font-size:14px;font-weight:700">OpenAI DGV</span>
-              <span style="font-size:11px;color:#999">Investment Assistant</span>
-            </div>
-            """, unsafe_allow_html=True)
-
-            inv_system = (
-                "คุณคือ OpenAI DGV Investment Assistant ผู้เชี่ยวชาญการลงทุนระยะยาว\n\n"
-                f"ข้อมูลการวิเคราะห์ {symbol}:\n"
-                f"- Invest Score: {inv['score']}/100\n"
-                f"- Win Rate (Backtest): {bt['winrate']}% ({bt['wins']}W/{bt['losses']}L จาก {bt['total']} signals)\n"
-                f"- RSI: {inv['rsi']:.1f} | MACD: {'Bullish' if inv['macd']>inv['sig'] else 'Bearish'}\n"
-                f"- MA50: {inv['ma50']:.4f} | MA200: " + (f"{inv['ma200']:.4f}" if inv['ma200'] else "N/A") + "\n"
-                f"- ผลตอบแทน 1M: {inv['ret_1m']:+.1f}% | 3M: {inv['ret_3m']:+.1f}% | 6M: {inv['ret_6m']:+.1f}%\n"
-                f"- ความผันผวน: {inv['vol_30']:.1f}%\n\n"
-                "ตอบภาษาไทย กระชับ ให้ข้อมูลเชิงลึก พร้อมแนะนำ position sizing และ risk management\n"
-                "ระบุเสมอว่าเป็นการวิเคราะห์เพื่อประกอบการตัดสินใจเท่านั้น"
-            )
-
-            invest_html = '<div class="chat-wrapper">'
-            for m in st.session_state.invest_chat:
-                if m["role"] == "assistant":
-                    invest_html += f'<div class="msg-row"><div class="av ai-av">AI</div><div class="bub ai-b">{m["content"].replace(chr(10),"<br>")}</div></div>'
-                else:
-                    invest_html += f'<div class="msg-row user-row"><div class="av u-av">คุณ</div><div class="bub u-b">{m["content"].replace(chr(10),"<br>")}</div></div>'
-            invest_html += '</div><div class="dsc">วิเคราะห์เพื่อประกอบการตัดสินใจเท่านั้น</div>'
-            st.markdown(invest_html, unsafe_allow_html=True)
-
-            if q2 := st.chat_input("ถามเรื่องแนวโน้ม win rate การลงทุน...", key="invest_input"):
-                st.session_state.invest_chat.append({"role":"user","content":q2})
-                mkt2 = get_market_ctx(q2)
-                full_q2 = q2 + mkt2
-                try:
-                    api_key = st.secrets["GOOGLE_API_KEY"]
-                    client  = genai.Client(api_key=api_key)
-                    hist2 = [{"role":"user" if m["role"]=="user" else "model",
-                              "parts":[{"text":m["content"]}]}
-                             for m in st.session_state.invest_chat[1:-1]]
-                    resp2 = client.models.generate_content(
-                        model="gemini-2.0-flash",
-                        contents=hist2 + [{"role":"user","parts":[{"text": inv_system+"\n\n---\n"+full_q2}]}]
-                    )
-                    reply2 = resp2.text
-                except Exception as e:
-                    reply2 = f"ขออภัย: {e}"
-                st.session_state.invest_chat.append({"role":"assistant","content":reply2})
-                st.rerun()
-
-    time.sleep(10)
-    st.rerun()
+# ─────────────────────────────────────────────────────────────
+#  AUTO REFRESH (30s)
+# ─────────────────────────────────────────────────────────────
+time.sleep(30)
+st.rerun()
