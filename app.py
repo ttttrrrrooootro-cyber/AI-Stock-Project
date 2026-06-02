@@ -645,14 +645,66 @@ def dark_layout(fig, height=580, title=None):
 # ─────────────────────────────────────────────────────────────
 #  FETCH DATA (yfinance — historical)
 # ─────────────────────────────────────────────────────────────
-@st.cache_data(ttl=300)
-def fetch_data(symbol, period="10y"):
+# ─────────────────────────────────────────────────────────────
+#  FETCH DATA (historical) — yfinance + Stooq fallback
+#  yfinance มักถูก Yahoo บล็อก/จำกัดบน cloud → มีแหล่งสำรอง Stooq
+# ─────────────────────────────────────────────────────────────
+def _from_yfinance(symbol, period):
+    # 1) Ticker.history
     try:
-        t = yf.Ticker(symbol)
-        d = t.history(period=period)
-        return d if not d.empty else None
+        d = yf.Ticker(symbol).history(period=period, auto_adjust=True)
+        if d is not None and not d.empty:
+            return d
+    except Exception:
+        pass
+    # 2) yf.download (บางครั้งทำงานได้เมื่อ history ล้มเหลว)
+    try:
+        d = yf.download(symbol, period=period, auto_adjust=True,
+                        progress=False, threads=False)
+        if d is not None and not d.empty:
+            if isinstance(d.columns, pd.MultiIndex):
+                d.columns = d.columns.get_level_values(0)
+            return d
+    except Exception:
+        pass
+    return None
+
+def _stooq_symbol(yf_sym: str) -> str | None:
+    m = {
+        "BTC-USD": "btcusd", "^GSPC": "^spx", "GC=F": "xauusd",
+        "EURUSD=X": "eurusd", "GBPUSD=X": "gbpusd", "USDJPY=X": "usdjpy",
+    }
+    if yf_sym in m:
+        return m[yf_sym]
+    if all(c not in yf_sym for c in ["=", "-", "^"]):
+        return f"{yf_sym.lower()}.us"   # US stocks
+    return None
+
+def _from_stooq(symbol):
+    s = _stooq_symbol(symbol)
+    if not s:
+        return None
+    try:
+        url = f"https://stooq.com/q/d/l/?s={s}&i=d"
+        d = pd.read_csv(url)
+        if d is None or d.empty or "Close" not in d.columns:
+            return None
+        d["Date"] = pd.to_datetime(d["Date"])
+        d = d.set_index("Date").sort_index()
+        return d if len(d) >= 100 else None
     except Exception:
         return None
+
+@st.cache_data(ttl=300)
+def fetch_data(symbol, period="10y"):
+    d = _from_yfinance(symbol, period)
+    if d is not None and len(d) >= 100:
+        return d
+    # fallback: Stooq
+    d = _from_stooq(symbol)
+    if d is not None and len(d) >= 100:
+        return d
+    return None
 
 @st.cache_data(ttl=60)
 def fetch_watchlist_scores():
@@ -695,7 +747,17 @@ data = fetch_data(symbol)
 is_fx = "=X" in symbol or symbol in ["EURUSD=X","GBPUSD=X","USDJPY=X"]
 
 if data is None or len(data) < 100:
-    st.error("⚠️ ไม่พบข้อมูล หรือข้อมูลไม่เพียงพอ กรุณาลองใหม่")
+    st.error(
+        f"⚠️ ดึงข้อมูล **{symbol}** ไม่สำเร็จ (ทั้ง yfinance และ Stooq)\n\n"
+        "สาเหตุที่พบบ่อย: Yahoo Finance จำกัด/บล็อก IP ของ Streamlit Cloud ชั่วคราว "
+        "(rate limit) — มักหายเองใน 1-2 นาที"
+    )
+    cretry, _ = st.columns([1, 3])
+    with cretry:
+        if st.button("🔄 ลองใหม่"):
+            fetch_data.clear()
+            st.rerun()
+    st.caption("ถ้าลองหลายครั้งแล้วยังไม่ได้ ลองเปลี่ยน symbol อื่น หรือรอสักครู่แล้วรีเฟรช")
     st.stop()
 
 rt_quote = fetch_realtime_quote(symbol)
