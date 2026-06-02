@@ -1,7 +1,7 @@
 """
 DGV Investment Analyzer — Mathematical Deep Analysis
 วิเคราะห์การลงทุนด้วยคณิตศาสตร์ย้อนหลัง 10 ปี
-ราคา Real-time จาก Finnhub | ข้อมูลย้อนหลังจาก yfinance
+ราคา Real-time จาก Finnhub | ข้อมูลย้อนหลังจาก yfinance | AI โดย Claude (Anthropic)
 """
 
 import time
@@ -12,7 +12,7 @@ from plotly.subplots import make_subplots
 import streamlit as st
 import yfinance as yf
 import finnhub
-from google import genai
+import anthropic
 
 # ─────────────────────────────────────────────────────────────
 #  PAGE CONFIG
@@ -24,279 +24,230 @@ st.set_page_config(
 )
 
 # ─────────────────────────────────────────────────────────────
-#  GLOBAL CSS
+#  GLOBAL CSS  —  Dark "Terminal" theme
 # ─────────────────────────────────────────────────────────────
 st.markdown("""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=DM+Sans:wght@300;400;500;600&display=swap');
 
 :root {
-  --ink: #0d0d0d;
-  --paper: #f8f6f1;
-  --cream: #ede9e0;
-  --gold: #c8a84b;
-  --gold-light: #f0d98a;
-  --green: #2d7a4f;
-  --red: #c0392b;
-  --blue: #1a3a5c;
-  --muted: #8a8478;
-  --border: #d8d2c5;
-  --card: #ffffff;
+  --bg:        #070a11;
+  --bg-2:      #0b0f1a;
+  --surface:   #111726;
+  --surface-2: #18203250;
+  --border:    rgba(255,255,255,0.07);
+  --glow-gold: rgba(230,195,92,0.18);
+  --ink:       #e9eef7;
+  --muted:     #79859a;
+  --gold:      #e6c35c;
+  --gold-dim:  #c8a84b;
+  --green:     #2ee6a0;
+  --cyan:      #34e3c4;
+  --red:       #ff5d6c;
+  --blue:      #5b8def;
 }
 
-html, body, [class*="css"] {
-  font-family: 'DM Sans', sans-serif !important;
-  background-color: var(--paper) !important;
+/* App background — radial glow */
+html, body, [class*="css"], .stApp {
+  font-family: 'Space Grotesk','DM Sans', sans-serif !important;
   color: var(--ink) !important;
 }
+.stApp {
+  background:
+    radial-gradient(1100px 500px at 18% -8%, rgba(230,195,92,0.07), transparent 60%),
+    radial-gradient(900px 500px at 95% 8%, rgba(52,227,196,0.05), transparent 55%),
+    var(--bg) !important;
+}
+.block-container { padding-top: 1rem; }
 
-/* Header */
+/* Headings + numbers */
+.dm-serif { font-family:'DM Serif Display',serif; }
+.mono { font-family:'JetBrains Mono',monospace; }
+
+/* ── Masthead ───────────────────────────────────────── */
 .dgv-masthead {
-  background: var(--ink);
-  color: #fff;
-  padding: 22px 32px 18px;
-  margin: -16px -16px 24px;
+  position: relative;
+  background: linear-gradient(135deg, #0c1120 0%, #131b2e 60%, #0c1120 100%);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 22px 30px 20px;
+  margin: -8px 0 26px;
   display: flex;
-  align-items: baseline;
-  gap: 16px;
-  border-bottom: 3px solid var(--gold);
+  align-items: center;
+  gap: 18px;
+  overflow: hidden;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.04);
+}
+.dgv-masthead::after {
+  content:''; position:absolute; left:0; right:0; bottom:0; height:2px;
+  background: linear-gradient(90deg, transparent, var(--gold), var(--cyan), transparent);
+  opacity:.8;
 }
 .dgv-wordmark {
-  font-family: 'DM Serif Display', serif;
-  font-size: 32px;
-  letter-spacing: -1px;
-  color: var(--gold);
+  font-family:'DM Serif Display',serif;
+  font-size: 40px; line-height:1; letter-spacing:-2px;
+  background: linear-gradient(120deg, var(--gold) 0%, #fff4cf 50%, var(--gold-dim) 100%);
+  -webkit-background-clip:text; background-clip:text; color:transparent;
+  filter: drop-shadow(0 2px 14px var(--glow-gold));
 }
 .dgv-tagline {
-  font-size: 12px;
-  color: #aaa;
-  letter-spacing: 3px;
-  text-transform: uppercase;
+  font-family:'JetBrains Mono',monospace;
+  font-size: 11px; color: var(--gold); letter-spacing: 4px; text-transform: uppercase;
 }
+.dgv-sub { font-size: 12px; color: var(--muted); margin-top: 4px; }
 
-/* Real-time badge */
+/* ── Real-time badge / dot ──────────────────────────── */
 .rt-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  background: rgba(45,122,79,0.15);
-  border: 1px solid rgba(45,122,79,0.4);
-  border-radius: 20px;
-  padding: 3px 10px;
-  font-size: 11px;
-  color: #2d7a4f;
-  font-family: 'DM Mono', monospace;
-  font-weight: 500;
+  display:inline-flex; align-items:center; gap:6px;
+  background: rgba(46,230,160,0.10);
+  border: 1px solid rgba(46,230,160,0.35);
+  border-radius: 20px; padding: 3px 11px;
+  font-size: 11px; color: var(--green);
+  font-family:'JetBrains Mono',monospace; font-weight:600;
 }
-.rt-dot {
-  width: 7px; height: 7px;
-  background: #2d7a4f;
-  border-radius: 50%;
-  animation: pulse 1.5s infinite;
-}
-@keyframes pulse {
-  0%,100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.4; transform: scale(0.8); }
-}
+.rt-dot { width:7px; height:7px; background: var(--green); border-radius:50%;
+  box-shadow:0 0 10px var(--green); animation: pulse 1.5s infinite; }
+@keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.35;transform:scale(.7)} }
 
-/* Finnhub price panel */
+/* ── Finnhub price panel (glass) ────────────────────── */
 .rt-panel {
-  background: var(--ink);
-  border-radius: 10px;
-  padding: 14px 18px;
-  margin-bottom: 16px;
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
-  gap: 12px;
-  border: 1px solid rgba(200,168,75,0.25);
-}
-.rt-item { }
-.rt-item-label {
-  font-size: 10px;
-  letter-spacing: 1.5px;
-  text-transform: uppercase;
-  color: #666;
-  margin-bottom: 3px;
-  font-family: 'DM Mono', monospace;
-}
-.rt-item-val {
-  font-family: 'DM Mono', monospace;
-  font-size: 16px;
-  font-weight: 500;
-  color: #fff;
-}
-.rt-item-val.pos { color: #2d7a4f; }
-.rt-item-val.neg { color: #c0392b; }
-.rt-item-val.gold { color: #c8a84b; }
-
-/* Section headers */
-.section-title {
-  font-family: 'DM Serif Display', serif;
-  font-size: 20px;
-  color: var(--ink);
-  border-bottom: 1.5px solid var(--border);
-  padding-bottom: 6px;
-  margin-bottom: 14px;
-}
-
-/* Metric cards */
-.metric-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-  gap: 10px;
-  margin-bottom: 16px;
-}
-.mcard {
-  background: var(--card);
+  background: linear-gradient(160deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01));
+  backdrop-filter: blur(14px);
   border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 12px 14px;
-  position: relative;
+  border-radius: 14px; padding: 16px 20px; margin-bottom: 18px;
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(112px,1fr)); gap: 14px;
+  box-shadow: 0 6px 30px rgba(0,0,0,0.35);
 }
-.mcard::before {
-  content: '';
-  position: absolute;
-  top: 0; left: 0; right: 0;
-  height: 3px;
-  background: var(--gold);
-  border-radius: 8px 8px 0 0;
+.rt-item-label { font-size:10px; letter-spacing:1.5px; text-transform:uppercase;
+  color: var(--muted); margin-bottom:4px; font-family:'JetBrains Mono',monospace; }
+.rt-item-val { font-family:'JetBrains Mono',monospace; font-size:17px; font-weight:600; color:#fff; }
+.rt-item-val.pos { color: var(--green); text-shadow:0 0 12px rgba(46,230,160,.4); }
+.rt-item-val.neg { color: var(--red);   text-shadow:0 0 12px rgba(255,93,108,.35); }
+.rt-item-val.gold{ color: var(--gold);  text-shadow:0 0 14px var(--glow-gold); }
+
+/* ── Section headers ────────────────────────────────── */
+.section-title {
+  font-family:'DM Serif Display',serif; font-size: 21px; color: var(--ink);
+  margin-bottom: 14px; display:flex; align-items:center; gap:10px;
 }
-.mcard-label {
-  font-size: 10px;
-  letter-spacing: 1.5px;
-  text-transform: uppercase;
-  color: var(--muted);
-  margin-bottom: 4px;
+.section-title::before {
+  content:''; width:4px; height:20px; border-radius:3px;
+  background: linear-gradient(var(--gold), var(--cyan));
 }
-.mcard-value {
-  font-family: 'DM Mono', monospace;
-  font-size: 20px;
-  font-weight: 500;
-  color: var(--ink);
+
+/* ── Metric cards (glass + glow rail) ───────────────── */
+.mcard {
+  background: linear-gradient(160deg, rgba(255,255,255,0.045), rgba(255,255,255,0.012));
+  border: 1px solid var(--border); border-radius: 12px;
+  padding: 13px 15px; position: relative; overflow:hidden;
+  transition: transform .18s ease, box-shadow .18s ease;
 }
-.mcard-sub {
-  font-size: 11px;
-  color: var(--muted);
-  margin-top: 2px;
-}
+.mcard:hover { transform: translateY(-2px); box-shadow:0 10px 26px rgba(0,0,0,.4); }
+.mcard::before { content:''; position:absolute; top:0; left:0; bottom:0; width:3px;
+  background: var(--gold); box-shadow: 0 0 14px var(--glow-gold); }
+.mcard-label { font-size:10px; letter-spacing:1.5px; text-transform:uppercase;
+  color: var(--muted); margin-bottom:5px; }
+.mcard-value { font-family:'JetBrains Mono',monospace; font-size:21px; font-weight:600; color: var(--ink); }
+.mcard-sub { font-size:11px; color: var(--muted); margin-top:3px; }
 .mcard.pos .mcard-value { color: var(--green); }
 .mcard.neg .mcard-value { color: var(--red); }
-.mcard.gold .mcard-value { color: var(--gold); }
-.mcard.gold::before { background: var(--gold); }
-.mcard.pos::before  { background: var(--green); }
-.mcard.neg::before  { background: var(--red); }
+.mcard.gold .mcard-value{ color: var(--gold); }
+.mcard.pos::before  { background: var(--green); box-shadow:0 0 14px rgba(46,230,160,.5); }
+.mcard.neg::before  { background: var(--red);   box-shadow:0 0 14px rgba(255,93,108,.45); }
 .mcard.blue::before { background: var(--blue); }
 
-/* Score dial */
+/* ── Score ring / verdict ───────────────────────────── */
 .score-ring {
-  display: flex;
-  align-items: center;
-  gap: 20px;
-  background: var(--ink);
-  border-radius: 10px;
-  padding: 18px 22px;
-  margin-bottom: 16px;
-  color: #fff;
+  display:flex; align-items:center; gap:26px;
+  background: linear-gradient(135deg, #0d1322, #15203a);
+  border: 1px solid var(--border); border-radius: 16px;
+  padding: 20px 26px; margin-bottom: 18px; position:relative; overflow:hidden;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.05);
 }
-.score-num {
-  font-family: 'DM Serif Display', serif;
-  font-size: 52px;
-  color: var(--gold);
-  line-height: 1;
-}
-.score-label { font-size: 11px; color: #aaa; letter-spacing: 2px; text-transform: uppercase; }
-.score-verdict { font-size: 18px; font-weight: 600; color: #fff; margin-top: 4px; }
+.score-ring::after { content:''; position:absolute; right:-40px; top:-40px;
+  width:180px; height:180px; border-radius:50%;
+  background: radial-gradient(var(--glow-gold), transparent 70%); }
+.score-num { font-family:'DM Serif Display',serif; font-size:58px; line-height:1;
+  background: linear-gradient(120deg,var(--gold),#fff4cf,var(--gold-dim));
+  -webkit-background-clip:text; background-clip:text; color:transparent;
+  filter: drop-shadow(0 0 18px var(--glow-gold)); }
+.score-label { font-size:11px; color: var(--muted); letter-spacing:2px; text-transform:uppercase; }
+.score-verdict { font-size:19px; font-weight:700; color:#fff; margin-top:4px; }
 
-/* Signal rows */
-.sig-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 7px 0;
-  border-bottom: 1px solid var(--cream);
-  font-size: 13px;
-}
-.sig-icon { font-size: 16px; width: 22px; text-align: center; }
-.sig-text { flex: 1; color: var(--ink); }
-.sig-badge {
-  font-family: 'DM Mono', monospace;
-  font-size: 11px;
-  padding: 2px 7px;
-  border-radius: 4px;
-  background: var(--cream);
-  color: var(--muted);
-}
+/* ── Signal rows ────────────────────────────────────── */
+.sig-row { display:flex; align-items:center; gap:11px; padding:8px 0;
+  border-bottom:1px solid var(--border); font-size:13px; }
+.sig-icon { font-size:16px; width:22px; text-align:center; }
+.sig-text { flex:1; color: var(--ink); }
+.sig-badge { font-family:'JetBrains Mono',monospace; font-size:11px; padding:2px 8px;
+  border-radius:6px; background: rgba(255,255,255,0.05); color: var(--muted);
+  border:1px solid var(--border); }
 
-/* Chat */
-.chat-wrap {
-  max-height: 340px;
-  overflow-y: auto;
-  padding: 4px 0;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--card);
-  padding: 10px;
-  margin-bottom: 8px;
-}
-.msg-row { display: flex; gap: 8px; margin-bottom: 10px; align-items: flex-start; }
+/* ── Chat ───────────────────────────────────────────── */
+.chat-wrap { max-height:360px; overflow-y:auto; padding:12px;
+  border:1px solid var(--border); border-radius:14px;
+  background: linear-gradient(160deg, rgba(255,255,255,0.03), rgba(255,255,255,0.008));
+  margin-bottom:8px; }
+.msg-row { display:flex; gap:8px; margin-bottom:11px; align-items:flex-start; }
 .msg-row.u { flex-direction: row-reverse; }
-.av { width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center;
-      justify-content: center; font-size: 9px; font-weight: 700; flex-shrink: 0; margin-top: 2px; }
-.av.ai { background: var(--ink); color: var(--gold); font-family: 'DM Serif Display', serif; font-size: 12px; }
-.av.usr { background: var(--blue); color: #fff; }
-.bub { max-width: 82%; padding: 9px 13px; border-radius: 14px; font-size: 13px; line-height: 1.6; }
-.bub.ai-b { background: var(--cream); color: var(--ink); border-bottom-left-radius: 3px; }
-.bub.u-b  { background: var(--ink);  color: #fff;       border-bottom-right-radius: 3px; }
+.av { width:28px; height:28px; border-radius:9px; display:flex; align-items:center;
+  justify-content:center; font-size:11px; font-weight:700; flex-shrink:0; margin-top:2px; }
+.av.ai { background: linear-gradient(135deg,#1a2236,#0e1320); color: var(--gold);
+  font-family:'DM Serif Display',serif; border:1px solid var(--border);
+  box-shadow:0 0 12px var(--glow-gold); }
+.av.usr { background: linear-gradient(135deg, var(--blue), #3a63b8); color:#fff; }
+.bub { max-width:82%; padding:10px 14px; border-radius:14px; font-size:13px; line-height:1.65; }
+.bub.ai-b { background: rgba(255,255,255,0.05); color: var(--ink);
+  border:1px solid var(--border); border-bottom-left-radius:4px; }
+.bub.u-b  { background: linear-gradient(135deg,#1d2940,#16203a); color:#fff;
+  border:1px solid var(--border); border-bottom-right-radius:4px; }
 
-/* Income calculator */
-.calc-box {
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 18px 20px;
-}
-.calc-result {
-  background: var(--ink);
-  color: #fff;
-  border-radius: 8px;
-  padding: 14px 18px;
-  margin-top: 12px;
-}
-.calc-row { display: flex; justify-content: space-between; padding: 5px 0;
-            border-bottom: 1px solid rgba(255,255,255,0.1); font-size: 13px; }
-.calc-row:last-child { border-bottom: none; }
-.calc-row span:last-child { font-family: 'DM Mono', monospace; color: var(--gold-light); font-weight: 500; }
+/* ── Calc result ────────────────────────────────────── */
+.calc-result { background: linear-gradient(135deg,#0d1322,#15203a);
+  border:1px solid var(--border); color:#fff; border-radius:14px; padding:16px 20px; }
+.calc-row { display:flex; justify-content:space-between; padding:6px 0;
+  border-bottom:1px solid var(--border); font-size:13px; }
+.calc-row:last-child { border-bottom:none; }
+.calc-row span:last-child { font-family:'JetBrains Mono',monospace; color: var(--gold); font-weight:600; }
 
-/* Progress bar */
-.pb-bg { background: var(--cream); border-radius: 6px; height: 10px; width: 100%; }
-.pb-fill { height: 10px; border-radius: 6px; transition: width .5s ease; }
+/* ── Progress bar ───────────────────────────────────── */
+.pb-bg { background: rgba(255,255,255,0.07); border-radius:6px; height:10px; width:100%; overflow:hidden; }
+.pb-fill { height:10px; border-radius:6px; transition: width .6s ease; box-shadow:0 0 12px currentColor; }
 
-/* Rank table */
-.rank-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-.rank-table th { background: var(--ink); color: var(--gold); padding: 9px 12px;
-                  text-align: left; font-family: 'DM Mono', monospace; font-weight: 500;
-                  font-size: 11px; letter-spacing: 1px; }
-.rank-table td { padding: 9px 12px; border-bottom: 1px solid var(--border); vertical-align: middle; }
-.rank-table tr:hover td { background: var(--cream); }
-.rank-num { font-family: 'DM Serif Display', serif; font-size: 20px; color: var(--gold); }
-.rank-ticker { font-family: 'DM Mono', monospace; font-weight: 500; font-size: 14px; }
+/* ── Rank table ─────────────────────────────────────── */
+.rank-table { width:100%; border-collapse: collapse; font-size:13px;
+  background: rgba(255,255,255,0.02); border-radius:12px; overflow:hidden; }
+.rank-table th { background: rgba(255,255,255,0.04); color: var(--gold); padding:11px 12px;
+  text-align:left; font-family:'JetBrains Mono',monospace; font-weight:600;
+  font-size:11px; letter-spacing:1px; border-bottom:1px solid var(--border); }
+.rank-table td { padding:11px 12px; border-bottom:1px solid var(--border); vertical-align:middle; color:var(--ink); }
+.rank-table tr:hover td { background: rgba(255,255,255,0.04); }
+.rank-num { font-family:'DM Serif Display',serif; font-size:21px; color: var(--gold); }
+.rank-ticker { font-family:'JetBrains Mono',monospace; font-weight:600; font-size:14px; color:var(--ink); }
 
-/* Tabs */
-.stTabs [data-baseweb="tab-list"] {
-  gap: 0;
-  border-bottom: 2px solid var(--border);
-}
+/* ── Streamlit widgets (dark) ───────────────────────── */
+.stTextInput input, .stNumberInput input {
+  background: rgba(255,255,255,0.04) !important; color: var(--ink) !important;
+  border:1px solid var(--border) !important; border-radius:10px !important; }
+.stTextInput input:focus, .stNumberInput input:focus {
+  border-color: var(--gold) !important; box-shadow:0 0 0 2px var(--glow-gold) !important; }
+[data-testid="stMetricValue"] { font-family:'JetBrains Mono',monospace; color: var(--ink); }
+[data-testid="stMetricLabel"] { color: var(--muted); }
+.stCaption, .stMarkdown small { color: var(--muted) !important; }
+.stChatInput textarea { background: rgba(255,255,255,0.04) !important; color: var(--ink) !important; }
+
+/* ── Tabs ───────────────────────────────────────────── */
+.stTabs [data-baseweb="tab-list"] { gap:6px; border-bottom:1px solid var(--border); }
 .stTabs [data-baseweb="tab"] {
-  font-family: 'DM Sans', sans-serif !important;
-  font-size: 13px !important;
-  font-weight: 500 !important;
-  padding: 10px 20px !important;
-  border-radius: 0 !important;
-}
+  font-family:'Space Grotesk',sans-serif !important; font-size:13px !important; font-weight:600 !important;
+  padding:9px 18px !important; border-radius:10px 10px 0 0 !important; color: var(--muted) !important; }
 .stTabs [aria-selected="true"] {
-  background: var(--ink) !important;
-  color: var(--gold) !important;
-}
+  background: linear-gradient(160deg, rgba(230,195,92,0.14), rgba(255,255,255,0.02)) !important;
+  color: var(--gold) !important; border-bottom:2px solid var(--gold) !important; }
+
+/* alerts */
+.stAlert { background: rgba(255,255,255,0.04) !important; border:1px solid var(--border) !important;
+  border-radius:12px !important; color: var(--ink) !important; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -308,23 +259,30 @@ st.markdown("""
   <div class="dgv-wordmark">DGV</div>
   <div>
     <div class="dgv-tagline">Mathematical Investment Analyzer</div>
-    <div style="font-size:12px;color:#ccc;margin-top:3px">
-      วิเคราะห์การลงทุนด้วยคณิตศาสตร์ · ย้อนหลัง 10 ปี · ราคา Real-time จาก Finnhub
+    <div class="dgv-sub">
+      วิเคราะห์การลงทุนด้วยคณิตศาสตร์ · ย้อนหลัง 10 ปี · ราคา Real-time จาก Finnhub · AI โดย Claude
     </div>
   </div>
 </div>
 """, unsafe_allow_html=True)
 
 # ─────────────────────────────────────────────────────────────
-#  FINNHUB CLIENT
+#  CLIENTS  (Finnhub + Claude)
 # ─────────────────────────────────────────────────────────────
 @st.cache_resource
 def get_finnhub_client():
-    """สร้าง Finnhub client จาก secrets"""
     api_key = st.secrets.get("FINNHUB_API_KEY", "")
     return finnhub.Client(api_key=api_key)
 
+@st.cache_resource
+def get_claude_client():
+    api_key = st.secrets.get("ANTHROPIC_API_KEY", "")
+    return anthropic.Anthropic(api_key=api_key)
+
 finnhub_client = get_finnhub_client()
+
+# โมเดล Claude — เปลี่ยนได้ตามต้องการ (เช่น claude-opus-4-6 / claude-haiku-4-5-20251001)
+CLAUDE_MODEL = "claude-sonnet-4-6"
 
 # ─────────────────────────────────────────────────────────────
 #  SESSION STATE
@@ -332,7 +290,7 @@ finnhub_client = get_finnhub_client()
 for k, v in [
     ("history", {}),
     ("chat", [{"role": "assistant", "content":
-               "สวัสดีครับ! 📊 ผมวิเคราะห์จากคณิตศาสตร์ล้วน ๆ\nถามได้เลย: Sharpe, Drawdown, ผลตอบแทน, ความเสี่ยง, ขนาด Position..."}]),
+               "สวัสดีครับ! 📊 ผมคือ Claude ที่วิเคราะห์จากคณิตศาสตร์ล้วน ๆ\nถามได้เลย: Sharpe, Drawdown, ผลตอบแทน, ความเสี่ยง, ขนาด Position..."}]),
     ("last_refresh", 0),
 ]:
     if k not in st.session_state:
@@ -354,22 +312,18 @@ WATCHLIST = {
     "^GSPC":   "S&P 500 Index",
 }
 
-# Finnhub รองรับ symbol format แตกต่างจาก yfinance
-# Map yfinance → Finnhub symbol
 FINNHUB_SYMBOL_MAP = {
-    "GC=F":    None,        # Futures — Finnhub ไม่รองรับฟรี
-    "BTC-USD": "BINANCE:BTCUSDT",  # Crypto ใช้ exchange prefix
-    "^GSPC":   None,        # Index — Finnhub ไม่รองรับ
-    "EURUSD=X": "OANDA:EUR_USD",   # FX
+    "GC=F":    None,
+    "BTC-USD": "BINANCE:BTCUSDT",
+    "^GSPC":   None,
+    "EURUSD=X": "OANDA:EUR_USD",
     "GBPUSD=X": "OANDA:GBP_USD",
     "USDJPY=X": "OANDA:USD_JPY",
 }
 
 def get_finnhub_symbol(yf_symbol: str) -> str | None:
-    """แปลง yfinance symbol → Finnhub symbol"""
     if yf_symbol in FINNHUB_SYMBOL_MAP:
         return FINNHUB_SYMBOL_MAP[yf_symbol]
-    # สำหรับ US stocks (ไม่มี suffix พิเศษ) ใช้ตรงได้เลย
     if "=" not in yf_symbol and "-" not in yf_symbol and "^" not in yf_symbol:
         return yf_symbol
     return None
@@ -377,23 +331,17 @@ def get_finnhub_symbol(yf_symbol: str) -> str | None:
 # ─────────────────────────────────────────────────────────────
 #  REAL-TIME QUOTE (Finnhub)
 # ─────────────────────────────────────────────────────────────
-@st.cache_data(ttl=15)  # cache 15 วินาที
+@st.cache_data(ttl=15)
 def fetch_realtime_quote(yf_symbol: str) -> dict | None:
-    """
-    ดึงราคา real-time จาก Finnhub
-    คืน dict: c (current), h, l, o, pc (prev close), d (change), dp (change%)
-    คืน None ถ้าไม่รองรับ symbol นั้น
-    """
     fh_sym = get_finnhub_symbol(yf_symbol)
     if fh_sym is None:
         return None
     try:
         q = finnhub_client.quote(fh_sym)
-        # Finnhub คืน 0 ถ้า symbol ไม่ถูกต้อง
         if not q or q.get("c", 0) == 0:
             return None
-        q["d"]  = q["c"] - q["pc"]               # price change
-        q["dp"] = (q["d"] / q["pc"] * 100) if q["pc"] else 0  # % change
+        q["d"]  = q["c"] - q["pc"]
+        q["dp"] = (q["d"] / q["pc"] * 100) if q["pc"] else 0
         q["symbol"] = fh_sym
         return q
     except Exception:
@@ -668,10 +616,29 @@ def score_color(score):
     if score >= 50: return "gold"
     return "neg"
 
+# Plotly dark theme helper
+def dark_layout(fig, height=580, title=None):
+    fig.update_layout(
+        height=height,
+        title=title,
+        xaxis_rangeslider_visible=False,
+        margin=dict(l=10, r=10, t=40, b=10),
+        plot_bgcolor="rgba(0,0,0,0)",
+        paper_bgcolor="rgba(0,0,0,0)",
+        font=dict(family="Space Grotesk", color="#c3cbd9", size=12),
+        legend=dict(bgcolor="rgba(20,26,40,0.7)", bordercolor="rgba(255,255,255,0.1)",
+                    borderwidth=1, font=dict(size=11, color="#c3cbd9")),
+    )
+    fig.update_xaxes(gridcolor="rgba(255,255,255,0.05)", zerolinecolor="rgba(255,255,255,0.08)",
+                     linecolor="rgba(255,255,255,0.12)")
+    fig.update_yaxes(gridcolor="rgba(255,255,255,0.05)", zerolinecolor="rgba(255,255,255,0.08)",
+                     linecolor="rgba(255,255,255,0.12)")
+    return fig
+
 # ─────────────────────────────────────────────────────────────
 #  FETCH DATA (yfinance — historical)
 # ─────────────────────────────────────────────────────────────
-@st.cache_data(ttl=300)   # historical cache 5 นาที
+@st.cache_data(ttl=300)
 def fetch_data(symbol, period="10y"):
     try:
         t = yf.Ticker(symbol)
@@ -724,10 +691,8 @@ if data is None or len(data) < 100:
     st.error("⚠️ ไม่พบข้อมูล หรือข้อมูลไม่เพียงพอ กรุณาลองใหม่")
     st.stop()
 
-# ── Real-time quote จาก Finnhub
 rt_quote = fetch_realtime_quote(symbol)
 
-# ── ราคาที่ใช้แสดง: Finnhub ถ้ามี, fallback yfinance
 if rt_quote and rt_quote.get("c", 0) > 0:
     cur_price     = rt_quote["c"]
     prev_price    = rt_quote["pc"]
@@ -743,7 +708,6 @@ else:
 
 fmt_p = lambda v: f"{v:,.4f}" if is_fx else f"${v:,.2f}"
 
-# ── Price header
 with c2:
     delta_str = (f"{price_chg:+.4f} ({price_chg_pct:+.2f}%)" if is_fx
                  else f"${price_chg:+.2f} ({price_chg_pct:+.2f}%)")
@@ -755,7 +719,7 @@ with c3:
     st.caption(f"{source_label}\n📅 Historical {data_years:.1f} ปี | {len(data):,} วัน")
 
 # ─────────────────────────────────────────────────────────────
-#  REAL-TIME PANEL (แสดงเฉพาะเมื่อ Finnhub ให้ข้อมูล)
+#  REAL-TIME PANEL
 # ─────────────────────────────────────────────────────────────
 if rt_quote:
     chg_cls   = "pos" if price_chg >= 0 else "neg"
@@ -796,7 +760,7 @@ if rt_quote:
     """, unsafe_allow_html=True)
 
 # ─────────────────────────────────────────────────────────────
-#  COMPUTE Math Analysis (ใช้ historical data จาก yfinance)
+#  COMPUTE Math Analysis
 # ─────────────────────────────────────────────────────────────
 with st.spinner("กำลังวิเคราะห์คณิตศาสตร์..."):
     m   = full_math_analysis(data, symbol)
@@ -832,21 +796,21 @@ with tab_overview:
           <div>
             <div class="score-label">คำแนะนำ</div>
             <div class="score-verdict">{verdict_emoji.get(m['verdict'],'')} {m['verdict']}</div>
-            <div style="font-size:11px;color:#aaa;margin-top:6px">Win Rate Backtest: {bt['winrate']}%
+            <div style="font-size:11px;color:#9aa6b8;margin-top:6px">Win Rate Backtest: {bt['winrate']}%
             ({bt['wins']}W/{bt['losses']}L)</div>
           </div>
         </div>
         """, unsafe_allow_html=True)
 
         wr = bt["winrate"]
-        wr_col = "#2d7a4f" if wr>=60 else "#c8a84b" if wr>=45 else "#c0392b"
+        wr_col = "#2ee6a0" if wr>=60 else "#e6c35c" if wr>=45 else "#ff5d6c"
         st.markdown(f"""
         <div style="margin-bottom:8px">
           <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px">
             <span>Win Rate (MA Cross Strategy · ย้อนหลัง 10 ปี)</span>
-            <span style="font-family:'DM Mono',monospace;font-weight:600;color:{wr_col}">{wr}%</span>
+            <span style="font-family:'JetBrains Mono',monospace;font-weight:600;color:{wr_col}">{wr}%</span>
           </div>
-          <div class="pb-bg"><div class="pb-fill" style="width:{min(wr,100)}%;background:{wr_col}"></div></div>
+          <div class="pb-bg"><div class="pb-fill" style="width:{min(wr,100)}%;background:{wr_col};color:{wr_col}"></div></div>
           <div style="font-size:11px;color:var(--muted);margin-top:3px">{bt['total']} สัญญาณ | {bt['wins']} ชนะ | {bt['losses']} แพ้</div>
         </div>
         """, unsafe_allow_html=True)
@@ -872,7 +836,6 @@ with tab_overview:
               {'<div class="mcard-sub">'+sub+'</div>' if sub else ''}
             </div>""", unsafe_allow_html=True)
 
-        # ถ้า Finnhub มีราคา real-time ให้แสดงด้วย
         if rt_quote:
             mcard("PRICE (REAL-TIME)",
                   fmt_p(rt_quote['c']),
@@ -913,12 +876,12 @@ with tab_overview:
         for label, val in [("1 เดือน", m["ret_1m"]), ("3 เดือน", m["ret_3m"]),
                             ("6 เดือน", m["ret_6m"]), ("1 ปี", m["ret_1y"]),
                             ("3 ปี",    m["ret_3y"])]:
-            col = "#2d7a4f" if val>=0 else "#c0392b"
+            col = "#2ee6a0" if val>=0 else "#ff5d6c"
             st.markdown(f"""
             <div style="display:flex;justify-content:space-between;padding:5px 0;
                         border-bottom:1px solid var(--border);font-size:13px">
               <span>{label}</span>
-              <span style="font-family:'DM Mono',monospace;font-weight:600;color:{col}">{val:+.1f}%</span>
+              <span style="font-family:'JetBrains Mono',monospace;font-weight:600;color:{col}">{val:+.1f}%</span>
             </div>""", unsafe_allow_html=True)
 
 # ══════════════════════════════════════════════════════════════
@@ -946,7 +909,7 @@ with tab_chart:
         fig.add_trace(go.Candlestick(
             x=df_c.index, open=df_c["Open"], high=df_c["High"],
             low=df_c["Low"], close=df_c["Close"], name="Price",
-            increasing_line_color="#2d7a4f", decreasing_line_color="#c0392b"
+            increasing_line_color="#2ee6a0", decreasing_line_color="#ff5d6c"
         ), row=1, col=1)
         for col_ma, width, dash, name_ma in [
             ("MA20", 1.2, "dot", "MA20"),
@@ -954,49 +917,49 @@ with tab_chart:
             ("MA200", 1.8, "dash", "MA200"),
         ]:
             if col_ma in df_c.columns and not df_c[col_ma].isna().all():
-                colors = {"MA20":"#f39c12","MA50":"#9b59b6","MA200":"#e74c3c"}
+                colors = {"MA20":"#f3b34c","MA50":"#a877e6","MA200":"#ff5d6c"}
                 fig.add_trace(go.Scatter(
                     x=df_c.index, y=df_c[col_ma], mode="lines",
                     name=name_ma, line=dict(color=colors[col_ma], width=width, dash=dash)
                 ), row=1, col=1)
         fig.add_trace(go.Scatter(
             x=df_c.index, y=df_c["BB_up"], name="BB Upper",
-            line=dict(color="rgba(30,90,150,0.4)", width=1), fill=None, showlegend=False
+            line=dict(color="rgba(91,141,239,0.5)", width=1), fill=None, showlegend=False
         ), row=1, col=1)
         fig.add_trace(go.Scatter(
             x=df_c.index, y=df_c["BB_dn"], name="BB Band",
-            fill='tonexty', fillcolor='rgba(30,90,150,0.07)',
-            line=dict(color="rgba(30,90,150,0.4)", width=1), showlegend=False
+            fill='tonexty', fillcolor='rgba(91,141,239,0.08)',
+            line=dict(color="rgba(91,141,239,0.5)", width=1), showlegend=False
         ), row=1, col=1)
 
-        # Real-time price line (ถ้ามี Finnhub)
         if rt_quote:
             fig.add_hline(y=rt_quote["c"], row=1, col=1,
-                          line_color="#c8a84b", line_dash="dot", line_width=1.5,
+                          line_color="#e6c35c", line_dash="dot", line_width=1.5,
                           annotation_text=f"RT {fmt_p(rt_quote['c'])}",
-                          annotation_font_color="#c8a84b",
+                          annotation_font_color="#e6c35c",
                           annotation_position="right")
 
         fig.add_trace(go.Scatter(
             x=df_c.index, y=df_c["RSI"], mode="lines",
-            name="RSI", line=dict(color="#7b1fa2", width=1.5)
+            name="RSI", line=dict(color="#a877e6", width=1.5)
         ), row=2, col=1)
-        fig.add_hline(y=70, line_color="#c0392b", line_dash="dash", line_width=1, row=2, col=1)
-        fig.add_hline(y=30, line_color="#2d7a4f", line_dash="dash", line_width=1, row=2, col=1)
-        fig.add_hline(y=50, line_color="#aaa", line_dash="dot", line_width=0.8, row=2, col=1)
-        hist_c = ["#2d7a4f" if v >= 0 else "#c0392b" for v in df_c["MACDhist"]]
+        fig.add_hline(y=70, line_color="#ff5d6c", line_dash="dash", line_width=1, row=2, col=1)
+        fig.add_hline(y=30, line_color="#2ee6a0", line_dash="dash", line_width=1, row=2, col=1)
+        fig.add_hline(y=50, line_color="#7d8799", line_dash="dot", line_width=0.8, row=2, col=1)
+        hist_c = ["#2ee6a0" if v >= 0 else "#ff5d6c" for v in df_c["MACDhist"]]
         fig.add_trace(go.Bar(
             x=df_c.index, y=df_c["MACDhist"], name="Histogram",
             marker_color=hist_c, opacity=0.65
         ), row=3, col=1)
         fig.add_trace(go.Scatter(
             x=df_c.index, y=df_c["MACD"], mode="lines",
-            name="MACD", line=dict(color="#1a3a5c", width=1.4)
+            name="MACD", line=dict(color="#5b8def", width=1.4)
         ), row=3, col=1)
         fig.add_trace(go.Scatter(
             x=df_c.index, y=df_c["MACDsig"], mode="lines",
-            name="Signal", line=dict(color="#c8a84b", width=1.4)
+            name="Signal", line=dict(color="#e6c35c", width=1.4)
         ), row=3, col=1)
+        dark_layout(fig, height=600)
 
     elif chart_type == "Line + BB":
         fig = make_subplots(rows=2, cols=1, shared_xaxes=True,
@@ -1004,44 +967,45 @@ with tab_chart:
                             subplot_titles=("Price + Bollinger Bands", "Z-Score (60D)"))
         fig.add_trace(go.Scatter(
             x=df_c.index, y=df_c["Close"], mode="lines",
-            name="ราคา", line=dict(color="#1a3a5c", width=2)
+            name="ราคา", line=dict(color="#5b8def", width=2)
         ), row=1, col=1)
         fig.add_trace(go.Scatter(
             x=df_c.index, y=df_c["BB_up"], name="BB+2σ",
-            line=dict(color="#c8a84b", width=1, dash="dash"), fill=None
+            line=dict(color="#e6c35c", width=1, dash="dash"), fill=None
         ), row=1, col=1)
         fig.add_trace(go.Scatter(
             x=df_c.index, y=df_c["BB_dn"], name="BB-2σ",
-            fill='tonexty', fillcolor='rgba(200,168,75,0.08)',
-            line=dict(color="#c8a84b", width=1, dash="dash")
+            fill='tonexty', fillcolor='rgba(230,195,92,0.08)',
+            line=dict(color="#e6c35c", width=1, dash="dash")
         ), row=1, col=1)
         fig.add_trace(go.Scatter(
             x=df_c.index, y=df_c["BB_mid"], name="BB Mid",
-            line=dict(color="#aaa", width=1, dash="dot")
+            line=dict(color="#7d8799", width=1, dash="dot")
         ), row=1, col=1)
         if rt_quote:
             fig.add_hline(y=rt_quote["c"], row=1, col=1,
-                          line_color="#c8a84b", line_dash="dot", line_width=1.5,
+                          line_color="#e6c35c", line_dash="dot", line_width=1.5,
                           annotation_text=f"Live {fmt_p(rt_quote['c'])}",
-                          annotation_font_color="#c8a84b")
+                          annotation_font_color="#e6c35c")
         zs = df_c["ZScore"]
-        z_col = ["#2d7a4f" if v < -1 else "#c0392b" if v > 1 else "#888" for v in zs]
+        z_col = ["#2ee6a0" if v < -1 else "#ff5d6c" if v > 1 else "#7d8799" for v in zs]
         fig.add_trace(go.Bar(x=df_c.index, y=zs, name="Z-Score",
                              marker_color=z_col, opacity=0.7), row=2, col=1)
-        fig.add_hline(y=2,  line_color="#c0392b", line_dash="dash", row=2, col=1)
-        fig.add_hline(y=-2, line_color="#2d7a4f", line_dash="dash", row=2, col=1)
-        fig.add_hline(y=0,  line_color="#aaa", row=2, col=1)
+        fig.add_hline(y=2,  line_color="#ff5d6c", line_dash="dash", row=2, col=1)
+        fig.add_hline(y=-2, line_color="#2ee6a0", line_dash="dash", row=2, col=1)
+        fig.add_hline(y=0,  line_color="#7d8799", row=2, col=1)
+        dark_layout(fig, height=600)
 
     elif chart_type == "Z-Score":
         fig = go.Figure()
         zs = df_c["ZScore"]
-        z_col = ["#2d7a4f" if v < -1.5 else "#c0392b" if v > 1.5 else "#1a3a5c" for v in zs]
+        z_col = ["#2ee6a0" if v < -1.5 else "#ff5d6c" if v > 1.5 else "#5b8def" for v in zs]
         fig.add_trace(go.Bar(x=df_c.index, y=zs, name="Z-Score 60D",
                              marker_color=z_col, opacity=0.8))
-        fig.add_hline(y=2,  line_color="#c0392b", line_dash="dash", annotation_text="Overbought +2σ")
-        fig.add_hline(y=-2, line_color="#2d7a4f", line_dash="dash", annotation_text="Oversold -2σ")
-        fig.add_hline(y=0,  line_color="#888", line_width=0.8)
-        fig.update_layout(title="Z-Score (60-Day Rolling) — ระบุโซน Extreme")
+        fig.add_hline(y=2,  line_color="#ff5d6c", line_dash="dash", annotation_text="Overbought +2σ")
+        fig.add_hline(y=-2, line_color="#2ee6a0", line_dash="dash", annotation_text="Oversold -2σ")
+        fig.add_hline(y=0,  line_color="#7d8799", line_width=0.8)
+        dark_layout(fig, height=600, title="Z-Score (60-Day Rolling) — ระบุโซน Extreme")
 
     else:  # Drawdown
         prices_c = df_c["Close"]
@@ -1050,23 +1014,13 @@ with tab_chart:
         fig = go.Figure()
         fig.add_trace(go.Scatter(
             x=df_c.index, y=dd, mode="lines", name="Drawdown",
-            fill="tozeroy", fillcolor="rgba(192,57,43,0.15)",
-            line=dict(color="#c0392b", width=1.5)
+            fill="tozeroy", fillcolor="rgba(255,93,108,0.15)",
+            line=dict(color="#ff5d6c", width=1.5)
         ))
-        fig.add_hline(y=-20, line_color="#c8a84b", line_dash="dash", annotation_text="-20% Threshold")
-        fig.add_hline(y=-40, line_color="#c0392b", line_dash="dash", annotation_text="-40% Severe")
-        fig.update_layout(title="Drawdown Curve — ความเสียหายจาก Peak")
+        fig.add_hline(y=-20, line_color="#e6c35c", line_dash="dash", annotation_text="-20% Threshold")
+        fig.add_hline(y=-40, line_color="#ff5d6c", line_dash="dash", annotation_text="-40% Severe")
+        dark_layout(fig, height=600, title="Drawdown Curve — ความเสียหายจาก Peak")
 
-    fig.update_layout(
-        height=580,
-        xaxis_rangeslider_visible=False,
-        margin=dict(l=10, r=10, t=36, b=10),
-        plot_bgcolor="#fff",
-        paper_bgcolor="#f8f6f1",
-        legend=dict(bgcolor="rgba(255,255,255,0.85)", bordercolor="#d8d2c5",
-                    borderwidth=1, font=dict(size=11)),
-        font=dict(family="DM Sans"),
-    )
     st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
 
     if bt["entries"]:
@@ -1075,23 +1029,21 @@ with tab_chart:
         prices_full = m["df"]["Close"]
         fig_bt.add_trace(go.Scatter(
             x=prices_full.index, y=prices_full,
-            mode="lines", name="ราคา", line=dict(color="#1a3a5c", width=1.5)
+            mode="lines", name="ราคา", line=dict(color="#5b8def", width=1.5)
         ))
         w_d = [(e[0], e[1]) for e in bt["entries"] if e[2]=="win"  and e[0] in prices_full.index]
         l_d = [(e[0], e[1]) for e in bt["entries"] if e[2]=="lose" and e[0] in prices_full.index]
         if w_d:
             fig_bt.add_trace(go.Scatter(
                 x=[x[0] for x in w_d], y=[x[1] for x in w_d], mode="markers",
-                name="Win Entry", marker=dict(symbol="triangle-up", size=9, color="#2d7a4f")
+                name="Win Entry", marker=dict(symbol="triangle-up", size=9, color="#2ee6a0")
             ))
         if l_d:
             fig_bt.add_trace(go.Scatter(
                 x=[x[0] for x in l_d], y=[x[1] for x in l_d], mode="markers",
-                name="Lose Entry", marker=dict(symbol="triangle-down", size=9, color="#c0392b")
+                name="Lose Entry", marker=dict(symbol="triangle-down", size=9, color="#ff5d6c")
             ))
-        fig_bt.update_layout(height=280, margin=dict(l=10,r=10,t=20,b=10),
-                              plot_bgcolor="#fff", paper_bgcolor="#f8f6f1",
-                              xaxis_rangeslider_visible=False)
+        dark_layout(fig_bt, height=280)
         st.plotly_chart(fig_bt, use_container_width=True, config={"displayModeBar": False})
 
 # ══════════════════════════════════════════════════════════════
@@ -1110,14 +1062,14 @@ with tab_rank:
     else:
         medals = ["🥇","🥈","🥉"] + [""] * 20
         verdict_icon = {"Strong Buy":"🚀","Buy":"📈","Hold/Watch":"⏳","Underweight":"⚠️","Avoid":"🚫"}
-        score_bg = lambda s: "#d4edda" if s>=75 else "#fff3cd" if s>=50 else "#f8d7da"
+        score_bg = lambda s: "rgba(46,230,160,0.18)" if s>=75 else "rgba(230,195,92,0.18)" if s>=50 else "rgba(255,93,108,0.18)"
 
         html_rows = ""
         for i, r in enumerate(rankings):
             sc_bg  = score_bg(r["score"])
             v_icon = verdict_icon.get(r["verdict"], "")
-            cagr_c = "#2d7a4f" if r["cagr"]>=0 else "#c0392b"
-            mom_c  = "#2d7a4f" if r["momentum"]>=0 else "#c0392b"
+            cagr_c = "#2ee6a0" if r["cagr"]>=0 else "#ff5d6c"
+            mom_c  = "#2ee6a0" if r["momentum"]>=0 else "#ff5d6c"
             reasons = []
             if r["sharpe"] >= 1.5:  reasons.append(f"Sharpe สูง ({r['sharpe']:.1f})")
             elif r["sharpe"] < 0.5: reasons.append(f"Sharpe ต่ำ ({r['sharpe']:.1f})")
@@ -1138,16 +1090,16 @@ with tab_rank:
                 <div style="font-size:11px;color:var(--muted)">{r['name']}</div>
               </td>
               <td style="text-align:center">
-                <span style="background:{sc_bg};padding:3px 10px;border-radius:20px;
-                             font-family:'DM Mono',monospace;font-weight:600;font-size:13px">
+                <span style="background:{sc_bg};padding:3px 11px;border-radius:20px;
+                             font-family:'JetBrains Mono',monospace;font-weight:600;font-size:13px;color:#fff">
                   {r['score']}
                 </span>
               </td>
-              <td style="font-family:'DM Mono',monospace;color:{cagr_c}">{r['cagr']:+.1f}%</td>
-              <td style="font-family:'DM Mono',monospace">{r['sharpe']:.2f}</td>
-              <td style="font-family:'DM Mono',monospace;color:#c0392b">{r['mdd']:.1f}%</td>
-              <td style="font-family:'DM Mono',monospace;color:{mom_c}">{r['momentum']:+.1f}%</td>
-              <td style="font-family:'DM Mono',monospace">{r['winrate']:.0f}%</td>
+              <td style="font-family:'JetBrains Mono',monospace;color:{cagr_c}">{r['cagr']:+.1f}%</td>
+              <td style="font-family:'JetBrains Mono',monospace">{r['sharpe']:.2f}</td>
+              <td style="font-family:'JetBrains Mono',monospace;color:#ff5d6c">{r['mdd']:.1f}%</td>
+              <td style="font-family:'JetBrains Mono',monospace;color:{mom_c}">{r['momentum']:+.1f}%</td>
+              <td style="font-family:'JetBrains Mono',monospace">{r['winrate']:.0f}%</td>
               <td>{v_icon} {r['verdict']}</td>
               <td style="font-size:11px;color:var(--muted);max-width:200px">{reason_str}</td>
             </tr>"""
@@ -1214,22 +1166,22 @@ with tab_income:
         st.markdown(f"""
         <div class="calc-result">
           <div style="font-size:11px;letter-spacing:2px;text-transform:uppercase;
-                      color:#aaa;margin-bottom:10px">ผลการคำนวณ · {years_inv} ปี</div>
+                      color:#9aa6b8;margin-bottom:10px">ผลการคำนวณ · {years_inv} ปี</div>
           <div class="calc-row"><span>มูลค่าสุดท้าย</span><span>{final_val:,.0f}</span></div>
           <div class="calc-row"><span>เงินลงทุนรวม</span><span>{total_contrib:,.0f}</span></div>
           <div class="calc-row"><span>กำไรสะสม</span><span>{total_gain:,.0f}</span></div>
           <div class="calc-row"><span>ผลตอบแทนรวม</span><span>{total_return_pct:+.1f}%</span></div>
           <div class="calc-row"><span>รายได้ต่อปี</span><span>{ann_income:,.0f}</span></div>
           <div class="calc-row"><span>รายได้ต่อเดือน</span><span>{ann_income/12:,.0f}</span></div>
-          <div style="margin-top:12px;padding-top:10px;border-top:1px solid rgba(255,255,255,0.15)">
-            <div style="font-size:10px;color:#aaa;margin-bottom:6px">SCENARIOS ({years_inv} ปี)</div>
+          <div style="margin-top:12px;padding-top:10px;border-top:1px solid rgba(255,255,255,0.12)">
+            <div style="font-size:10px;color:#9aa6b8;margin-bottom:6px">SCENARIOS ({years_inv} ปี)</div>
         """, unsafe_allow_html=True)
         for label, sv in scenarios.items():
-            col_s = "#2d7a4f" if sv > total_contrib else "#c0392b"
+            col_s = "#2ee6a0" if sv > total_contrib else "#ff5d6c"
             st.markdown(f"""
             <div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0">
-              <span style="color:#ccc">{label}</span>
-              <span style="font-family:'DM Mono',monospace;color:{col_s}">{sv:,.0f}</span>
+              <span style="color:#c3cbd9">{label}</span>
+              <span style="font-family:'JetBrains Mono',monospace;color:{col_s}">{sv:,.0f}</span>
             </div>""", unsafe_allow_html=True)
         st.markdown("</div></div>", unsafe_allow_html=True)
 
@@ -1238,21 +1190,16 @@ with tab_income:
         years_x = [i/12 for i in range(len(values))]
         fig_grow.add_trace(go.Scatter(
             x=years_x, y=contributions, mode="lines", name="เงินลงทุนสะสม",
-            fill="tozeroy", fillcolor="rgba(200,168,75,0.1)",
-            line=dict(color="#c8a84b", width=1.5, dash="dash")
+            fill="tozeroy", fillcolor="rgba(230,195,92,0.10)",
+            line=dict(color="#e6c35c", width=1.5, dash="dash")
         ))
         fig_grow.add_trace(go.Scatter(
             x=years_x, y=values, mode="lines", name="มูลค่าพอร์ต",
-            fill="tonexty", fillcolor="rgba(45,122,79,0.12)",
-            line=dict(color="#2d7a4f", width=2.5)
+            fill="tonexty", fillcolor="rgba(46,230,160,0.12)",
+            line=dict(color="#2ee6a0", width=2.5)
         ))
-        fig_grow.update_layout(
-            title=f"การเติบโตของพอร์ต {years_inv} ปี",
-            height=320, margin=dict(l=10,r=10,t=36,b=10),
-            plot_bgcolor="#fff", paper_bgcolor="#f8f6f1",
-            xaxis_title="ปี", yaxis_title="มูลค่า",
-            legend=dict(bgcolor="rgba(255,255,255,0.8)"),
-        )
+        dark_layout(fig_grow, height=320, title=f"การเติบโตของพอร์ต {years_inv} ปี")
+        fig_grow.update_layout(xaxis_title="ปี", yaxis_title="มูลค่า")
         st.plotly_chart(fig_grow, use_container_width=True, config={"displayModeBar": False})
 
         st.markdown("#### ⚠️ คำนวณความเสี่ยง")
@@ -1268,7 +1215,7 @@ with tab_income:
         st.markdown(f"""
         <div class="calc-result" style="margin-top:0">
           <div style="font-size:11px;letter-spacing:2px;text-transform:uppercase;
-                      color:#aaa;margin-bottom:10px">RISK METRICS · {conf_level}% Confidence</div>
+                      color:#9aa6b8;margin-bottom:10px">RISK METRICS · {conf_level}% Confidence</div>
           <div class="calc-row"><span>VaR/วัน ({conf_level}%)</span><span>{var_pct:.2f}%</span></div>
           <div class="calc-row"><span>VaR เงิน</span><span>{var_thb:,.0f}</span></div>
           <div class="calc-row"><span>Expected Shortfall</span><span>{es_pct:.2f}%</span></div>
@@ -1282,16 +1229,15 @@ with tab_income:
         """, unsafe_allow_html=True)
 
 # ══════════════════════════════════════════════════════════════
-#  TAB 5 — AI CHAT
+#  TAB 5 — AI CHAT  (Claude)
 # ══════════════════════════════════════════════════════════════
 with tab_chat:
     col_ch, _ = st.columns([3, 2])
     with col_ch:
-        st.markdown('<div class="section-title">🤖 AI Investment Assistant (Gemini)</div>',
+        st.markdown('<div class="section-title">🤖 AI Investment Assistant (Claude)</div>',
                     unsafe_allow_html=True)
-        st.caption("วิเคราะห์จากตัวเลขคณิตศาสตร์ของ DGV · ไม่ใช้ข่าวสาร")
+        st.caption("วิเคราะห์จากตัวเลขคณิตศาสตร์ของ DGV · ขับเคลื่อนโดย Claude (Anthropic) · ไม่ใช้ข่าวสาร")
 
-        # เพิ่ม real-time context เข้าไปใน system prompt
         rt_ctx = ""
         if rt_quote:
             rt_ctx = f"""
@@ -1311,12 +1257,12 @@ with tab_chat:
 • Volatility: Short={m['vol_s']:.1f}% Long={m['vol_l']:.1f}%
 • Composite Score: {m['score']}/100 → {m['verdict']}
 
-ตอบภาษาไทย กระชับ ใช้ตัวเลขที่ให้ไว้ ระบุว่าเป็นการวิเคราะห์เพื่อประกอบการตัดสินใจ"""
+ตอบภาษาไทย กระชับ ใช้ตัวเลขที่ให้ไว้ ระบุว่าเป็นการวิเคราะห์เพื่อประกอบการตัดสินใจ ไม่ใช่คำแนะนำการลงทุน"""
 
         chat_html = '<div class="chat-wrap">'
         for msg in st.session_state.chat:
             if msg["role"] == "assistant":
-                chat_html += f'<div class="msg-row"><div class="av ai">D</div><div class="bub ai-b">{msg["content"].replace(chr(10),"<br>")}</div></div>'
+                chat_html += f'<div class="msg-row"><div class="av ai">C</div><div class="bub ai-b">{msg["content"].replace(chr(10),"<br>")}</div></div>'
             else:
                 chat_html += f'<div class="msg-row u"><div class="av usr">คุณ</div><div class="bub u-b">{msg["content"].replace(chr(10),"<br>")}</div></div>'
         chat_html += '</div>'
@@ -1325,18 +1271,21 @@ with tab_chat:
         if q := st.chat_input("ถามเรื่องตัวเลข, ความเสี่ยง, Sharpe, ผลตอบแทน...", key="main_chat"):
             st.session_state.chat.append({"role": "user", "content": q})
             try:
-                api_key = st.secrets["GOOGLE_API_KEY"]
-                client  = genai.Client(api_key=api_key)
+                client = get_claude_client()
+                # ประวัติสนทนา: ข้าม greeting ตัวแรก และข้อความ q ที่เพิ่งเพิ่ม (จะต่อท้ายเอง)
                 hist = [
-                    {"role": "user" if m_["role"] == "user" else "model",
-                     "parts": [{"text": m_["content"]}]}
+                    {"role": m_["role"], "content": m_["content"]}
                     for m_ in st.session_state.chat[1:-1]
                 ]
-                resp = client.models.generate_content(
-                    model="gemini-2.0-flash",
-                    contents=hist + [{"role": "user", "parts": [{"text": sys_ctx + "\n\n---\n" + q}]}]
+                resp = client.messages.create(
+                    model=CLAUDE_MODEL,
+                    max_tokens=1024,
+                    system=sys_ctx,
+                    messages=hist + [{"role": "user", "content": q}],
                 )
-                reply = resp.text
+                reply = "".join(
+                    block.text for block in resp.content if block.type == "text"
+                )
             except Exception as e:
                 reply = f"ขออภัย: {e}"
             st.session_state.chat.append({"role": "assistant", "content": reply})
@@ -1347,4 +1296,3 @@ with tab_chat:
 # ─────────────────────────────────────────────────────────────
 time.sleep(30)
 st.rerun()
-
