@@ -235,6 +235,13 @@ html, body, [class*="css"], .stApp {
 [data-testid="stMetricLabel"] { color: var(--muted); }
 .stCaption, .stMarkdown small { color: var(--muted) !important; }
 .stChatInput textarea { background: rgba(255,255,255,0.04) !important; color: var(--ink) !important; }
+/* chat input border → ให้เข้าธีม (แก้กรอบแดงเริ่มต้นของ Streamlit) */
+[data-testid="stChatInput"], .stChatInput, .stChatInput > div {
+  border-color: var(--border) !important; }
+.stChatInput { border:1px solid var(--border) !important; border-radius:14px !important;
+  background: rgba(255,255,255,0.03) !important; }
+.stChatInput:focus-within {
+  border-color: var(--gold) !important; box-shadow:0 0 0 2px var(--glow-gold) !important; }
 
 /* ── Tabs ───────────────────────────────────────────── */
 .stTabs [data-baseweb="tab-list"] { gap:6px; border-bottom:1px solid var(--border); }
@@ -331,7 +338,7 @@ def get_finnhub_symbol(yf_symbol: str) -> str | None:
 # ─────────────────────────────────────────────────────────────
 #  REAL-TIME QUOTE (Finnhub)
 # ─────────────────────────────────────────────────────────────
-@st.cache_data(ttl=15)
+@st.cache_data(ttl=2)   # cache 2 วินาที — อัปเดตถี่สำหรับ live ticker
 def fetch_realtime_quote(yf_symbol: str) -> dict | None:
     fh_sym = get_finnhub_symbol(yf_symbol)
     if fh_sym is None:
@@ -721,43 +728,58 @@ with c3:
 # ─────────────────────────────────────────────────────────────
 #  REAL-TIME PANEL
 # ─────────────────────────────────────────────────────────────
-if rt_quote:
-    chg_cls   = "pos" if price_chg >= 0 else "neg"
-    chg_arrow = "▲" if price_chg >= 0 else "▼"
+# ─────────────────────────────────────────────────────────────
+#  REAL-TIME PANEL — อัปเดตทุก 2 วินาที (เฉพาะแผงนี้ ไม่กระทบส่วนอื่น)
+# ─────────────────────────────────────────────────────────────
+@st.fragment(run_every=2)
+def realtime_panel():
+    q = fetch_realtime_quote(symbol)
+    if not q or q.get("c", 0) == 0:
+        st.caption("⏳ กำลังรอข้อมูล real-time...")
+        return
+    chg       = q["d"]
+    chgp      = q["dp"]
+    chg_cls   = "pos" if chg >= 0 else "neg"
+    chg_arrow = "▲" if chg >= 0 else "▼"
+    ts        = time.strftime("%H:%M:%S")
     st.markdown(f"""
     <div class="rt-panel">
       <div class="rt-item">
         <div class="rt-item-label">REAL-TIME</div>
-        <div class="rt-item-val gold">{fmt_p(rt_quote['c'])}</div>
+        <div class="rt-item-val gold">{fmt_p(q['c'])}</div>
       </div>
       <div class="rt-item">
         <div class="rt-item-label">เปลี่ยนแปลง</div>
-        <div class="rt-item-val {chg_cls}">{chg_arrow} {price_chg:+.2f} ({price_chg_pct:+.2f}%)</div>
+        <div class="rt-item-val {chg_cls}">{chg_arrow} {chg:+.2f} ({chgp:+.2f}%)</div>
       </div>
       <div class="rt-item">
         <div class="rt-item-label">HIGH วันนี้</div>
-        <div class="rt-item-val">{fmt_p(rt_quote['h'])}</div>
+        <div class="rt-item-val">{fmt_p(q['h'])}</div>
       </div>
       <div class="rt-item">
         <div class="rt-item-label">LOW วันนี้</div>
-        <div class="rt-item-val">{fmt_p(rt_quote['l'])}</div>
+        <div class="rt-item-val">{fmt_p(q['l'])}</div>
       </div>
       <div class="rt-item">
         <div class="rt-item-label">เปิด (OPEN)</div>
-        <div class="rt-item-val">{fmt_p(rt_quote['o'])}</div>
+        <div class="rt-item-val">{fmt_p(q['o'])}</div>
       </div>
       <div class="rt-item">
         <div class="rt-item-label">ปิดก่อนหน้า</div>
-        <div class="rt-item-val">{fmt_p(rt_quote['pc'])}</div>
+        <div class="rt-item-val">{fmt_p(q['pc'])}</div>
       </div>
       <div class="rt-item">
-        <div class="rt-item-label">แหล่งข้อมูล</div>
+        <div class="rt-item-label">อัปเดตล่าสุด</div>
         <div class="rt-item-val" style="font-size:12px">
-          <span class="rt-badge"><span class="rt-dot"></span>Finnhub LIVE</span>
+          <span class="rt-badge"><span class="rt-dot"></span>LIVE {ts}</span>
         </div>
       </div>
     </div>
     """, unsafe_allow_html=True)
+
+# แสดงแผง live เฉพาะ symbol ที่ Finnhub รองรับ
+if get_finnhub_symbol(symbol) is not None:
+    realtime_panel()
 
 # ─────────────────────────────────────────────────────────────
 #  COMPUTE Math Analysis
@@ -1292,7 +1314,12 @@ with tab_chat:
             st.rerun()
 
 # ─────────────────────────────────────────────────────────────
-#  AUTO REFRESH (30s)
+#  FOOTER
+#  แผงราคาอัปเดตเองทุก 2 วินาทีผ่าน fragment (ไม่ต้องรีเฟรชทั้งหน้า)
+#  ปุ่มนี้ใช้โหลดข้อมูลย้อนหลัง + ตัวเลขวิเคราะห์ใหม่ทั้งหมด
 # ─────────────────────────────────────────────────────────────
-time.sleep(30)
-st.rerun()
+st.markdown("<br>", unsafe_allow_html=True)
+if st.button("🔄 โหลดข้อมูลวิเคราะห์ใหม่ทั้งหมด"):
+    fetch_realtime_quote.clear()
+    fetch_data.clear()
+    st.rerun()
