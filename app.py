@@ -321,7 +321,7 @@ st.markdown("""
 @st.cache_resource
 def get_finnhub_client():
     """สร้าง Finnhub client จาก secrets"""
-    api_key = st.secrets.get("FINNHUB_API_KEY", "")
+    api_key = st.secrets.get("d8f4b71r01qub7kfqkbgd8f4b71r01qub7kfqkc0", "")
     return finnhub.Client(api_key=api_key)
 
 finnhub_client = get_finnhub_client()
