@@ -3,11 +3,13 @@ DGV Investment Analyzer — Mathematical Deep Analysis (Enhanced Edition)
 วิเคราะห์การลงทุนด้วยคณิตศาสตร์ย้อนหลัง 10 ปี
 ราคา Real-time จาก Finnhub | ข้อมูลย้อนหลังจาก yfinance + Stooq | AI โดย Claude (Anthropic)
 
-✨ Enhanced: อนิเมชั่นลื่นไหล · UI สวยขึ้น · ระบบเสถียรขึ้น · กราฟเรียลไทม์ ·
-   AI ที่ปรึกษาเป็นกันเอง · กราฟพยากรณ์อนาคต (Monte Carlo)
+✨ Enhanced: อนิเมชั่นลื่นไหล · UI สวยขึ้น · ระบบเสถียรขึ้น ·
+   กราฟ Real-time จริง (intraday) · 5 เส้นแนวโน้มที่ดีที่สุด (Advanced Models) ·
+   กองทุน/ETF/คริปโตเพิ่มเติม · ข่าว + วิเคราะห์อนาคตด้วย AI · AI ที่ปรึกษาเป็นกันเอง
 """
 
 import time
+import datetime as dt
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
@@ -439,41 +441,86 @@ for k, v in [
                "อยากรู้อะไรเกี่ยวกับ Sharpe, ความเสี่ยง, ผลตอบแทน, หรือควรลงเท่าไหร่ดี? "
                "ถามมาได้เลยครับ"}]),
     ("last_refresh", 0),
-    ("rt_ticks", {}),   # เก็บ tick real-time ต่อ symbol สำหรับกราฟสด
 ]:
     if k not in st.session_state:
         st.session_state[k] = v
 
 # ─────────────────────────────────────────────────────────────
-#  WATCHLIST
+#  ASSET GROUPS (กองทุน/ETF/คริปโต/หุ้น/ดัชนี เพิ่มเติม)
 # ─────────────────────────────────────────────────────────────
-WATCHLIST = {
-    "GC=F":    "ทองคำ (Gold Futures)",
-    "BTC-USD": "Bitcoin",
-    "NVDA":    "NVIDIA",
-    "AAPL":    "Apple",
-    "MSFT":    "Microsoft",
-    "TSLA":    "Tesla",
-    "AMZN":    "Amazon",
-    "META":    "Meta Platforms",
-    "GOOGL":   "Alphabet (Google)",
-    "^GSPC":   "S&P 500 Index",
+ASSET_GROUPS = {
+    "หุ้นเทคใหญ่ (Mega-cap Tech)": {
+        "NVDA":  "NVIDIA",
+        "AAPL":  "Apple",
+        "MSFT":  "Microsoft",
+        "GOOGL": "Alphabet (Google)",
+        "AMZN":  "Amazon",
+        "META":  "Meta Platforms",
+        "TSLA":  "Tesla",
+        "AMD":   "AMD",
+        "NFLX":  "Netflix",
+        "AVGO":  "Broadcom",
+    },
+    "ETF & กองทุน (Funds/ETFs)": {
+        "SPY":  "SPDR S&P 500 ETF",
+        "QQQ":  "Invesco Nasdaq-100 ETF",
+        "VOO":  "Vanguard S&P 500 ETF",
+        "VTI":  "Vanguard Total Market ETF",
+        "SCHD": "Schwab US Dividend ETF",
+        "ARKK": "ARK Innovation ETF",
+        "GLD":  "SPDR Gold Shares (ทองคำ)",
+        "TLT":  "iShares 20Y Treasury (พันธบัตร)",
+        "SMH":  "VanEck Semiconductor ETF",
+        "VWO":  "Vanguard Emerging Markets ETF",
+    },
+    "คริปโต (Crypto)": {
+        "BTC-USD": "Bitcoin",
+        "ETH-USD": "Ethereum",
+        "SOL-USD": "Solana",
+        "BNB-USD": "BNB",
+        "XRP-USD": "XRP",
+    },
+    "ดัชนี · ทอง · น้ำมัน": {
+        "^GSPC": "S&P 500 Index",
+        "^IXIC": "Nasdaq Composite",
+        "^DJI":  "Dow Jones",
+        "GC=F":  "ทองคำ (Gold Futures)",
+        "SI=F":  "เงิน (Silver Futures)",
+        "CL=F":  "น้ำมันดิบ (Crude Oil)",
+    },
+    "Forex": {
+        "EURUSD=X": "EUR/USD",
+        "GBPUSD=X": "GBP/USD",
+        "USDJPY=X": "USD/JPY",
+        "USDTHB=X": "USD/THB (เงินบาท)",
+    },
 }
 
+# รวมทุกกลุ่มเป็น dict เดียวสำหรับ lookup ชื่อ
+WATCHLIST = {sym: name for grp in ASSET_GROUPS.values() for sym, name in grp.items()}
+
 FINNHUB_SYMBOL_MAP = {
-    "GC=F":    None,
+    # commodities / indices ที่ Finnhub free ไม่รองรับ → None (ใช้ราคาปิดจาก yfinance)
+    "GC=F": None, "SI=F": None, "CL=F": None,
+    "^GSPC": None, "^IXIC": None, "^DJI": None,
+    # crypto → Binance
     "BTC-USD": "BINANCE:BTCUSDT",
-    "^GSPC":   None,
+    "ETH-USD": "BINANCE:ETHUSDT",
+    "SOL-USD": "BINANCE:SOLUSDT",
+    "BNB-USD": "BINANCE:BNBUSDT",
+    "XRP-USD": "BINANCE:XRPUSDT",
+    # forex → OANDA
     "EURUSD=X": "OANDA:EUR_USD",
     "GBPUSD=X": "OANDA:GBP_USD",
     "USDJPY=X": "OANDA:USD_JPY",
+    "USDTHB=X": "OANDA:USD_THB",
 }
 
 def get_finnhub_symbol(yf_symbol: str) -> str | None:
     if yf_symbol in FINNHUB_SYMBOL_MAP:
         return FINNHUB_SYMBOL_MAP[yf_symbol]
     if "=" not in yf_symbol and "-" not in yf_symbol and "^" not in yf_symbol:
-        return yf_symbol
+        return yf_symbol   # หุ้น/ETF สหรัฐ → ใช้ ticker ตรง ๆ
     return None
 
 # ─────────────────────────────────────────────────────────────
@@ -499,9 +546,83 @@ def fetch_realtime_quote(yf_symbol: str) -> dict | None:
         return None
 
 # ─────────────────────────────────────────────────────────────
-#  MATH FUNCTIONS
+#  INTRADAY (Real-time จริง) — yfinance 1m/5m/15m/1h
 # ─────────────────────────────────────────────────────────────
-def calc_rsi(series, period=14):
+@st.cache_data(ttl=45, show_spinner=False)
+def fetch_intraday(yf_symbol: str, interval: str = "5m", period: str = "5d"):
+    """ดึงแท่งราคา intraday จริงของวันนี้/ช่วงล่าสุด (ไม่ใช่การจำลอง)"""
+    try:
+        d = yf.Ticker(yf_symbol).history(period=period, interval=interval)
+        if d is not None and not d.empty and "Close" in d.columns:
+            return d.dropna(subset=["Close"])
+    except Exception:
+        pass
+    try:
+        d = yf.download(yf_symbol, period=period, interval=interval,
+                        progress=False, threads=False)
+        if d is not None and not d.empty:
+            if isinstance(d.columns, pd.MultiIndex):
+                d.columns = d.columns.get_level_values(0)
+            return d.dropna(subset=["Close"])
+    except Exception:
+        pass
+    return None
+
+# ─────────────────────────────────────────────────────────────
+#  NEWS (Finnhub) — ข่าวบริษัท + ข่าวตลาด/สงคราม/มหภาค
+# ─────────────────────────────────────────────────────────────
+@st.cache_data(ttl=600, show_spinner=False)
+def fetch_company_news(yf_symbol: str, days: int = 21):
+    """ข่าวเฉพาะหุ้น/ETF (ต้องเป็น ticker สหรัฐ — คริปโต/forex/ดัชนีจะไม่มี)"""
+    if finnhub_client is None:
+        return []
+    fh = get_finnhub_symbol(yf_symbol)
+    if fh is None or ":" in fh:   # crypto/forex mapped → company_news ใช้ไม่ได้
+        return []
+    try:
+        to_d  = dt.date.today()
+        frm_d = to_d - dt.timedelta(days=days)
+        news = finnhub_client.company_news(fh, _from=frm_d.isoformat(), to=to_d.isoformat())
+        news = [n for n in (news or []) if n.get("headline")]
+        news.sort(key=lambda n: n.get("datetime", 0), reverse=True)
+        return news[:25]
+    except Exception:
+        return []
+
+@st.cache_data(ttl=900, show_spinner=False)
+def fetch_general_news(category: str = "general"):
+    """ข่าวตลาด/เศรษฐกิจ/ภูมิรัฐศาสตร์ทั่วไป (รวมสงคราม นโยบาย ฯลฯ)"""
+    if finnhub_client is None:
+        return []
+    try:
+        news = finnhub_client.general_news(category) or []
+        news = [n for n in news if n.get("headline")]
+        news.sort(key=lambda n: n.get("datetime", 0), reverse=True)
+        return news[:20]
+    except Exception:
+        return []
+
+# คำสำคัญสำหรับประเมิน sentiment แบบ heuristic (โปร่งใส ตรวจสอบได้)
+_POS_WORDS = ["surge","beat","record","rally","upgrade","growth","profit","gain","soar",
+              "strong","boost","jump","outperform","bullish","expansion","win","high",
+              "raise","positive","optimis"]
+_NEG_WORDS = ["war","conflict","attack","sanction","crash","plunge","fall","drop","loss",
+              "downgrade","recession","fear","cut","weak","miss","lawsuit","probe","ban",
+              "tariff","inflation","slump","bearish","risk","decline","tension","strike",
+              "shortage","default","layoff","slow"]
+
+def news_sentiment(news_items):
+    """นับคำบวก/ลบจากพาดหัว+สรุป → คะแนน -100..+100 (heuristic)"""
+    if not news_items:
+        return 0, 0, 0
+    pos = neg = 0
+    for n in news_items:
+        text = (n.get("headline", "") + " " + n.get("summary", "")).lower()
+        pos += sum(text.count(w) for w in _POS_WORDS)
+        neg += sum(text.count(w) for w in _NEG_WORDS)
+    total = pos + neg
+    score = round((pos - neg) / total * 100) if total else 0
+    return score, pos, neg
     delta = series.diff()
     gain = delta.clip(lower=0).rolling(period).mean()
     loss = (-delta.clip(upper=0)).rolling(period).mean()
@@ -666,6 +787,115 @@ def linear_extrapolation(price_list, days=252):
     coeffs = np.polyfit(x, y, 1)
     future_x = np.arange(len(prices), len(prices) + days)
     return np.polyval(coeffs, future_x)
+
+# ─────────────────────────────────────────────────────────────
+#  ADVANCED FORECAST — 5 เส้นแนวโน้มที่ดีที่สุด (คณิตศาสตร์ขั้นสูง)
+#  Deterministic (ไม่ใช่การสุ่ม) — จัดอันดับด้วย out-of-sample error
+# ─────────────────────────────────────────────────────────────
+def _m_linear(y, n):
+    x = np.arange(len(y)); c = np.polyfit(x, y, 1)
+    return np.polyval(c, np.arange(len(y), len(y) + n))
+
+def _m_loglinear(y, n):
+    x = np.arange(len(y)); ly = np.log(np.maximum(y, 1e-9))
+    c = np.polyfit(x, ly, 1)
+    return np.exp(np.polyval(c, np.arange(len(y), len(y) + n)))
+
+def _m_poly2(y, n):
+    x = np.arange(len(y)); c = np.polyfit(x, y, 2)
+    return np.polyval(c, np.arange(len(y), len(y) + n))
+
+def _m_poly3(y, n):
+    x = np.arange(len(y)); c = np.polyfit(x, y, 3)
+    return np.polyval(c, np.arange(len(y), len(y) + n))
+
+def _m_theilsen(y, n):
+    L = len(y); x = np.arange(L)
+    idx = np.unique(np.linspace(0, L - 1, min(L, 160)).astype(int))
+    xs, ys = x[idx].astype(float), y[idx]
+    sl = []
+    for i in range(len(xs)):
+        dx = xs[i + 1:] - xs[i]
+        dy = ys[i + 1:] - ys[i]
+        msk = dx != 0
+        sl.extend((dy[msk] / dx[msk]).tolist())
+    slope = np.median(sl) if sl else 0.0
+    inter = np.median(ys - slope * xs)
+    return slope * np.arange(L, L + n) + inter
+
+def _m_holt(y, n, alpha=0.25, beta=0.12):
+    level = y[0]; trend = y[1] - y[0]
+    for t in range(1, len(y)):
+        prev = level
+        level = alpha * y[t] + (1 - alpha) * (level + trend)
+        trend = beta * (level - prev) + (1 - beta) * trend
+    return np.array([level + h * trend for h in range(1, n + 1)])
+
+def _m_holt_damped(y, n, alpha=0.25, beta=0.12, phi=0.97):
+    level = y[0]; trend = y[1] - y[0]
+    for t in range(1, len(y)):
+        prev = level
+        level = alpha * y[t] + (1 - alpha) * (level + phi * trend)
+        trend = beta * (level - prev) + (1 - beta) * phi * trend
+    out, s = [], 0.0
+    for h in range(1, n + 1):
+        s += phi ** h
+        out.append(level + s * trend)
+    return np.array(out)
+
+_FORECAST_MODELS = {
+    "Linear Regression":       (_m_linear,      "#5b8def"),
+    "Log-Linear (Exp Growth)": (_m_loglinear,   "#2ee6a0"),
+    "Polynomial (deg-2)":      (_m_poly2,       "#e6c35c"),
+    "Polynomial (deg-3)":      (_m_poly3,       "#ff9f43"),
+    "Theil-Sen (Robust)":      (_m_theilsen,    "#34e3c4"),
+    "Holt Exp Smoothing":      (_m_holt,        "#a877e6"),
+    "Holt Damped Trend":       (_m_holt_damped, "#ff5d6c"),
+}
+
+@st.cache_data(ttl=300, show_spinner=False)
+def advanced_forecast(price_list, horizon=252, top_k=5, test_frac=0.2):
+    """
+    ฟิตหลายโมเดลคณิตศาสตร์ → วัดความแม่นแบบ out-of-sample (เทรน 80% เทสต์ 20%)
+    → จัดอันดับด้วย MAPE → คืน top_k โมเดลที่ดีที่สุด พร้อมเส้นพยากรณ์อนาคต
+    """
+    y = np.asarray(pd.Series(price_list).dropna(), dtype=float)
+    if len(y) < 60:
+        return None
+    split = int(len(y) * (1 - test_frac))
+    y_tr, y_te = y[:split], y[split:]
+    lo, hi = y.min() * 0.3, y.max() * 3.0   # ขอบเขตกันค่าระเบิด
+    results = []
+    for name, (fn, color) in _FORECAST_MODELS.items():
+        try:
+            pred_te = fn(y_tr, len(y_te))
+            if not np.isfinite(pred_te).all():
+                continue
+            mape = float(np.mean(np.abs((y_te - pred_te) / (y_te + 1e-9))) * 100)
+            rmse = float(np.sqrt(np.mean((y_te - pred_te) ** 2)))
+            fut = np.clip(fn(y, horizon), lo, hi)
+            if not np.isfinite(fut).all():
+                continue
+            results.append({
+                "name": name, "color": color, "mape": mape, "rmse": rmse,
+                "forecast": fut, "end": float(fut[-1]),
+                "ret": float((fut[-1] / y[-1] - 1) * 100),
+            })
+        except Exception:
+            continue
+    if not results:
+        return None
+    results.sort(key=lambda r: r["mape"])
+    top = results[:top_k]
+    # consensus (ค่าเฉลี่ยของ top) — มุมมองรวม
+    consensus = np.mean([r["forecast"] for r in top], axis=0)
+    return {
+        "last": float(y[-1]), "horizon": horizon, "top": top, "all": results,
+        "consensus": consensus,
+        "consensus_end": float(consensus[-1]),
+        "consensus_ret": float((consensus[-1] / y[-1] - 1) * 100),
+        "best_name": top[0]["name"], "best_mape": top[0]["mape"],
+    }
 
 # ─────────────────────────────────────────────────────────────
 def winrate_backtest(df, strategy="ma_cross"):
@@ -916,22 +1146,24 @@ def fetch_data(symbol, period="10y"):
     return None
 
 @st.cache_data(ttl=60, show_spinner=False)
-def fetch_watchlist_scores():
+def fetch_watchlist_scores(symbols=None):
+    syms = symbols if symbols is not None else list(WATCHLIST.keys())
     results = []
-    for sym, name in WATCHLIST.items():
+    for sym in syms:
+        name = WATCHLIST.get(sym, sym)
         df = fetch_data(sym)
         if df is None or len(df) < 252:
             continue
         try:
-            m = full_math_analysis(df, sym)
-            bt = winrate_backtest(df)
+            mm = full_math_analysis(df, sym)
+            bt2 = winrate_backtest(df)
             results.append({
                 "sym": sym, "name": name,
-                "score": m["score"], "verdict": m["verdict"],
-                "cagr": m["cagr"], "sharpe": m["sharpe"],
-                "mdd": m["mdd"], "winrate": bt["winrate"],
-                "momentum": m["momentum"], "vol": m["vol_l"],
-                "cur": m["cur"],
+                "score": mm["score"], "verdict": mm["verdict"],
+                "cagr": mm["cagr"], "sharpe": mm["sharpe"],
+                "mdd": mm["mdd"], "winrate": bt2["winrate"],
+                "momentum": mm["momentum"], "vol": mm["vol_l"],
+                "cur": mm["cur"],
             })
         except Exception:
             continue
@@ -999,22 +1231,36 @@ with c3:
     st.caption(f"{source_label}\n📅 Historical {data_years:.1f} ปี | {len(data):,} วัน")
 
 # ─────────────────────────────────────────────────────────────
-#  REAL-TIME PANEL + LIVE SPARKLINE — อัปเดตทุก 2 วินาที
+#  REAL-TIME PANEL + LIVE INTRADAY CHART (ข้อมูลจริง) — อัปเดตทุก 3 วินาที
 # ─────────────────────────────────────────────────────────────
-@st.fragment(run_every=2)
+# ตัวเลือกช่วง/สไตล์กราฟ real-time (อยู่นอก fragment เพื่อไม่ให้รีเซ็ตทุกวินาที)
+if get_finnhub_symbol(symbol) is not None or not is_fx:
+    iv_col1, iv_col2 = st.columns([3, 1])
+    with iv_col1:
+        _iv_label = st.radio(
+            "ช่วงกราฟ Real-time",
+            ["1 นาที · วันนี้", "5 นาที · 5 วัน", "15 นาที · 5 วัน", "1 ชม. · 1 เดือน"],
+            horizontal=True, label_visibility="collapsed", key="rt_interval_radio")
+    with iv_col2:
+        _rt_style = st.radio("สไตล์", ["เส้น", "แท่งเทียน"],
+                             horizontal=True, label_visibility="collapsed", key="rt_style_radio")
+    _IV_MAP = {
+        "1 นาที · วันนี้":  ("1m", "1d"),
+        "5 นาที · 5 วัน":   ("5m", "5d"),
+        "15 นาที · 5 วัน":  ("15m", "5d"),
+        "1 ชม. · 1 เดือน":  ("60m", "1mo"),
+    }
+    _RT_INTERVAL, _RT_PERIOD = _IV_MAP[_iv_label]
+else:
+    _RT_INTERVAL, _RT_PERIOD, _rt_style = "5m", "5d", "เส้น"
+
+
+@st.fragment(run_every=3)
 def realtime_panel():
     q = fetch_realtime_quote(symbol)
     if not q or q.get("c", 0) == 0:
         st.caption("⏳ กำลังรอข้อมูล real-time...")
         return
-
-    # เก็บ tick เข้า session สำหรับกราฟสด (เก็บสูงสุด ~120 จุด)
-    ticks = st.session_state.rt_ticks.get(symbol, [])
-    now_ts = time.time()
-    if not ticks or now_ts - ticks[-1][0] >= 1.5:
-        ticks.append((now_ts, q["c"]))
-        ticks = ticks[-120:]
-        st.session_state.rt_ticks[symbol] = ticks
 
     chg       = q["d"]
     chgp      = q["dp"]
@@ -1056,39 +1302,81 @@ def realtime_panel():
     </div>
     """, unsafe_allow_html=True)
 
-    # กราฟสด (สะสมจาก tick) — แสดงเมื่อมีจุด ≥ 3
-    if len(ticks) >= 3:
-        tt = [time.strftime("%H:%M:%S", time.localtime(t[0])) for t in ticks]
-        vv = [t[1] for t in ticks]
-        up = vv[-1] >= vv[0]
-        line_c = "#2ee6a0" if up else "#ff5d6c"
-        fill_c = "rgba(46,230,160,0.12)" if up else "rgba(255,93,108,0.10)"
-        fig_live = go.Figure()
+    # ── กราฟ intraday จริง (yfinance) + จุดราคา live ล่าสุด (Finnhub) ──
+    intra = fetch_intraday(symbol, interval=_RT_INTERVAL, period=_RT_PERIOD)
+    if intra is None or intra.empty or len(intra) < 2:
+        st.caption("⏳ กำลังโหลดกราฟ intraday จริง... (บางสินทรัพย์อาจไม่มีข้อมูลรายนาที)")
+        return
+
+    closes = intra["Close"]
+    up = closes.iloc[-1] >= closes.iloc[0]
+    line_c = "#2ee6a0" if up else "#ff5d6c"
+    fill_c = "rgba(46,230,160,0.10)" if up else "rgba(255,93,108,0.09)"
+
+    fig_live = go.Figure()
+    if _rt_style == "แท่งเทียน" and {"Open", "High", "Low"}.issubset(intra.columns):
+        fig_live.add_trace(go.Candlestick(
+            x=intra.index, open=intra["Open"], high=intra["High"],
+            low=intra["Low"], close=intra["Close"], name="ราคา",
+            increasing_line_color="#2ee6a0", decreasing_line_color="#ff5d6c",
+            increasing_fillcolor="rgba(46,230,160,0.6)",
+            decreasing_fillcolor="rgba(255,93,108,0.6)",
+        ))
+    else:
         fig_live.add_trace(go.Scatter(
-            x=tt, y=vv, mode="lines", name="Live",
+            x=intra.index, y=closes, mode="lines", name="ราคา",
             line=dict(color=line_c, width=2, shape="spline"),
             fill="tozeroy", fillcolor=fill_c,
         ))
-        fig_live.add_trace(go.Scatter(
-            x=[tt[-1]], y=[vv[-1]], mode="markers",
-            marker=dict(size=10, color=line_c, line=dict(color="#fff", width=1)),
-            showlegend=False,
-        ))
-        fig_live.update_layout(
-            height=150, margin=dict(l=8, r=8, t=8, b=8),
-            plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
-            showlegend=False, font=dict(family="JetBrains Mono", color="#c3cbd9", size=10),
-            yaxis=dict(showgrid=False, side="right"),
-            xaxis=dict(showgrid=False, nticks=6),
-        )
-        fig_live.update_yaxes(range=[min(vv) * 0.999, max(vv) * 1.001])
-        st.plotly_chart(fig_live, use_container_width=True,
-                        config={"displayModeBar": False}, key=f"live_chart_{symbol}")
-        st.caption(f"📡 กราฟสด (intraday tick) · เก็บ {len(ticks)} จุด · สร้างจากราคา Finnhub แบบ real-time")
+    # จุด live ล่าสุดจาก Finnhub (real-time กว่า bar)
+    fig_live.add_trace(go.Scatter(
+        x=[intra.index[-1]], y=[q["c"]], mode="markers",
+        marker=dict(size=11, color="#e6c35c", line=dict(color="#fff", width=1.5)),
+        name="Live", showlegend=False,
+    ))
+    fig_live.add_hline(y=q["c"], line_color="#e6c35c", line_dash="dot", line_width=1,
+                       annotation_text=f"Live {fmt_p(q['c'])}", annotation_font_color="#e6c35c",
+                       annotation_position="left")
+    if q.get("pc"):
+        fig_live.add_hline(y=q["pc"], line_color="rgba(255,255,255,0.25)",
+                           line_dash="dash", line_width=1)
+    fig_live.update_layout(
+        height=260, margin=dict(l=8, r=8, t=8, b=8),
+        plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
+        showlegend=False, xaxis_rangeslider_visible=False,
+        font=dict(family="JetBrains Mono", color="#c3cbd9", size=10),
+        hovermode="x unified",
+        hoverlabel=dict(bgcolor="rgba(15,20,32,0.95)", bordercolor="rgba(230,195,92,0.4)",
+                        font=dict(family="JetBrains Mono", size=10, color="#e9eef7")),
+    )
+    fig_live.update_xaxes(showgrid=False, nticks=8)
+    fig_live.update_yaxes(showgrid=False, side="right", gridcolor="rgba(255,255,255,0.04)")
+    st.plotly_chart(fig_live, use_container_width=True,
+                    config={"displayModeBar": False}, key=f"live_chart_{symbol}")
+    st.caption(f"📡 กราฟ Real-time จริง · {_RT_INTERVAL} bars จาก yfinance ({len(intra)} แท่ง) · "
+               f"จุดทอง = ราคา live ล่าสุดจาก Finnhub · เส้นประขาว = ราคาปิดก่อนหน้า")
 
-# แสดงแผง live เฉพาะ symbol ที่ Finnhub รองรับ
+# แสดงแผง live (Finnhub) หรืออย่างน้อยกราฟ intraday (yfinance) สำหรับหุ้น/ETF
 if get_finnhub_symbol(symbol) is not None:
     realtime_panel()
+else:
+    # สินทรัพย์ที่ Finnhub free ไม่รองรับ → ยังโชว์กราฟ intraday จริงจาก yfinance ได้
+    _intra0 = fetch_intraday(symbol, interval=_RT_INTERVAL, period=_RT_PERIOD)
+    if _intra0 is not None and not _intra0.empty and len(_intra0) >= 2:
+        _cl = _intra0["Close"]; _up = _cl.iloc[-1] >= _cl.iloc[0]
+        _lc = "#2ee6a0" if _up else "#ff5d6c"
+        _fig0 = go.Figure()
+        _fig0.add_trace(go.Scatter(x=_intra0.index, y=_cl, mode="lines",
+            line=dict(color=_lc, width=2, shape="spline"),
+            fill="tozeroy", fillcolor=("rgba(46,230,160,0.10)" if _up else "rgba(255,93,108,0.09)")))
+        _fig0.update_layout(height=240, margin=dict(l=8, r=8, t=8, b=8),
+            plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", showlegend=False,
+            font=dict(family="JetBrains Mono", color="#c3cbd9", size=10))
+        _fig0.update_xaxes(showgrid=False); _fig0.update_yaxes(showgrid=False, side="right")
+        st.plotly_chart(_fig0, use_container_width=True, config={"displayModeBar": False},
+                        key=f"intra0_{symbol}")
+        st.caption(f"📊 กราฟ intraday จริง · {_RT_INTERVAL} bars จาก yfinance "
+                   "(Finnhub free ไม่รองรับ live สำหรับสินทรัพย์นี้)")
 
 # ─────────────────────────────────────────────────────────────
 #  COMPUTE Math Analysis
@@ -1100,10 +1388,11 @@ with st.spinner("กำลังวิเคราะห์คณิตศาส
 # ─────────────────────────────────────────────────────────────
 #  TABS
 # ─────────────────────────────────────────────────────────────
-tab_overview, tab_chart, tab_forecast, tab_rank, tab_income, tab_chat = st.tabs([
+tab_overview, tab_chart, tab_forecast, tab_news, tab_rank, tab_income, tab_chat = st.tabs([
     "📐 ภาพรวมคณิตศาสตร์",
     "📈 กราฟวิเคราะห์",
     "🔮 พยากรณ์อนาคต",
+    "📰 ข่าว & อนาคต",
     "🏆 อันดับสินทรัพย์",
     "💰 คำนวณรายได้",
     "🤖 AI ที่ปรึกษา",
@@ -1403,13 +1692,116 @@ with tab_chart:
 #  TAB 3 — FORECAST (Monte Carlo)  [NEW]
 # ══════════════════════════════════════════════════════════════
 with tab_forecast:
-    st.markdown('<div class="section-title">🔮 พยากรณ์เส้นทางราคาในอนาคต</div>', unsafe_allow_html=True)
+    # ══════════ ส่วนที่ 1: 5 เส้นแนวโน้มที่ดีที่สุด (Advanced Models) ══════════
+    st.markdown('<div class="section-title">🎯 5 เส้นแนวโน้มที่ดีที่สุด (คณิตศาสตร์ขั้นสูง)</div>',
+                unsafe_allow_html=True)
+    st.markdown("""
+    <div class="fc-banner">
+      ฟิตหลายโมเดลคณิตศาสตร์ (Linear · Log-Linear · Polynomial · Theil-Sen · Holt) แล้ว
+      <b>วัดความแม่นแบบ out-of-sample</b> (เทรน 80% / ทดสอบ 20%) จัดอันดับด้วยค่า
+      <b>MAPE</b> (ยิ่งต่ำยิ่งแม่น) → เลือก <b>5 โมเดลที่ดีที่สุด</b> มาต่อเส้นแนวโน้มอนาคต
+      <br><span style="color:var(--muted);font-size:12px">เป็นการคำนวณเชิงกำหนด (deterministic) ไม่ใช่การสุ่ม — เส้น Consensus = ค่าเฉลี่ยของ 5 โมเดล</span>
+    </div>
+    """, unsafe_allow_html=True)
+
+    af1, af2 = st.columns([1, 1])
+    with af1:
+        adv_horizon = st.select_slider(
+            "ระยะเวลาพยากรณ์ (เส้นแนวโน้ม)",
+            options=[63, 126, 252, 504, 756], value=252,
+            format_func=lambda d: f"{d//21} เดือน" if d < 252 else f"{d//252} ปี",
+            key="adv_horizon")
+    with af2:
+        show_consensus = st.checkbox("แสดงเส้น Consensus (ค่าเฉลี่ย)", value=True, key="adv_consensus")
+
+    price_list = m["df"]["Close"].dropna().tolist()
+    with st.spinner("กำลังฟิตโมเดลและจัดอันดับ..."):
+        adv = advanced_forecast(price_list, horizon=adv_horizon, top_k=5)
+
+    if adv is None:
+        st.warning("ข้อมูลไม่พอสำหรับการพยากรณ์ขั้นสูง (ต้องการอย่างน้อย ~60 วัน)")
+    else:
+        last_date_a = m["df"].index[-1]
+        fut_dates_a = pd.bdate_range(start=last_date_a, periods=adv_horizon + 1)[1:]
+        hist_a = m["df"]["Close"].tail(252)
+
+        fig_adv = go.Figure()
+        fig_adv.add_trace(go.Scatter(
+            x=hist_a.index, y=hist_a.values, mode="lines", name="ราคาในอดีต",
+            line=dict(color="#9aa6b8", width=2)))
+        # เส้นพยากรณ์ 5 โมเดล (เส้นที่ดีที่สุด = หนา/ทึบ, ที่เหลือบางลง)
+        for rank, r in enumerate(adv["top"]):
+            is_best = (rank == 0)
+            fig_adv.add_trace(go.Scatter(
+                x=list(fut_dates_a), y=r["forecast"], mode="lines",
+                name=f"{'⭐ ' if is_best else ''}{r['name']} (MAPE {r['mape']:.1f}%)",
+                line=dict(color=r["color"], width=3 if is_best else 1.6,
+                          dash=None if is_best else "dot"),
+                opacity=1.0 if is_best else 0.75))
+        # consensus
+        if show_consensus:
+            fig_adv.add_trace(go.Scatter(
+                x=list(fut_dates_a), y=adv["consensus"], mode="lines",
+                name="🎯 Consensus (เฉลี่ย 5 โมเดล)",
+                line=dict(color="#ffffff", width=2.2, dash="dash")))
+        # จุดราคาปัจจุบัน + เส้นแบ่งอดีต/อนาคต
+        fig_adv.add_trace(go.Scatter(
+            x=[hist_a.index[-1]], y=[adv["last"]], mode="markers",
+            marker=dict(size=10, color="#e6c35c", line=dict(color="#fff", width=1.5)),
+            name="ราคาปัจจุบัน"))
+        fig_adv.add_vline(x=last_date_a, line_color="rgba(255,255,255,0.25)",
+                          line_dash="dot", line_width=1)
+        dark_layout(fig_adv, height=560,
+                    title=f"5 เส้นแนวโน้มที่ดีที่สุด · {symbol} · {adv_horizon} วันทำการข้างหน้า")
+        st.plotly_chart(fig_adv, use_container_width=True, config={"displayModeBar": False})
+
+        # ตารางจัดอันดับโมเดล
+        adv_horizon_label = f"{adv_horizon//252} ปี" if adv_horizon >= 252 else f"{adv_horizon//21} เดือน"
+        rows_html = ""
+        for rank, r in enumerate(adv["top"], 1):
+            ret_c = "#2ee6a0" if r["ret"] >= 0 else "#ff5d6c"
+            star = "⭐" if rank == 1 else str(rank)
+            rows_html += f"""
+            <tr>
+              <td><span class="rank-num">{star}</span></td>
+              <td><span style="color:{r['color']};font-weight:600">{r['name']}</span></td>
+              <td style="font-family:'JetBrains Mono',monospace">{r['mape']:.2f}%</td>
+              <td style="font-family:'JetBrains Mono',monospace">{fmt_p(r['end'])}</td>
+              <td style="font-family:'JetBrains Mono',monospace;color:{ret_c}">{r['ret']:+.1f}%</td>
+            </tr>"""
+        cons_c = "#2ee6a0" if adv["consensus_ret"] >= 0 else "#ff5d6c"
+        st.markdown(f"""
+        <table class="rank-table">
+          <thead><tr>
+            <th>อันดับ</th><th>โมเดล (วิธีคณิตศาสตร์)</th><th>ความคลาด (MAPE)</th>
+            <th>ราคาคาดการณ์</th><th>ผลตอบแทน ({adv_horizon_label})</th>
+          </tr></thead>
+          <tbody>{rows_html}
+            <tr style="background:rgba(255,255,255,0.04)">
+              <td>🎯</td><td><b>Consensus (เฉลี่ย 5 โมเดล)</b></td>
+              <td style="font-family:'JetBrains Mono',monospace">—</td>
+              <td style="font-family:'JetBrains Mono',monospace"><b>{fmt_p(adv['consensus_end'])}</b></td>
+              <td style="font-family:'JetBrains Mono',monospace;color:{cons_c}"><b>{adv['consensus_ret']:+.1f}%</b></td>
+            </tr>
+          </tbody>
+        </table>""", unsafe_allow_html=True)
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.info(f"📌 โมเดลที่แม่นที่สุดในอดีตคือ **{adv['best_name']}** (MAPE {adv['best_mape']:.2f}%) — "
+                f"มุมมองรวม (Consensus) ชี้ว่า {symbol} มีแนวโน้ม "
+                f"**{'ขึ้น' if adv['consensus_ret']>=0 else 'ลง'}** ราว {adv['consensus_ret']:+.1f}% "
+                f"ใน {adv_horizon_label} · MAPE ต่ำ = โมเดลเคยพยากรณ์ช่วงทดสอบได้แม่น แต่ไม่รับประกันอนาคต")
+
+    st.markdown("<hr style='border-color:rgba(255,255,255,0.08);margin:26px 0'>",
+                unsafe_allow_html=True)
+
+    # ══════════ ส่วนที่ 2: Monte Carlo (เส้นทางจำลองความน่าจะเป็น) ══════════
+    st.markdown('<div class="section-title">🔮 พยากรณ์ความน่าจะเป็น (Monte Carlo)</div>', unsafe_allow_html=True)
     st.markdown("""
     <div class="fc-banner">
       จำลองอนาคตด้วย <b>Monte Carlo (Geometric Brownian Motion)</b> — สุ่มเส้นทางราคาหลายร้อยเส้น
       จากค่าเฉลี่ยผลตอบแทน (μ) และความผันผวน (σ) ในอดีต แล้วสรุปเป็น
-      <b>แถบความเชื่อมั่น</b> (5%–95%) บวกกับ <b>เส้นแนวโน้ม Linear Trend</b> ที่ต่อจากเทรนด์เชิงเส้น
-      <br><span style="color:var(--muted);font-size:12px">⚠️ เป็นการจำลองเชิงสถิติ ไม่ใช่การทำนายแน่นอน — ราคาจริงขึ้นกับปัจจัยที่โมเดลนี้ไม่ครอบคลุม</span>
+      <b>แถบความเชื่อมั่น</b> (5%–95%) — ใช้ดู "ช่วงความเสี่ยง" ที่ราคาอาจไปได้
+      <br><span style="color:var(--muted);font-size:12px">⚠️ เป็นการจำลองเชิงสถิติ (มีการสุ่ม) ไม่ใช่การทำนายแน่นอน — ต่างจาก 5 เส้นด้านบนที่เป็น deterministic</span>
     </div>
     """, unsafe_allow_html=True)
 
@@ -1425,7 +1817,6 @@ with tab_forecast:
     with fc3:
         show_paths = st.checkbox("แสดงเส้นทางตัวอย่าง", value=True)
 
-    price_list = m["df"]["Close"].dropna().tolist()
     with st.spinner("กำลังจำลองอนาคต (Monte Carlo)..."):
         fc = monte_carlo_forecast(price_list, days=horizon, n_sims=n_sims)
         lin = linear_extrapolation(price_list, days=horizon)
@@ -1533,6 +1924,126 @@ with tab_forecast:
                 "ยิ่งช่วงเวลายาว แถบความไม่แน่นอนยิ่งกว้าง (ความเสี่ยงสูงขึ้น)")
 
 # ══════════════════════════════════════════════════════════════
+#  TAB · NEWS — ข่าว + วิเคราะห์เชื่อมโยงอนาคตด้วย AI
+# ══════════════════════════════════════════════════════════════
+with tab_news:
+    st.markdown('<div class="section-title">📰 ข่าว & แนวโน้มอนาคต</div>', unsafe_allow_html=True)
+    st.caption("ข่าวจริงจาก Finnhub — ข่าวบริษัท + ข่าวตลาด/เศรษฐกิจ/ภูมิรัฐศาสตร์ (สงคราม นโยบาย ฯลฯ) "
+               "พร้อมให้ AI ประเมินผลกระทบต่ออนาคตของสินทรัพย์")
+
+    with st.spinner("กำลังดึงข่าวล่าสุด..."):
+        comp_news = fetch_company_news(symbol, days=21)
+        gen_news  = fetch_general_news("general")
+
+    # ── Sentiment heuristic จากพาดหัวข่าว ──
+    all_news_for_sent = (comp_news or []) + (gen_news or [])
+    sent_score, n_pos, n_neg = news_sentiment(all_news_for_sent)
+    sent_label = ("เชิงบวก 🟢" if sent_score > 15 else
+                  "เชิงลบ 🔴" if sent_score < -15 else "เป็นกลาง 🟡")
+    sent_col = "#2ee6a0" if sent_score > 15 else "#ff5d6c" if sent_score < -15 else "#e6c35c"
+    bar_pct = (sent_score + 100) / 2  # map -100..100 → 0..100
+
+    nc1, nc2 = st.columns([1, 1])
+    with nc1:
+        st.markdown(f"""
+        <div class="mcard" style="--accent:{sent_col}">
+          <div class="mcard-label">SENTIMENT ข่าว (Heuristic)</div>
+          <div class="mcard-value" style="color:{sent_col}">{sent_score:+d} · {sent_label}</div>
+          <div class="mcard-sub">คำเชิงบวก {n_pos} · คำเชิงลบ {n_neg} จาก {len(all_news_for_sent)} ข่าว</div>
+          <div class="pb-bg" style="margin-top:8px"><div class="pb-fill"
+            style="width:{bar_pct:.0f}%;background:{sent_col};color:{sent_col}"></div></div>
+        </div>""", unsafe_allow_html=True)
+    with nc2:
+        st.markdown(f"""
+        <div class="mcard blue">
+          <div class="mcard-label">ภาพรวมตัวเลข (ประกอบข่าว)</div>
+          <div class="mcard-value">{m['score']}/100 · {m['verdict']}</div>
+          <div class="mcard-sub">CAGR {m['cagr']:+.1f}% · Momentum {m['momentum']:+.1f}% · RSI {m['rsi']:.0f}</div>
+        </div>""", unsafe_allow_html=True)
+
+    st.caption("⚠️ Sentiment นี้เป็นการนับคำแบบหยาบ (heuristic) เพื่อดูภาพรวมเร็ว ๆ — "
+               "กดปุ่มด้านล่างให้ AI วิเคราะห์เชิงลึกแทน")
+
+    # ── ปุ่มให้ AI วิเคราะห์ข่าว → อนาคต ──
+    if st.button("🧠 ให้ AI วิเคราะห์ข่าว → เชื่อมโยงอนาคต", use_container_width=False):
+        if not all_news_for_sent:
+            st.warning("ยังไม่มีข่าวให้วิเคราะห์ (ลองหุ้น/ETF สหรัฐ เช่น AAPL, NVDA — คริปโต/forex/ดัชนีมักไม่มีข่าวบริษัท)")
+        else:
+            headlines_txt = "\n".join(
+                f"- [{dt.datetime.fromtimestamp(n.get('datetime', 0)).strftime('%d/%m')}] "
+                f"{n.get('headline','')} ({n.get('source','')})"
+                for n in all_news_for_sent[:18]
+            )
+            news_sys = f"""คุณคือนักวิเคราะห์การลงทุนของ DGV ที่เชี่ยวชาญการเชื่อมโยงข่าวกับแนวโน้มราคา
+วิเคราะห์ข่าวด้านล่างเกี่ยวกับ {symbol} ({WATCHLIST.get(symbol, symbol)}) อย่างสมดุล
+
+ข้อมูลเชิงปริมาณปัจจุบัน:
+• ราคา: {fmt_p(cur_price)} | CAGR: {m['cagr']:+.1f}% | Momentum: {m['momentum']:+.1f}% | RSI: {m['rsi']:.0f}
+• Composite Score: {m['score']}/100 → {m['verdict']} | Volatility: {m['vol_l']:.1f}%
+
+โครงสร้างคำตอบ (ภาษาไทย กระชับ อ่านง่าย):
+1. 📊 สรุปภาพรวมข่าว: ประเด็นหลัก 2-3 เรื่อง (รวมข่าวมหภาค/สงคราม/นโยบายถ้ามี)
+2. 🟢 ปัจจัยบวก / 🔴 ปัจจัยลบ ต่อราคา
+3. 🔮 ผลต่อแนวโน้มอนาคต: ข่าวพวกนี้น่าจะหนุนหรือกดดันราคาอย่างไร เชื่อมกับตัวเลขข้างต้น
+4. ⚠️ จบด้วยเตือนสั้น ๆ ว่าเป็นการวิเคราะห์ประกอบการตัดสินใจ ไม่ใช่คำแนะนำลงทุน
+
+อย่าคัดลอกพาดหัวข่าวมาตรง ๆ ให้สรุปด้วยคำพูดของคุณเอง"""
+            try:
+                client = get_claude_client()
+                resp = client.messages.create(
+                    model=CLAUDE_MODEL, max_tokens=1200, system=news_sys,
+                    messages=[{"role": "user",
+                               "content": f"ข่าวล่าสุดเกี่ยวกับ {symbol}:\n{headlines_txt}\n\n"
+                                          "ช่วยวิเคราะห์เชื่อมโยงกับแนวโน้มอนาคตให้หน่อยครับ"}],
+                )
+                analysis = "".join(b.text for b in resp.content if b.type == "text")
+                st.markdown(f"""<div class="calc-result" style="margin-bottom:14px">
+                  <div style="font-size:11px;letter-spacing:2px;text-transform:uppercase;
+                       color:{sent_col};margin-bottom:10px">🧠 บทวิเคราะห์ข่าว → อนาคต โดย Claude</div>
+                  <div style="line-height:1.75;font-size:13px">{analysis.replace(chr(10),'<br>')}</div>
+                </div>""", unsafe_allow_html=True)
+            except Exception as e:
+                st.error(f"วิเคราะห์ข่าวไม่สำเร็จ (เช็ค ANTHROPIC_API_KEY): {e}")
+
+    # ── รายการข่าว ──
+    ncol1, ncol2 = st.columns(2)
+
+    def render_news_list(items, empty_msg):
+        if not items:
+            st.caption(empty_msg)
+            return
+        for n in items[:12]:
+            ts_n = n.get("datetime", 0)
+            date_s = dt.datetime.fromtimestamp(ts_n).strftime("%d/%m %H:%M") if ts_n else ""
+            head = (n.get("headline", "") or "")[:160]
+            src  = n.get("source", "")
+            url  = n.get("url", "#")
+            summ = (n.get("summary", "") or "")[:140]
+            summ = summ + "…" if len(n.get("summary", "") or "") > 140 else summ
+            st.markdown(f"""
+            <div class="mcard" style="margin-bottom:9px;animation:fadeInUp .4s ease both">
+              <div style="font-size:10px;color:var(--muted);font-family:'JetBrains Mono',monospace;margin-bottom:3px">
+                {date_s} · {src}</div>
+              <a href="{url}" target="_blank" style="color:var(--ink);text-decoration:none;
+                 font-weight:600;font-size:13px;line-height:1.4">{head}</a>
+              {'<div style="font-size:11px;color:var(--muted);margin-top:5px;line-height:1.5">'+summ+'</div>' if summ else ''}
+            </div>""", unsafe_allow_html=True)
+
+    with ncol1:
+        st.markdown(f'<div class="section-title" style="font-size:17px">🏢 ข่าวเกี่ยวกับ {symbol}</div>',
+                    unsafe_allow_html=True)
+        render_news_list(comp_news,
+                         "ไม่มีข่าวบริษัทสำหรับสินทรัพย์นี้ (คริปโต/forex/ดัชนี/ทองคำ มักไม่มีข่าวบริษัทใน Finnhub) — "
+                         "ลองหุ้น/ETF สหรัฐ เช่น AAPL, NVDA, TSLA")
+    with ncol2:
+        st.markdown('<div class="section-title" style="font-size:17px">🌍 ข่าวตลาด · เศรษฐกิจ · ภูมิรัฐศาสตร์</div>',
+                    unsafe_allow_html=True)
+        render_news_list(gen_news, "ดึงข่าวตลาดไม่สำเร็จ (ตรวจสอบ FINNHUB_API_KEY ใน secrets)")
+
+    st.info("📌 ข่าวมาจาก Finnhub แบบ real-time — คลิกพาดหัวเพื่ออ่านฉบับเต็มที่ต้นทาง · "
+            "การลงทุนมีความเสี่ยง ข่าวเป็นเพียงปัจจัยประกอบ ไม่ใช่คำแนะนำ")
+
+# ══════════════════════════════════════════════════════════════
 #  TAB 4 — RANKING
 # ══════════════════════════════════════════════════════════════
 with tab_rank:
@@ -1540,8 +2051,12 @@ with tab_rank:
                 unsafe_allow_html=True)
     st.caption("คำนวณจาก Sharpe, CAGR, Drawdown, Momentum, MA Alignment, Z-Score — ไม่มีปัจจัยข่าว")
 
-    with st.spinner("กำลังดึงและวิเคราะห์ทุกสินทรัพย์..."):
-        rankings = fetch_watchlist_scores()
+    rk_group = st.selectbox("เลือกหมวดสินทรัพย์", list(ASSET_GROUPS.keys()),
+                            index=0, key="rank_group")
+    rk_syms = list(ASSET_GROUPS[rk_group].keys())
+
+    with st.spinner(f"กำลังดึงและวิเคราะห์ {len(rk_syms)} สินทรัพย์ในหมวด «{rk_group}»..."):
+        rankings = fetch_watchlist_scores(rk_syms)
 
     if not rankings:
         st.warning("ไม่สามารถดึงข้อมูลได้")
@@ -1735,6 +2250,25 @@ with tab_chat:
 • ราคา Real-time (Finnhub): {fmt_p(rt_quote['c'])} (เปลี่ยน {price_chg:+.2f} / {price_chg_pct:+.2f}%)
 • High วันนี้: {fmt_p(rt_quote['h'])} · Low: {fmt_p(rt_quote['l'])} · Open: {fmt_p(rt_quote['o'])}"""
 
+        # ── บริบทพยากรณ์ขั้นสูง (5 โมเดล) ──
+        fc_ctx = ""
+        try:
+            if adv is not None:
+                fc_ctx = (f"\n• พยากรณ์ขั้นสูง: โมเดลแม่นสุด «{adv['best_name']}» (MAPE {adv['best_mape']:.1f}%) | "
+                          f"Consensus 5 โมเดล → {adv['consensus_ret']:+.1f}%")
+        except NameError:
+            pass
+
+        # ── บริบทข่าว (พาดหัวล่าสุด + sentiment) ──
+        news_ctx = ""
+        try:
+            heads = (comp_news or []) + (gen_news or [])
+            if heads:
+                top_heads = "; ".join((n.get("headline", "") or "")[:90] for n in heads[:6])
+                news_ctx = (f"\n• ข่าวล่าสุด (sentiment heuristic {sent_score:+d}): {top_heads}")
+        except NameError:
+            pass
+
         sys_ctx = f"""คุณคือ "DGV" — เพื่อนคู่คิดด้านการลงทุนที่อบอุ่น เป็นกันเอง และเก่งคณิตศาสตร์การเงินมาก
 คุณคุยกับผู้ใช้เหมือนเพื่อนสนิทที่ไว้ใจได้ ไม่ใช่หุ่นยนต์ที่อ่านตัวเลขแห้ง ๆ
 
@@ -1743,6 +2277,7 @@ with tab_chat:
 • เป็นที่ปรึกษาที่ดี: ฟังก่อน เข้าใจเป้าหมาย/ความกังวลของเขา แล้วค่อยให้มุมมอง
 • ซื่อสัตย์เรื่องความเสี่ยงเสมอ — ไม่เชียร์เกินจริง ไม่ขู่เกินจริง ให้ภาพที่สมดุล
 • อ้างอิงตัวเลขจริงด้านล่างเสมอเวลาวิเคราะห์ อธิบายให้เข้าใจง่ายว่าตัวเลขนั้นแปลว่าอะไรในชีวิตจริง
+• เชื่อมโยงข่าว (ถ้ามี) เข้ากับแนวโน้มราคา เวลาผู้ใช้ถามถึงอนาคต/ข่าว/สงคราม
 • ถ้าผู้ใช้ดูกังวล/เครียดเรื่องเงิน ให้ใจเย็น ปลอบใจอย่างจริงใจ และเตือนให้ลงทุนเท่าที่รับความเสี่ยงไหว
 • ถามคำถามต่อเนื่องเพื่อเข้าใจเขามากขึ้น (เช่น เป้าหมาย ระยะเวลา ความเสี่ยงที่รับได้) เมื่อเหมาะสม
 • ตอบกระชับ อ่านง่าย ไม่ยัดศัพท์เทคนิคจนงง — ถ้าใช้ศัพท์ ให้ขยายความสั้น ๆ
@@ -1756,7 +2291,7 @@ with tab_chat:
 • Linear Trend: {m['trend_slope']:+.1f}%/ปี | R²={m['r2']:.2f}
 • Volatility: Short={m['vol_s']:.1f}% Long={m['vol_l']:.1f}%
 • ผลตอบแทน: 1M {m['ret_1m']:+.1f}% · 3M {m['ret_3m']:+.1f}% · 1Y {m['ret_1y']:+.1f}%
-• Composite Score: {m['score']}/100 → {m['verdict']}
+• Composite Score: {m['score']}/100 → {m['verdict']}{fc_ctx}{news_ctx}
 
 สำคัญ: ตอบภาษาไทย ทุกครั้งที่ให้ความเห็นการลงทุน ให้จบด้วยการเตือนสั้น ๆ ว่านี่เป็นข้อมูลประกอบการตัดสินใจ
 ไม่ใช่คำแนะนำการลงทุนที่รับประกันผล และการลงทุนมีความเสี่ยง ผู้ลงทุนควรตัดสินใจด้วยตัวเอง"""
@@ -1822,26 +2357,22 @@ with tab_chat:
 # ─────────────────────────────────────────────────────────────
 with st.expander("📡 วิธีดู/หากราฟแบบเรียลไทม์ (Real-time) — คำแนะนำ"):
     st.markdown("""
-**ในแอปนี้:** แผงราคาด้านบนและกราฟสด (intraday tick) อัปเดตเองทุก ~2 วินาทีผ่าน Finnhub
-โดยไม่ต้องรีเฟรชหน้า — รองรับหุ้นสหรัฐ, Bitcoin, และคู่เงิน Forex หลัก
+**ในแอปนี้ (อัปเดตแล้ว ✅):** กราฟ Real-time ด้านบนเป็น **ข้อมูลจริง** — แท่งราคา intraday
+(1m/5m/15m/1h) จาก yfinance + จุดราคา live ล่าสุดจาก Finnhub อัปเดตเองทุก ~3 วินาที
+โดยไม่ต้องรีเฟรชหน้า สลับช่วงเวลา/สไตล์ (เส้น↔แท่งเทียน) ได้จากปุ่มเหนือกราฟ
 
-**ถ้าอยากได้กราฟเรียลไทม์ละเอียดขึ้น แนะนำ:**
+**Symbol ที่รองรับ live price (Finnhub) ในแอปนี้:**
+- หุ้น/ETF สหรัฐ: `AAPL`, `NVDA`, `MSFT`, `SPY`, `QQQ`, `ARKK` ฯลฯ
+- คริปโต: `BTC-USD`, `ETH-USD`, `SOL-USD`, `BNB-USD`, `XRP-USD` (→ Binance)
+- Forex: `EURUSD=X`, `GBPUSD=X`, `USDJPY=X`, `USDTHB=X` (→ OANDA)
+- ⚠️ ทองคำ `GC=F`, เงิน `SI=F`, น้ำมัน `CL=F`, ดัชนี `^GSPC/^IXIC/^DJI` ใช้แท่ง intraday
+  จาก yfinance (Finnhub free ไม่รองรับ live price แต่กราฟ intraday ยังเห็นได้)
 
-1. **ตั้งค่า Finnhub API Key** ใน `secrets.toml` → `FINNHUB_API_KEY = "..."`
-   ฟรีได้ที่ finnhub.io (60 req/นาที) ก็พอสำหรับ live ticker
-
-2. **Symbol ที่รองรับ real-time** ผ่าน Finnhub ในแอปนี้:
-   - หุ้นสหรัฐ: `AAPL`, `NVDA`, `MSFT`, `TSLA` ฯลฯ
-   - คริปโต: `BTC-USD` (→ BINANCE:BTCUSDT)
-   - Forex: `EURUSD=X`, `GBPUSD=X`, `USDJPY=X`
-   - ⚠️ ทองคำ `GC=F` และดัชนี `^GSPC` ใช้ราคาปิดล่าสุดจาก yfinance (Finnhub free ไม่รองรับ)
-
-3. **อยากได้กราฟ candlestick real-time แบบ intraday** (1m/5m):
-   อัปเกรดเป็น Finnhub paid หรือใช้ websocket (`finnhub.Client` รองรับ `/stock/candle`
-   และ websocket stream) — แล้วนำมา plot ด้วย Plotly เหมือนแท็บ "กราฟวิเคราะห์"
-
-4. **แหล่ง real-time ทางเลือกอื่น:** Polygon.io, Alpaca, Twelve Data, Binance API (คริปโต)
-   — ทุกตัวมี free tier และเสียบเข้าโครงสร้างเดิมได้ง่าย (แก้แค่ฟังก์ชัน `fetch_realtime_quote`)
+**อยากได้ real-time ละเอียด/เร็วขึ้นอีก:**
+1. **Finnhub websocket** (`finnhub.Client` รองรับ stream) — ราคาวิ่งแบบ tick-by-tick จริง
+2. **แหล่งอื่นที่มี free tier:** Polygon.io, Alpaca, Twelve Data, Binance API (คริปโต)
+   — เสียบเข้าโครงสร้างเดิมได้ง่าย (แก้ที่ฟังก์ชัน `fetch_realtime_quote` / `fetch_intraday`)
+3. ข้อจำกัด yfinance: 1m ย้อนได้ ~7 วัน, 5m/15m ~60 วัน — เพียงพอสำหรับกราฟวันนี้/สัปดาห์นี้
     """)
 
 # ─────────────────────────────────────────────────────────────
@@ -1852,11 +2383,15 @@ fcol1, fcol2 = st.columns([1, 3])
 with fcol1:
     if st.button("🔄 โหลดข้อมูลวิเคราะห์ใหม่ทั้งหมด"):
         fetch_realtime_quote.clear()
+        fetch_intraday.clear()
         fetch_data.clear()
         fetch_watchlist_scores.clear()
         monte_carlo_forecast.clear()
+        advanced_forecast.clear()
+        fetch_company_news.clear()
+        fetch_general_news.clear()
         st.rerun()
 with fcol2:
-    st.caption("แผงราคา + กราฟสดอัปเดตเองทุก 2 วินาที (fragment) · "
-               "ปุ่มนี้โหลดข้อมูลย้อนหลัง + ตัวเลขวิเคราะห์ + พยากรณ์ใหม่ทั้งหมด · "
+    st.caption("กราฟ Real-time (intraday จริง) อัปเดตเองทุก 3 วินาที (fragment) · "
+               "ปุ่มนี้โหลดข้อมูลย้อนหลัง + ตัวเลขวิเคราะห์ + พยากรณ์ + ข่าวใหม่ทั้งหมด · "
                "DGV เป็นเครื่องมือวิเคราะห์เชิงปริมาณ ไม่ใช่คำแนะนำการลงทุน")
