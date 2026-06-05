@@ -623,6 +623,11 @@ def news_sentiment(news_items):
     total = pos + neg
     score = round((pos - neg) / total * 100) if total else 0
     return score, pos, neg
+
+# ─────────────────────────────────────────────────────────────
+#  MATH FUNCTIONS
+# ─────────────────────────────────────────────────────────────
+def calc_rsi(series, period=14):
     delta = series.diff()
     gain = delta.clip(lower=0).rolling(period).mean()
     loss = (-delta.clip(upper=0)).rolling(period).mean()
