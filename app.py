@@ -1,7 +1,10 @@
 """
-DGV Investment Analyzer — Mathematical Deep Analysis
+DGV Investment Analyzer — Mathematical Deep Analysis (Enhanced Edition)
 วิเคราะห์การลงทุนด้วยคณิตศาสตร์ย้อนหลัง 10 ปี
-ราคา Real-time จาก Finnhub | ข้อมูลย้อนหลังจาก yfinance | AI โดย Claude (Anthropic)
+ราคา Real-time จาก Finnhub | ข้อมูลย้อนหลังจาก yfinance + Stooq | AI โดย Claude (Anthropic)
+
+✨ Enhanced: อนิเมชั่นลื่นไหล · UI สวยขึ้น · ระบบเสถียรขึ้น · กราฟเรียลไทม์ ·
+   AI ที่ปรึกษาเป็นกันเอง · กราฟพยากรณ์อนาคต (Monte Carlo)
 """
 
 import time
@@ -19,12 +22,13 @@ import anthropic
 # ─────────────────────────────────────────────────────────────
 st.set_page_config(
     page_title="DGV · Investment Analyzer",
+    page_icon="📊",
     layout="wide",
     initial_sidebar_state="collapsed",
 )
 
 # ─────────────────────────────────────────────────────────────
-#  GLOBAL CSS  —  Dark "Terminal" theme
+#  GLOBAL CSS  —  Dark "Terminal" theme + Rich Animations
 # ─────────────────────────────────────────────────────────────
 st.markdown("""
 <style>
@@ -36,6 +40,7 @@ st.markdown("""
   --surface:   #111726;
   --surface-2: #18203250;
   --border:    rgba(255,255,255,0.07);
+  --border-hi: rgba(255,255,255,0.14);
   --glow-gold: rgba(230,195,92,0.18);
   --ink:       #e9eef7;
   --muted:     #79859a;
@@ -45,20 +50,72 @@ st.markdown("""
   --cyan:      #34e3c4;
   --red:       #ff5d6c;
   --blue:      #5b8def;
+  --purple:    #a877e6;
 }
 
-/* App background — radial glow */
+/* ═══════════════ KEYFRAMES (Animations) ═══════════════ */
+@keyframes fadeInUp {
+  from { opacity:0; transform: translateY(18px); }
+  to   { opacity:1; transform: translateY(0); }
+}
+@keyframes fadeIn {
+  from { opacity:0; } to { opacity:1; }
+}
+@keyframes slideInLeft {
+  from { opacity:0; transform: translateX(-16px); }
+  to   { opacity:1; transform: translateX(0); }
+}
+@keyframes scaleIn {
+  from { opacity:0; transform: scale(.92); }
+  to   { opacity:1; transform: scale(1); }
+}
+@keyframes pulse {
+  0%,100% { opacity:1; transform: scale(1); }
+  50%     { opacity:.35; transform: scale(.7); }
+}
+@keyframes glowPulse {
+  0%,100% { box-shadow: 0 0 14px var(--glow-gold); }
+  50%     { box-shadow: 0 0 28px rgba(230,195,92,.45); }
+}
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position:  200% 0; }
+}
+@keyframes float {
+  0%,100% { transform: translateY(0); }
+  50%     { transform: translateY(-6px); }
+}
+@keyframes bgShift {
+  0%   { background-position: 0% 50%, 100% 50%, 0 0; }
+  50%  { background-position: 40% 60%, 60% 40%, 0 0; }
+  100% { background-position: 0% 50%, 100% 50%, 0 0; }
+}
+@keyframes ringSweep {
+  from { stroke-dashoffset: var(--dash-full); }
+  to   { stroke-dashoffset: var(--dash-target); }
+}
+@keyframes gradientText {
+  0%,100% { background-position: 0% 50%; }
+  50%     { background-position: 100% 50%; }
+}
+@keyframes blink {
+  0%,100% { opacity:1; } 50% { opacity:.2; }
+}
+
+/* App background — animated radial glow */
 html, body, [class*="css"], .stApp {
   font-family: 'Space Grotesk','DM Sans', sans-serif !important;
   color: var(--ink) !important;
 }
 .stApp {
   background:
-    radial-gradient(1100px 500px at 18% -8%, rgba(230,195,92,0.07), transparent 60%),
-    radial-gradient(900px 500px at 95% 8%, rgba(52,227,196,0.05), transparent 55%),
+    radial-gradient(1100px 520px at 18% -8%, rgba(230,195,92,0.08), transparent 60%),
+    radial-gradient(900px 520px at 95% 8%, rgba(52,227,196,0.06), transparent 55%),
     var(--bg) !important;
+  background-size: 200% 200%, 200% 200%, 100% 100% !important;
+  animation: bgShift 22s ease-in-out infinite;
 }
-.block-container { padding-top: 1rem; }
+.block-container { padding-top: 1rem; animation: fadeIn .6s ease both; }
 
 /* Headings + numbers */
 .dm-serif { font-family:'DM Serif Display',serif; }
@@ -77,18 +134,30 @@ html, body, [class*="css"], .stApp {
   gap: 18px;
   overflow: hidden;
   box-shadow: 0 8px 40px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.04);
+  animation: fadeInUp .7s cubic-bezier(.21,.6,.35,1) both;
+}
+.dgv-masthead::before {
+  content:''; position:absolute; inset:0;
+  background: linear-gradient(110deg, transparent 30%, rgba(255,255,255,0.05) 50%, transparent 70%);
+  background-size: 200% 100%;
+  animation: shimmer 6s linear infinite;
+  pointer-events:none;
 }
 .dgv-masthead::after {
   content:''; position:absolute; left:0; right:0; bottom:0; height:2px;
   background: linear-gradient(90deg, transparent, var(--gold), var(--cyan), transparent);
-  opacity:.8;
+  background-size: 200% 100%;
+  animation: shimmer 4s linear infinite;
+  opacity:.85;
 }
 .dgv-wordmark {
   font-family:'DM Serif Display',serif;
   font-size: 40px; line-height:1; letter-spacing:-2px;
-  background: linear-gradient(120deg, var(--gold) 0%, #fff4cf 50%, var(--gold-dim) 100%);
+  background: linear-gradient(120deg, var(--gold) 0%, #fff4cf 45%, var(--gold-dim) 90%);
+  background-size: 200% auto;
   -webkit-background-clip:text; background-clip:text; color:transparent;
   filter: drop-shadow(0 2px 14px var(--glow-gold));
+  animation: gradientText 5s ease infinite, float 6s ease-in-out infinite;
 }
 .dgv-tagline {
   font-family:'JetBrains Mono',monospace;
@@ -107,7 +176,6 @@ html, body, [class*="css"], .stApp {
 }
 .rt-dot { width:7px; height:7px; background: var(--green); border-radius:50%;
   box-shadow:0 0 10px var(--green); animation: pulse 1.5s infinite; }
-@keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.35;transform:scale(.7)} }
 
 /* ── Finnhub price panel (glass) ────────────────────── */
 .rt-panel {
@@ -117,10 +185,13 @@ html, body, [class*="css"], .stApp {
   border-radius: 14px; padding: 16px 20px; margin-bottom: 18px;
   display: grid; grid-template-columns: repeat(auto-fit, minmax(112px,1fr)); gap: 14px;
   box-shadow: 0 6px 30px rgba(0,0,0,0.35);
+  animation: fadeInUp .6s ease both;
 }
+.rt-item { animation: scaleIn .5s ease both; }
 .rt-item-label { font-size:10px; letter-spacing:1.5px; text-transform:uppercase;
   color: var(--muted); margin-bottom:4px; font-family:'JetBrains Mono',monospace; }
-.rt-item-val { font-family:'JetBrains Mono',monospace; font-size:17px; font-weight:600; color:#fff; }
+.rt-item-val { font-family:'JetBrains Mono',monospace; font-size:17px; font-weight:600; color:#fff;
+  transition: color .3s ease; }
 .rt-item-val.pos { color: var(--green); text-shadow:0 0 12px rgba(46,230,160,.4); }
 .rt-item-val.neg { color: var(--red);   text-shadow:0 0 12px rgba(255,93,108,.35); }
 .rt-item-val.gold{ color: var(--gold);  text-shadow:0 0 14px var(--glow-gold); }
@@ -129,10 +200,12 @@ html, body, [class*="css"], .stApp {
 .section-title {
   font-family:'DM Serif Display',serif; font-size: 21px; color: var(--ink);
   margin-bottom: 14px; display:flex; align-items:center; gap:10px;
+  animation: slideInLeft .5s ease both;
 }
 .section-title::before {
   content:''; width:4px; height:20px; border-radius:3px;
   background: linear-gradient(var(--gold), var(--cyan));
+  box-shadow: 0 0 10px var(--glow-gold);
 }
 
 /* ── Metric cards (glass + glow rail) ───────────────── */
@@ -140,11 +213,17 @@ html, body, [class*="css"], .stApp {
   background: linear-gradient(160deg, rgba(255,255,255,0.045), rgba(255,255,255,0.012));
   border: 1px solid var(--border); border-radius: 12px;
   padding: 13px 15px; position: relative; overflow:hidden;
-  transition: transform .18s ease, box-shadow .18s ease;
+  transition: transform .2s cubic-bezier(.2,.8,.2,1), box-shadow .2s ease, border-color .2s ease;
+  animation: fadeInUp .5s ease both;
 }
-.mcard:hover { transform: translateY(-2px); box-shadow:0 10px 26px rgba(0,0,0,.4); }
+.mcard:hover { transform: translateY(-3px) scale(1.012);
+  box-shadow:0 12px 30px rgba(0,0,0,.45); border-color: var(--border-hi); }
 .mcard::before { content:''; position:absolute; top:0; left:0; bottom:0; width:3px;
   background: var(--gold); box-shadow: 0 0 14px var(--glow-gold); }
+.mcard::after { content:''; position:absolute; inset:0;
+  background: linear-gradient(110deg, transparent 40%, rgba(255,255,255,0.04) 50%, transparent 60%);
+  background-size: 220% 100%; opacity:0; transition: opacity .3s ease; }
+.mcard:hover::after { opacity:1; animation: shimmer 1.2s linear; }
 .mcard-label { font-size:10px; letter-spacing:1.5px; text-transform:uppercase;
   color: var(--muted); margin-bottom:5px; }
 .mcard-value { font-family:'JetBrains Mono',monospace; font-size:21px; font-weight:600; color: var(--ink); }
@@ -154,7 +233,7 @@ html, body, [class*="css"], .stApp {
 .mcard.gold .mcard-value{ color: var(--gold); }
 .mcard.pos::before  { background: var(--green); box-shadow:0 0 14px rgba(46,230,160,.5); }
 .mcard.neg::before  { background: var(--red);   box-shadow:0 0 14px rgba(255,93,108,.45); }
-.mcard.blue::before { background: var(--blue); }
+.mcard.blue::before { background: var(--blue); box-shadow:0 0 14px rgba(91,141,239,.45); }
 
 /* ── Score ring / verdict ───────────────────────────── */
 .score-ring {
@@ -163,20 +242,38 @@ html, body, [class*="css"], .stApp {
   border: 1px solid var(--border); border-radius: 16px;
   padding: 20px 26px; margin-bottom: 18px; position:relative; overflow:hidden;
   box-shadow: inset 0 1px 0 rgba(255,255,255,.05);
+  animation: scaleIn .6s cubic-bezier(.2,.8,.2,1) both;
 }
 .score-ring::after { content:''; position:absolute; right:-40px; top:-40px;
   width:180px; height:180px; border-radius:50%;
-  background: radial-gradient(var(--glow-gold), transparent 70%); }
-.score-num { font-family:'DM Serif Display',serif; font-size:58px; line-height:1;
+  background: radial-gradient(var(--glow-gold), transparent 70%);
+  animation: glowPulse 4s ease-in-out infinite; }
+
+/* circular gauge svg */
+.gauge-wrap { position:relative; width:120px; height:120px; flex-shrink:0; }
+.gauge-svg { transform: rotate(-90deg); }
+.gauge-track { fill:none; stroke: rgba(255,255,255,0.07); stroke-width:11; }
+.gauge-prog  { fill:none; stroke-width:11; stroke-linecap:round;
+  stroke-dasharray: var(--circ);
+  animation: ringSweep 1.4s cubic-bezier(.2,.8,.2,1) forwards;
+  filter: drop-shadow(0 0 8px currentColor); }
+.gauge-center { position:absolute; inset:0; display:flex; flex-direction:column;
+  align-items:center; justify-content:center; }
+.gauge-num { font-family:'DM Serif Display',serif; font-size:38px; line-height:1;
   background: linear-gradient(120deg,var(--gold),#fff4cf,var(--gold-dim));
   -webkit-background-clip:text; background-clip:text; color:transparent;
-  filter: drop-shadow(0 0 18px var(--glow-gold)); }
+  filter: drop-shadow(0 0 12px var(--glow-gold)); }
+.gauge-max { font-size:10px; color:#7d8799; margin-top:-2px; }
+
 .score-label { font-size:11px; color: var(--muted); letter-spacing:2px; text-transform:uppercase; }
-.score-verdict { font-size:19px; font-weight:700; color:#fff; margin-top:4px; }
+.score-verdict { font-size:22px; font-weight:700; color:#fff; margin-top:4px;
+  animation: fadeInUp .8s ease both; }
 
 /* ── Signal rows ────────────────────────────────────── */
 .sig-row { display:flex; align-items:center; gap:11px; padding:8px 0;
-  border-bottom:1px solid var(--border); font-size:13px; }
+  border-bottom:1px solid var(--border); font-size:13px;
+  animation: slideInLeft .45s ease both; transition: background .2s ease; }
+.sig-row:hover { background: rgba(255,255,255,0.02); }
 .sig-icon { font-size:16px; width:22px; text-align:center; }
 .sig-text { flex:1; color: var(--ink); }
 .sig-badge { font-family:'JetBrains Mono',monospace; font-size:11px; padding:2px 8px;
@@ -184,27 +281,36 @@ html, body, [class*="css"], .stApp {
   border:1px solid var(--border); }
 
 /* ── Chat ───────────────────────────────────────────── */
-.chat-wrap { max-height:360px; overflow-y:auto; padding:12px;
+.chat-wrap { max-height:380px; overflow-y:auto; padding:14px;
   border:1px solid var(--border); border-radius:14px;
   background: linear-gradient(160deg, rgba(255,255,255,0.03), rgba(255,255,255,0.008));
-  margin-bottom:8px; }
-.msg-row { display:flex; gap:8px; margin-bottom:11px; align-items:flex-start; }
+  margin-bottom:8px; scroll-behavior:smooth; }
+.chat-wrap::-webkit-scrollbar { width:7px; }
+.chat-wrap::-webkit-scrollbar-thumb { background: rgba(230,195,92,0.25); border-radius:6px; }
+.msg-row { display:flex; gap:8px; margin-bottom:12px; align-items:flex-start;
+  animation: fadeInUp .4s ease both; }
 .msg-row.u { flex-direction: row-reverse; }
-.av { width:28px; height:28px; border-radius:9px; display:flex; align-items:center;
+.av { width:30px; height:30px; border-radius:9px; display:flex; align-items:center;
   justify-content:center; font-size:11px; font-weight:700; flex-shrink:0; margin-top:2px; }
 .av.ai { background: linear-gradient(135deg,#1a2236,#0e1320); color: var(--gold);
   font-family:'DM Serif Display',serif; border:1px solid var(--border);
   box-shadow:0 0 12px var(--glow-gold); }
 .av.usr { background: linear-gradient(135deg, var(--blue), #3a63b8); color:#fff; }
-.bub { max-width:82%; padding:10px 14px; border-radius:14px; font-size:13px; line-height:1.65; }
+.bub { max-width:82%; padding:11px 15px; border-radius:14px; font-size:13px; line-height:1.7; }
 .bub.ai-b { background: rgba(255,255,255,0.05); color: var(--ink);
   border:1px solid var(--border); border-bottom-left-radius:4px; }
 .bub.u-b  { background: linear-gradient(135deg,#1d2940,#16203a); color:#fff;
   border:1px solid var(--border); border-bottom-right-radius:4px; }
+.typing { display:inline-flex; gap:4px; }
+.typing span { width:6px; height:6px; border-radius:50%; background:var(--gold);
+  animation: blink 1.2s infinite; }
+.typing span:nth-child(2){ animation-delay:.2s; }
+.typing span:nth-child(3){ animation-delay:.4s; }
 
 /* ── Calc result ────────────────────────────────────── */
 .calc-result { background: linear-gradient(135deg,#0d1322,#15203a);
-  border:1px solid var(--border); color:#fff; border-radius:14px; padding:16px 20px; }
+  border:1px solid var(--border); color:#fff; border-radius:14px; padding:16px 20px;
+  animation: fadeInUp .5s ease both; }
 .calc-row { display:flex; justify-content:space-between; padding:6px 0;
   border-bottom:1px solid var(--border); font-size:13px; }
 .calc-row:last-child { border-bottom:none; }
@@ -212,42 +318,64 @@ html, body, [class*="css"], .stApp {
 
 /* ── Progress bar ───────────────────────────────────── */
 .pb-bg { background: rgba(255,255,255,0.07); border-radius:6px; height:10px; width:100%; overflow:hidden; }
-.pb-fill { height:10px; border-radius:6px; transition: width .6s ease; box-shadow:0 0 12px currentColor; }
+.pb-fill { height:10px; border-radius:6px; transition: width 1s cubic-bezier(.2,.8,.2,1);
+  box-shadow:0 0 12px currentColor;
+  background-image: linear-gradient(90deg, transparent, rgba(255,255,255,0.25), transparent);
+  background-size: 200% 100%; animation: shimmer 2.4s linear infinite; }
 
 /* ── Rank table ─────────────────────────────────────── */
 .rank-table { width:100%; border-collapse: collapse; font-size:13px;
-  background: rgba(255,255,255,0.02); border-radius:12px; overflow:hidden; }
+  background: rgba(255,255,255,0.02); border-radius:12px; overflow:hidden;
+  animation: fadeInUp .6s ease both; }
 .rank-table th { background: rgba(255,255,255,0.04); color: var(--gold); padding:11px 12px;
   text-align:left; font-family:'JetBrains Mono',monospace; font-weight:600;
   font-size:11px; letter-spacing:1px; border-bottom:1px solid var(--border); }
 .rank-table td { padding:11px 12px; border-bottom:1px solid var(--border); vertical-align:middle; color:var(--ink); }
-.rank-table tr:hover td { background: rgba(255,255,255,0.04); }
+.rank-table tr { transition: background .2s ease; }
+.rank-table tr:hover td { background: rgba(255,255,255,0.05); }
 .rank-num { font-family:'DM Serif Display',serif; font-size:21px; color: var(--gold); }
 .rank-ticker { font-family:'JetBrains Mono',monospace; font-weight:600; font-size:14px; color:var(--ink); }
+
+/* ── Info pill / forecast box ───────────────────────── */
+.fc-banner { background: linear-gradient(135deg, rgba(91,141,239,0.10), rgba(168,119,230,0.06));
+  border:1px solid var(--border); border-radius:14px; padding:14px 18px; margin-bottom:14px;
+  font-size:13px; color:var(--ink); animation: fadeInUp .5s ease both; }
+.fc-banner b { color: var(--gold); }
 
 /* ── Streamlit widgets (dark) ───────────────────────── */
 .stTextInput input, .stNumberInput input {
   background: rgba(255,255,255,0.04) !important; color: var(--ink) !important;
-  border:1px solid var(--border) !important; border-radius:10px !important; }
+  border:1px solid var(--border) !important; border-radius:10px !important;
+  transition: border-color .25s ease, box-shadow .25s ease; }
 .stTextInput input:focus, .stNumberInput input:focus {
   border-color: var(--gold) !important; box-shadow:0 0 0 2px var(--glow-gold) !important; }
 [data-testid="stMetricValue"] { font-family:'JetBrains Mono',monospace; color: var(--ink); }
 [data-testid="stMetricLabel"] { color: var(--muted); }
 .stCaption, .stMarkdown small { color: var(--muted) !important; }
 .stChatInput textarea { background: rgba(255,255,255,0.04) !important; color: var(--ink) !important; }
-/* chat input border → ให้เข้าธีม (แก้กรอบแดงเริ่มต้นของ Streamlit) */
 [data-testid="stChatInput"], .stChatInput, .stChatInput > div {
   border-color: var(--border) !important; }
 .stChatInput { border:1px solid var(--border) !important; border-radius:14px !important;
-  background: rgba(255,255,255,0.03) !important; }
+  background: rgba(255,255,255,0.03) !important; transition: border-color .25s ease, box-shadow .25s ease; }
 .stChatInput:focus-within {
   border-color: var(--gold) !important; box-shadow:0 0 0 2px var(--glow-gold) !important; }
+
+/* buttons */
+.stButton button {
+  border:1px solid var(--border) !important; border-radius:10px !important;
+  background: linear-gradient(160deg, rgba(255,255,255,0.05), rgba(255,255,255,0.01)) !important;
+  color: var(--ink) !important; transition: all .2s ease !important; }
+.stButton button:hover {
+  border-color: var(--gold) !important; transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(0,0,0,.4), 0 0 14px var(--glow-gold) !important; color: var(--gold) !important; }
 
 /* ── Tabs ───────────────────────────────────────────── */
 .stTabs [data-baseweb="tab-list"] { gap:6px; border-bottom:1px solid var(--border); }
 .stTabs [data-baseweb="tab"] {
   font-family:'Space Grotesk',sans-serif !important; font-size:13px !important; font-weight:600 !important;
-  padding:9px 18px !important; border-radius:10px 10px 0 0 !important; color: var(--muted) !important; }
+  padding:9px 18px !important; border-radius:10px 10px 0 0 !important; color: var(--muted) !important;
+  transition: all .2s ease; }
+.stTabs [data-baseweb="tab"]:hover { color: var(--ink) !important; background: rgba(255,255,255,0.03) !important; }
 .stTabs [aria-selected="true"] {
   background: linear-gradient(160deg, rgba(230,195,92,0.14), rgba(255,255,255,0.02)) !important;
   color: var(--gold) !important; border-bottom:2px solid var(--gold) !important; }
@@ -255,6 +383,10 @@ html, body, [class*="css"], .stApp {
 /* alerts */
 .stAlert { background: rgba(255,255,255,0.04) !important; border:1px solid var(--border) !important;
   border-radius:12px !important; color: var(--ink) !important; }
+
+/* expander */
+.streamlit-expanderHeader, [data-testid="stExpander"] summary {
+  background: rgba(255,255,255,0.03) !important; border-radius:10px !important; color: var(--ink) !important; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -267,7 +399,8 @@ st.markdown("""
   <div>
     <div class="dgv-tagline">Mathematical Investment Analyzer</div>
     <div class="dgv-sub">
-      วิเคราะห์การลงทุนด้วยคณิตศาสตร์ · ย้อนหลัง 10 ปี · ราคา Real-time จาก Finnhub · AI โดย Claude
+      วิเคราะห์การลงทุนด้วยคณิตศาสตร์ · ย้อนหลัง 10 ปี · ราคา Real-time จาก Finnhub ·
+      พยากรณ์อนาคต Monte Carlo · AI โดย Claude
     </div>
   </div>
 </div>
@@ -286,7 +419,10 @@ def get_claude_client():
     api_key = st.secrets.get("ANTHROPIC_API_KEY", "")
     return anthropic.Anthropic(api_key=api_key)
 
-finnhub_client = get_finnhub_client()
+try:
+    finnhub_client = get_finnhub_client()
+except Exception:
+    finnhub_client = None
 
 # โมเดล Claude — เปลี่ยนได้ตามต้องการ (เช่น claude-opus-4-6 / claude-haiku-4-5-20251001)
 CLAUDE_MODEL = "claude-sonnet-4-6"
@@ -297,8 +433,13 @@ CLAUDE_MODEL = "claude-sonnet-4-6"
 for k, v in [
     ("history", {}),
     ("chat", [{"role": "assistant", "content":
-               "สวัสดีครับ! 📊 ผมคือ Claude ที่วิเคราะห์จากคณิตศาสตร์ล้วน ๆ\nถามได้เลย: Sharpe, Drawdown, ผลตอบแทน, ความเสี่ยง, ขนาด Position..."}]),
+               "สวัสดีครับ! 👋 ผมคือ DGV ที่ปรึกษาการลงทุนของคุณ\n\n"
+               "ผมวิเคราะห์จากคณิตศาสตร์ล้วน ๆ — ไม่อิงข่าวลือ ไม่อิงอารมณ์ตลาด "
+               "แต่คุยกันสบาย ๆ ได้เลยนะครับ 😊\n\n"
+               "อยากรู้อะไรเกี่ยวกับ Sharpe, ความเสี่ยง, ผลตอบแทน, หรือควรลงเท่าไหร่ดี? "
+               "ถามมาได้เลยครับ"}]),
     ("last_refresh", 0),
+    ("rt_ticks", {}),   # เก็บ tick real-time ต่อ symbol สำหรับกราฟสด
 ]:
     if k not in st.session_state:
         st.session_state[k] = v
@@ -336,19 +477,22 @@ def get_finnhub_symbol(yf_symbol: str) -> str | None:
     return None
 
 # ─────────────────────────────────────────────────────────────
-#  REAL-TIME QUOTE (Finnhub)
+#  REAL-TIME QUOTE (Finnhub) — เสถียรขึ้น
 # ─────────────────────────────────────────────────────────────
 @st.cache_data(ttl=2)   # cache 2 วินาที — อัปเดตถี่สำหรับ live ticker
 def fetch_realtime_quote(yf_symbol: str) -> dict | None:
+    if finnhub_client is None:
+        return None
     fh_sym = get_finnhub_symbol(yf_symbol)
     if fh_sym is None:
         return None
     try:
         q = finnhub_client.quote(fh_sym)
-        if not q or q.get("c", 0) == 0:
+        if not q or q.get("c", 0) in (0, None):
             return None
-        q["d"]  = q["c"] - q["pc"]
-        q["dp"] = (q["d"] / q["pc"] * 100) if q["pc"] else 0
+        pc = q.get("pc") or q["c"]
+        q["d"]  = q["c"] - pc
+        q["dp"] = (q["d"] / pc * 100) if pc else 0
         q["symbol"] = fh_sym
         return q
     except Exception:
@@ -380,7 +524,7 @@ def calc_bollinger(series, window=20, std=2):
 def sharpe_ratio(returns, rf=0.05):
     rf_daily = rf / 252
     excess = returns - rf_daily
-    if excess.std() == 0:
+    if excess.std() == 0 or np.isnan(excess.std()):
         return 0.0
     return round((excess.mean() / excess.std()) * np.sqrt(252), 3)
 
@@ -388,7 +532,7 @@ def sortino_ratio(returns, rf=0.05):
     rf_daily = rf / 252
     excess = returns - rf_daily
     downside = returns[returns < 0].std()
-    if downside == 0:
+    if downside == 0 or np.isnan(downside):
         return 0.0
     return round((excess.mean() / downside) * np.sqrt(252), 3)
 
@@ -398,6 +542,8 @@ def max_drawdown(prices):
     return round(drawdown.min() * 100, 2)
 
 def calmar_ratio(returns, prices):
+    if len(prices) == 0:
+        return 0.0
     cagr_v = ((prices.iloc[-1] / prices.iloc[0]) ** (252 / len(prices)) - 1) * 100
     mdd  = abs(max_drawdown(prices))
     if mdd == 0:
@@ -455,13 +601,73 @@ def volatility_regime(returns, window=30):
     return round(vol_s, 2), round(vol_l, 2), round(ratio, 2)
 
 def value_at_risk(returns, confidence=0.95):
-    return round(np.percentile(returns.dropna(), (1 - confidence) * 100) * 100, 3)
+    r = returns.dropna()
+    if len(r) == 0:
+        return 0.0
+    return round(np.percentile(r, (1 - confidence) * 100) * 100, 3)
 
 def expected_shortfall(returns, confidence=0.95):
-    var = np.percentile(returns.dropna(), (1 - confidence) * 100)
-    es  = returns[returns <= var].mean()
-    return round(es * 100, 3)
+    r = returns.dropna()
+    if len(r) == 0:
+        return 0.0
+    var = np.percentile(r, (1 - confidence) * 100)
+    tail = r[r <= var]
+    if len(tail) == 0:
+        return round(var * 100, 3)
+    return round(tail.mean() * 100, 3)
 
+# ─────────────────────────────────────────────────────────────
+#  FORECAST — Monte Carlo (GBM) + Linear extrapolation  [NEW]
+# ─────────────────────────────────────────────────────────────
+@st.cache_data(ttl=300)
+def monte_carlo_forecast(price_list, days=252, n_sims=300, seed=42):
+    """
+    จำลองเส้นทางราคาในอนาคตด้วย Geometric Brownian Motion
+    คืนค่าเปอร์เซ็นไทล์ (5/25/50/75/95) + ตัวอย่างเส้นทาง
+    """
+    prices = pd.Series(price_list).dropna()
+    if len(prices) < 30:
+        return None
+    returns = prices.pct_change().dropna()
+    mu    = returns.mean()
+    sigma = returns.std()
+    last  = float(prices.iloc[-1])
+
+    rng = np.random.default_rng(seed)
+    sims = np.zeros((n_sims, days + 1))
+    sims[:, 0] = last
+    drift = (mu - 0.5 * sigma ** 2)
+    for t in range(1, days + 1):
+        z = rng.standard_normal(n_sims)
+        sims[:, t] = sims[:, t - 1] * np.exp(drift + sigma * z)
+
+    pct = lambda p: np.percentile(sims, p, axis=0)
+    sample_idx = rng.choice(n_sims, size=min(40, n_sims), replace=False)
+
+    final_prices = sims[:, -1]
+    return {
+        "p5":  pct(5),  "p25": pct(25), "p50": pct(50),
+        "p75": pct(75), "p95": pct(95),
+        "samples": sims[sample_idx],
+        "mu": float(mu), "sigma": float(sigma), "last": last, "days": days,
+        "final_median": float(np.median(final_prices)),
+        "final_p5":  float(np.percentile(final_prices, 5)),
+        "final_p95": float(np.percentile(final_prices, 95)),
+        "prob_up": float((final_prices > last).mean() * 100),
+        "exp_return": float((np.median(final_prices) / last - 1) * 100),
+    }
+
+def linear_extrapolation(price_list, days=252):
+    prices = pd.Series(price_list).dropna()
+    if len(prices) < 30:
+        return None
+    x = np.arange(len(prices), dtype=float)
+    y = prices.values.astype(float)
+    coeffs = np.polyfit(x, y, 1)
+    future_x = np.arange(len(prices), len(prices) + days)
+    return np.polyval(coeffs, future_x)
+
+# ─────────────────────────────────────────────────────────────
 def winrate_backtest(df, strategy="ma_cross"):
     d = df.copy()
     d["MA20"] = d["Close"].rolling(20).mean()
@@ -619,45 +825,45 @@ def full_math_analysis(df, symbol):
     }
 
 def score_color(score):
-    if score >= 75: return "pos"
-    if score >= 50: return "gold"
-    return "neg"
+    if score >= 75: return "#2ee6a0"
+    if score >= 50: return "#e6c35c"
+    return "#ff5d6c"
 
-# Plotly dark theme helper
+# Plotly dark theme helper — สวยขึ้น (hover, spike, unified)
 def dark_layout(fig, height=580, title=None):
     fig.update_layout(
         height=height,
-        title=title,
+        title=dict(text=title, font=dict(size=15, color="#e9eef7")) if title else None,
         xaxis_rangeslider_visible=False,
-        margin=dict(l=10, r=10, t=40, b=10),
+        margin=dict(l=10, r=10, t=46, b=10),
         plot_bgcolor="rgba(0,0,0,0)",
         paper_bgcolor="rgba(0,0,0,0)",
         font=dict(family="Space Grotesk", color="#c3cbd9", size=12),
+        hovermode="x unified",
+        hoverlabel=dict(bgcolor="rgba(15,20,32,0.95)", bordercolor="rgba(230,195,92,0.4)",
+                        font=dict(family="JetBrains Mono", size=11, color="#e9eef7")),
         legend=dict(bgcolor="rgba(20,26,40,0.7)", bordercolor="rgba(255,255,255,0.1)",
-                    borderwidth=1, font=dict(size=11, color="#c3cbd9")),
+                    borderwidth=1, font=dict(size=11, color="#c3cbd9"),
+                    orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+        transition=dict(duration=400, easing="cubic-in-out"),
     )
     fig.update_xaxes(gridcolor="rgba(255,255,255,0.05)", zerolinecolor="rgba(255,255,255,0.08)",
-                     linecolor="rgba(255,255,255,0.12)")
+                     linecolor="rgba(255,255,255,0.12)", showspikes=True,
+                     spikecolor="rgba(230,195,92,0.4)", spikethickness=1, spikemode="across", spikedash="dot")
     fig.update_yaxes(gridcolor="rgba(255,255,255,0.05)", zerolinecolor="rgba(255,255,255,0.08)",
                      linecolor="rgba(255,255,255,0.12)")
     return fig
 
 # ─────────────────────────────────────────────────────────────
-#  FETCH DATA (yfinance — historical)
-# ─────────────────────────────────────────────────────────────
-# ─────────────────────────────────────────────────────────────
-#  FETCH DATA (historical) — yfinance + Stooq fallback
-#  yfinance มักถูก Yahoo บล็อก/จำกัดบน cloud → มีแหล่งสำรอง Stooq
+#  FETCH DATA (historical) — yfinance + Stooq fallback (เสถียร)
 # ─────────────────────────────────────────────────────────────
 def _from_yfinance(symbol, period):
-    # 1) Ticker.history
     try:
         d = yf.Ticker(symbol).history(period=period, auto_adjust=True)
         if d is not None and not d.empty:
             return d
     except Exception:
         pass
-    # 2) yf.download (บางครั้งทำงานได้เมื่อ history ล้มเหลว)
     try:
         d = yf.download(symbol, period=period, auto_adjust=True,
                         progress=False, threads=False)
@@ -677,7 +883,7 @@ def _stooq_symbol(yf_sym: str) -> str | None:
     if yf_sym in m:
         return m[yf_sym]
     if all(c not in yf_sym for c in ["=", "-", "^"]):
-        return f"{yf_sym.lower()}.us"   # US stocks
+        return f"{yf_sym.lower()}.us"
     return None
 
 def _from_stooq(symbol):
@@ -695,18 +901,21 @@ def _from_stooq(symbol):
     except Exception:
         return None
 
-@st.cache_data(ttl=300)
+@st.cache_data(ttl=300, show_spinner=False)
 def fetch_data(symbol, period="10y"):
-    d = _from_yfinance(symbol, period)
-    if d is not None and len(d) >= 100:
-        return d
+    # ลอง yfinance ก่อน (พร้อม retry เบา ๆ)
+    for _ in range(2):
+        d = _from_yfinance(symbol, period)
+        if d is not None and len(d) >= 100:
+            return d
+        time.sleep(0.4)
     # fallback: Stooq
     d = _from_stooq(symbol)
     if d is not None and len(d) >= 100:
         return d
     return None
 
-@st.cache_data(ttl=60)
+@st.cache_data(ttl=60, show_spinner=False)
 def fetch_watchlist_scores():
     results = []
     for sym, name in WATCHLIST.items():
@@ -741,10 +950,12 @@ with c1:
     ).upper().replace("/", "").strip()
 
 # ─────────────────────────────────────────────────────────────
-#  FETCH: Historical (yfinance) + Real-time (Finnhub)
+#  FETCH: Historical + Real-time
 # ─────────────────────────────────────────────────────────────
-data = fetch_data(symbol)
-is_fx = "=X" in symbol or symbol in ["EURUSD=X","GBPUSD=X","USDJPY=X"]
+with st.spinner("กำลังดึงข้อมูลย้อนหลัง..."):
+    data = fetch_data(symbol)
+
+is_fx = "=X" in symbol or symbol in ["EURUSD=X", "GBPUSD=X", "USDJPY=X"]
 
 if data is None or len(data) < 100:
     st.error(
@@ -788,10 +999,7 @@ with c3:
     st.caption(f"{source_label}\n📅 Historical {data_years:.1f} ปี | {len(data):,} วัน")
 
 # ─────────────────────────────────────────────────────────────
-#  REAL-TIME PANEL
-# ─────────────────────────────────────────────────────────────
-# ─────────────────────────────────────────────────────────────
-#  REAL-TIME PANEL — อัปเดตทุก 2 วินาที (เฉพาะแผงนี้ ไม่กระทบส่วนอื่น)
+#  REAL-TIME PANEL + LIVE SPARKLINE — อัปเดตทุก 2 วินาที
 # ─────────────────────────────────────────────────────────────
 @st.fragment(run_every=2)
 def realtime_panel():
@@ -799,6 +1007,15 @@ def realtime_panel():
     if not q or q.get("c", 0) == 0:
         st.caption("⏳ กำลังรอข้อมูล real-time...")
         return
+
+    # เก็บ tick เข้า session สำหรับกราฟสด (เก็บสูงสุด ~120 จุด)
+    ticks = st.session_state.rt_ticks.get(symbol, [])
+    now_ts = time.time()
+    if not ticks or now_ts - ticks[-1][0] >= 1.5:
+        ticks.append((now_ts, q["c"]))
+        ticks = ticks[-120:]
+        st.session_state.rt_ticks[symbol] = ticks
+
     chg       = q["d"]
     chgp      = q["dp"]
     chg_cls   = "pos" if chg >= 0 else "neg"
@@ -839,6 +1056,36 @@ def realtime_panel():
     </div>
     """, unsafe_allow_html=True)
 
+    # กราฟสด (สะสมจาก tick) — แสดงเมื่อมีจุด ≥ 3
+    if len(ticks) >= 3:
+        tt = [time.strftime("%H:%M:%S", time.localtime(t[0])) for t in ticks]
+        vv = [t[1] for t in ticks]
+        up = vv[-1] >= vv[0]
+        line_c = "#2ee6a0" if up else "#ff5d6c"
+        fill_c = "rgba(46,230,160,0.12)" if up else "rgba(255,93,108,0.10)"
+        fig_live = go.Figure()
+        fig_live.add_trace(go.Scatter(
+            x=tt, y=vv, mode="lines", name="Live",
+            line=dict(color=line_c, width=2, shape="spline"),
+            fill="tozeroy", fillcolor=fill_c,
+        ))
+        fig_live.add_trace(go.Scatter(
+            x=[tt[-1]], y=[vv[-1]], mode="markers",
+            marker=dict(size=10, color=line_c, line=dict(color="#fff", width=1)),
+            showlegend=False,
+        ))
+        fig_live.update_layout(
+            height=150, margin=dict(l=8, r=8, t=8, b=8),
+            plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
+            showlegend=False, font=dict(family="JetBrains Mono", color="#c3cbd9", size=10),
+            yaxis=dict(showgrid=False, side="right"),
+            xaxis=dict(showgrid=False, nticks=6),
+        )
+        fig_live.update_yaxes(range=[min(vv) * 0.999, max(vv) * 1.001])
+        st.plotly_chart(fig_live, use_container_width=True,
+                        config={"displayModeBar": False}, key=f"live_chart_{symbol}")
+        st.caption(f"📡 กราฟสด (intraday tick) · เก็บ {len(ticks)} จุด · สร้างจากราคา Finnhub แบบ real-time")
+
 # แสดงแผง live เฉพาะ symbol ที่ Finnhub รองรับ
 if get_finnhub_symbol(symbol) is not None:
     realtime_panel()
@@ -853,12 +1100,13 @@ with st.spinner("กำลังวิเคราะห์คณิตศาส
 # ─────────────────────────────────────────────────────────────
 #  TABS
 # ─────────────────────────────────────────────────────────────
-tab_overview, tab_chart, tab_rank, tab_income, tab_chat = st.tabs([
+tab_overview, tab_chart, tab_forecast, tab_rank, tab_income, tab_chat = st.tabs([
     "📐 ภาพรวมคณิตศาสตร์",
     "📈 กราฟวิเคราะห์",
+    "🔮 พยากรณ์อนาคต",
     "🏆 อันดับสินทรัพย์",
     "💰 คำนวณรายได้",
-    "🤖 AI Assistant",
+    "🤖 AI ที่ปรึกษา",
 ])
 
 # ══════════════════════════════════════════════════════════════
@@ -870,18 +1118,33 @@ with tab_overview:
     with col_left:
         sc = m["score"]
         verdict_emoji = {"Strong Buy":"🚀","Buy":"📈","Hold/Watch":"⏳","Underweight":"⚠️","Avoid":"🚫"}
+        ring_c = score_color(sc)
+        # SVG circular gauge (animated)
+        R = 52
+        circ = 2 * np.pi * R
+        dash_target = circ * (1 - sc / 100)
         st.markdown(f"""
         <div class="score-ring">
-          <div>
-            <div class="score-label">COMPOSITE SCORE</div>
-            <div class="score-num">{sc}</div>
-            <div style="font-size:10px;color:#888">/ 100</div>
+          <div class="gauge-wrap">
+            <svg class="gauge-svg" width="120" height="120" viewBox="0 0 120 120"
+                 style="--circ:{circ:.1f};">
+              <circle class="gauge-track" cx="60" cy="60" r="{R}"></circle>
+              <circle class="gauge-prog" cx="60" cy="60" r="{R}"
+                      stroke="{ring_c}"
+                      style="--dash-full:{circ:.1f}; --dash-target:{dash_target:.1f}; color:{ring_c};">
+              </circle>
+            </svg>
+            <div class="gauge-center">
+              <div class="gauge-num">{sc}</div>
+              <div class="gauge-max">/ 100</div>
+            </div>
           </div>
           <div>
-            <div class="score-label">คำแนะนำ</div>
+            <div class="score-label">COMPOSITE SCORE</div>
             <div class="score-verdict">{verdict_emoji.get(m['verdict'],'')} {m['verdict']}</div>
-            <div style="font-size:11px;color:#9aa6b8;margin-top:6px">Win Rate Backtest: {bt['winrate']}%
-            ({bt['wins']}W/{bt['losses']}L)</div>
+            <div style="font-size:12px;color:#9aa6b8;margin-top:8px">Win Rate Backtest:
+              <b style="color:{ring_c}">{bt['winrate']}%</b>
+              ({bt['wins']}W / {bt['losses']}L)</div>
           </div>
         </div>
         """, unsafe_allow_html=True)
@@ -900,9 +1163,9 @@ with tab_overview:
         """, unsafe_allow_html=True)
 
         st.markdown('<div class="section-title">📋 ผลการวิเคราะห์ตัวชี้วัด</div>', unsafe_allow_html=True)
-        for icon, label, detail, _ in m["signals"]:
+        for idx, (icon, label, detail, _) in enumerate(m["signals"]):
             st.markdown(f"""
-            <div class="sig-row">
+            <div class="sig-row" style="animation-delay:{idx*0.05:.2f}s">
               <div class="sig-icon">{icon}</div>
               <div class="sig-text"><strong>{label}</strong></div>
               <div class="sig-badge">{detail}</div>
@@ -912,9 +1175,12 @@ with tab_overview:
     with col_right:
         st.markdown('<div class="section-title">📊 ตัวเลขสำคัญ</div>', unsafe_allow_html=True)
 
+        _delay = {"i": 0}
         def mcard(label, value, sub="", cls=""):
+            d = _delay["i"] * 0.04
+            _delay["i"] += 1
             st.markdown(f"""
-            <div class="mcard {cls}" style="margin-bottom:10px">
+            <div class="mcard {cls}" style="margin-bottom:10px;animation-delay:{d:.2f}s">
               <div class="mcard-label">{label}</div>
               <div class="mcard-value">{value}</div>
               {'<div class="mcard-sub">'+sub+'</div>' if sub else ''}
@@ -990,10 +1256,21 @@ with tab_chart:
                             vertical_spacing=0.025,
                             subplot_titles=("Price · MA · Bollinger Bands",
                                             "RSI (14)", "MACD (12,26,9)"))
+        # Bollinger band fill first (so candles overlay)
+        fig.add_trace(go.Scatter(
+            x=df_c.index, y=df_c["BB_up"], name="BB Upper",
+            line=dict(color="rgba(91,141,239,0.4)", width=1), fill=None, showlegend=False
+        ), row=1, col=1)
+        fig.add_trace(go.Scatter(
+            x=df_c.index, y=df_c["BB_dn"], name="BB Band",
+            fill='tonexty', fillcolor='rgba(91,141,239,0.07)',
+            line=dict(color="rgba(91,141,239,0.4)", width=1), showlegend=False
+        ), row=1, col=1)
         fig.add_trace(go.Candlestick(
             x=df_c.index, open=df_c["Open"], high=df_c["High"],
             low=df_c["Low"], close=df_c["Close"], name="Price",
-            increasing_line_color="#2ee6a0", decreasing_line_color="#ff5d6c"
+            increasing_line_color="#2ee6a0", decreasing_line_color="#ff5d6c",
+            increasing_fillcolor="rgba(46,230,160,0.55)", decreasing_fillcolor="rgba(255,93,108,0.55)"
         ), row=1, col=1)
         for col_ma, width, dash, name_ma in [
             ("MA20", 1.2, "dot", "MA20"),
@@ -1006,15 +1283,6 @@ with tab_chart:
                     x=df_c.index, y=df_c[col_ma], mode="lines",
                     name=name_ma, line=dict(color=colors[col_ma], width=width, dash=dash)
                 ), row=1, col=1)
-        fig.add_trace(go.Scatter(
-            x=df_c.index, y=df_c["BB_up"], name="BB Upper",
-            line=dict(color="rgba(91,141,239,0.5)", width=1), fill=None, showlegend=False
-        ), row=1, col=1)
-        fig.add_trace(go.Scatter(
-            x=df_c.index, y=df_c["BB_dn"], name="BB Band",
-            fill='tonexty', fillcolor='rgba(91,141,239,0.08)',
-            line=dict(color="rgba(91,141,239,0.5)", width=1), showlegend=False
-        ), row=1, col=1)
 
         if rt_quote:
             fig.add_hline(y=rt_quote["c"], row=1, col=1,
@@ -1050,17 +1318,18 @@ with tab_chart:
                             row_heights=[0.7, 0.3], vertical_spacing=0.03,
                             subplot_titles=("Price + Bollinger Bands", "Z-Score (60D)"))
         fig.add_trace(go.Scatter(
-            x=df_c.index, y=df_c["Close"], mode="lines",
-            name="ราคา", line=dict(color="#5b8def", width=2)
-        ), row=1, col=1)
-        fig.add_trace(go.Scatter(
             x=df_c.index, y=df_c["BB_up"], name="BB+2σ",
             line=dict(color="#e6c35c", width=1, dash="dash"), fill=None
         ), row=1, col=1)
         fig.add_trace(go.Scatter(
             x=df_c.index, y=df_c["BB_dn"], name="BB-2σ",
-            fill='tonexty', fillcolor='rgba(230,195,92,0.08)',
+            fill='tonexty', fillcolor='rgba(230,195,92,0.07)',
             line=dict(color="#e6c35c", width=1, dash="dash")
+        ), row=1, col=1)
+        fig.add_trace(go.Scatter(
+            x=df_c.index, y=df_c["Close"], mode="lines",
+            name="ราคา", line=dict(color="#5b8def", width=2.2, shape="spline"),
+            fill="tozeroy", fillcolor="rgba(91,141,239,0.06)"
         ), row=1, col=1)
         fig.add_trace(go.Scatter(
             x=df_c.index, y=df_c["BB_mid"], name="BB Mid",
@@ -1131,7 +1400,140 @@ with tab_chart:
         st.plotly_chart(fig_bt, use_container_width=True, config={"displayModeBar": False})
 
 # ══════════════════════════════════════════════════════════════
-#  TAB 3 — RANKING
+#  TAB 3 — FORECAST (Monte Carlo)  [NEW]
+# ══════════════════════════════════════════════════════════════
+with tab_forecast:
+    st.markdown('<div class="section-title">🔮 พยากรณ์เส้นทางราคาในอนาคต</div>', unsafe_allow_html=True)
+    st.markdown("""
+    <div class="fc-banner">
+      จำลองอนาคตด้วย <b>Monte Carlo (Geometric Brownian Motion)</b> — สุ่มเส้นทางราคาหลายร้อยเส้น
+      จากค่าเฉลี่ยผลตอบแทน (μ) และความผันผวน (σ) ในอดีต แล้วสรุปเป็น
+      <b>แถบความเชื่อมั่น</b> (5%–95%) บวกกับ <b>เส้นแนวโน้ม Linear Trend</b> ที่ต่อจากเทรนด์เชิงเส้น
+      <br><span style="color:var(--muted);font-size:12px">⚠️ เป็นการจำลองเชิงสถิติ ไม่ใช่การทำนายแน่นอน — ราคาจริงขึ้นกับปัจจัยที่โมเดลนี้ไม่ครอบคลุม</span>
+    </div>
+    """, unsafe_allow_html=True)
+
+    fc1, fc2, fc3 = st.columns([1, 1, 1])
+    with fc1:
+        horizon = st.select_slider("ระยะเวลาพยากรณ์",
+                                   options=[63, 126, 252, 504, 756],
+                                   value=252,
+                                   format_func=lambda d: f"{d//21} เดือน" if d < 252 else f"{d//252} ปี")
+    with fc2:
+        n_sims = st.select_slider("จำนวนเส้นทางจำลอง",
+                                  options=[100, 300, 500, 1000], value=300)
+    with fc3:
+        show_paths = st.checkbox("แสดงเส้นทางตัวอย่าง", value=True)
+
+    price_list = m["df"]["Close"].dropna().tolist()
+    with st.spinner("กำลังจำลองอนาคต (Monte Carlo)..."):
+        fc = monte_carlo_forecast(price_list, days=horizon, n_sims=n_sims)
+        lin = linear_extrapolation(price_list, days=horizon)
+
+    if fc is None:
+        st.warning("ข้อมูลไม่พอสำหรับการพยากรณ์")
+    else:
+        # สร้างแกนเวลาอนาคต (วันทำการ)
+        last_date = m["df"].index[-1]
+        future_dates = pd.bdate_range(start=last_date, periods=horizon + 1)[1:]
+        hist_tail = m["df"]["Close"].tail(252)  # โชว์ประวัติ 1 ปีล่าสุด
+
+        fig_fc = go.Figure()
+
+        # ── ประวัติ ──
+        fig_fc.add_trace(go.Scatter(
+            x=hist_tail.index, y=hist_tail.values, mode="lines", name="ราคาในอดีต",
+            line=dict(color="#5b8def", width=2)
+        ))
+
+        # ── แถบ 5–95% (กว้างสุด) ──
+        fig_fc.add_trace(go.Scatter(
+            x=list(future_dates), y=fc["p95"], mode="lines", name="95th",
+            line=dict(width=0), showlegend=False, hoverinfo="skip"
+        ))
+        fig_fc.add_trace(go.Scatter(
+            x=list(future_dates), y=fc["p5"], mode="lines", name="ช่วง 5–95%",
+            line=dict(width=0), fill="tonexty", fillcolor="rgba(230,195,92,0.10)"
+        ))
+        # ── แถบ 25–75% (แคบ) ──
+        fig_fc.add_trace(go.Scatter(
+            x=list(future_dates), y=fc["p75"], mode="lines", name="75th",
+            line=dict(width=0), showlegend=False, hoverinfo="skip"
+        ))
+        fig_fc.add_trace(go.Scatter(
+            x=list(future_dates), y=fc["p25"], mode="lines", name="ช่วง 25–75%",
+            line=dict(width=0), fill="tonexty", fillcolor="rgba(46,230,160,0.14)"
+        ))
+
+        # ── เส้นทางตัวอย่าง ──
+        if show_paths:
+            for i, path in enumerate(fc["samples"][:25]):
+                fig_fc.add_trace(go.Scatter(
+                    x=list(future_dates), y=path[1:], mode="lines",
+                    line=dict(color="rgba(120,140,170,0.18)", width=0.7),
+                    showlegend=(i == 0), name="เส้นทางจำลอง" if i == 0 else None,
+                    hoverinfo="skip"
+                ))
+
+        # ── median (เส้นกลาง) ──
+        fig_fc.add_trace(go.Scatter(
+            x=list(future_dates), y=fc["p50"], mode="lines", name="ค่ากลาง (Median)",
+            line=dict(color="#2ee6a0", width=2.5, shape="spline")
+        ))
+        # ── เส้นแนวโน้ม linear ──
+        if lin is not None:
+            fig_fc.add_trace(go.Scatter(
+                x=list(future_dates), y=lin, mode="lines", name="แนวโน้มเชิงเส้น (Linear)",
+                line=dict(color="#a877e6", width=2, dash="dash")
+            ))
+        # จุดราคาปัจจุบัน
+        fig_fc.add_trace(go.Scatter(
+            x=[hist_tail.index[-1]], y=[fc["last"]], mode="markers",
+            marker=dict(size=10, color="#e6c35c", line=dict(color="#fff", width=1.5)),
+            name="ราคาปัจจุบัน"
+        ))
+        fig_fc.add_vline(x=last_date, line_color="rgba(255,255,255,0.25)",
+                         line_dash="dot", line_width=1)
+        dark_layout(fig_fc, height=560,
+                    title=f"พยากรณ์ {symbol} · {horizon} วันทำการข้างหน้า · {n_sims} simulations")
+        st.plotly_chart(fig_fc, use_container_width=True, config={"displayModeBar": False})
+
+        # ── สรุปผลพยากรณ์ (การ์ด) ──
+        st.markdown('<div class="section-title" style="margin-top:6px">📊 สรุปผลการพยากรณ์</div>',
+                    unsafe_allow_html=True)
+        fcc1, fcc2, fcc3, fcc4 = st.columns(4)
+        exp_c  = "pos" if fc["exp_return"] >= 0 else "neg"
+        prob_c = "pos" if fc["prob_up"] >= 50 else "neg"
+        horizon_label = f"{horizon//252} ปี" if horizon >= 252 else f"{horizon//21} เดือน"
+        with fcc1:
+            st.markdown(f"""<div class="mcard {exp_c}">
+              <div class="mcard-label">ราคาคาดการณ์ (Median)</div>
+              <div class="mcard-value">{fmt_p(fc['final_median'])}</div>
+              <div class="mcard-sub">ใน {horizon_label}</div></div>""", unsafe_allow_html=True)
+        with fcc2:
+            st.markdown(f"""<div class="mcard {exp_c}">
+              <div class="mcard-label">ผลตอบแทนคาดหวัง</div>
+              <div class="mcard-value">{fc['exp_return']:+.1f}%</div>
+              <div class="mcard-sub">เทียบราคาปัจจุบัน</div></div>""", unsafe_allow_html=True)
+        with fcc3:
+            st.markdown(f"""<div class="mcard {prob_c}">
+              <div class="mcard-label">โอกาสราคาขึ้น</div>
+              <div class="mcard-value">{fc['prob_up']:.0f}%</div>
+              <div class="mcard-sub">จาก {n_sims} เส้นทาง</div></div>""", unsafe_allow_html=True)
+        with fcc4:
+            st.markdown(f"""<div class="mcard">
+              <div class="mcard-label">ช่วงราคา 90% CI</div>
+              <div class="mcard-value" style="font-size:15px">{fmt_p(fc['final_p5'])} – {fmt_p(fc['final_p95'])}</div>
+              <div class="mcard-sub">μ={fc['mu']*100:.3f}% σ={fc['sigma']*100:.2f}%/วัน</div></div>""",
+              unsafe_allow_html=True)
+
+        st.info(f"📌 ตีความ: จากการจำลอง {n_sims} เส้นทาง ราคา {symbol} มีแนวโน้ม "
+                f"**{'เพิ่มขึ้น' if fc['exp_return']>=0 else 'ลดลง'}** เฉลี่ย {fc['exp_return']:+.1f}% "
+                f"ใน {horizon_label} โดยมีโอกาส {fc['prob_up']:.0f}% ที่จะจบสูงกว่าราคาปัจจุบัน — "
+                "ยิ่งช่วงเวลายาว แถบความไม่แน่นอนยิ่งกว้าง (ความเสี่ยงสูงขึ้น)")
+
+# ══════════════════════════════════════════════════════════════
+#  TAB 4 — RANKING
 # ══════════════════════════════════════════════════════════════
 with tab_rank:
     st.markdown('<div class="section-title">🏆 อันดับสินทรัพย์ (Composite Score · คณิตศาสตร์ล้วน)</div>',
@@ -1202,7 +1604,7 @@ with tab_rank:
         st.info("📌 หมายเหตุ: อันดับนี้ใช้ข้อมูลราคาย้อนหลัง 10 ปีเท่านั้น ไม่รวมปัจจัยพื้นฐานหรือข่าว")
 
 # ══════════════════════════════════════════════════════════════
-#  TAB 4 — INCOME CALCULATOR
+#  TAB 5 — INCOME CALCULATOR
 # ══════════════════════════════════════════════════════════════
 with tab_income:
     st.markdown('<div class="section-title">💰 เครื่องคำนวณรายได้การลงทุน</div>', unsafe_allow_html=True)
@@ -1225,7 +1627,7 @@ with tab_income:
 
         total = capital
         values = [total]
-        contributions = [0]
+        contributions = [capital]
         for mo in range(1, years_inv * 12 + 1):
             total = total * (1 + rate_monthly) + monthly_add
             values.append(total)
@@ -1234,7 +1636,7 @@ with tab_income:
         final_val      = values[-1]
         total_contrib  = capital + monthly_add * years_inv * 12
         total_gain     = final_val - total_contrib
-        total_return_pct = (final_val / total_contrib - 1) * 100
+        total_return_pct = (final_val / total_contrib - 1) * 100 if total_contrib else 0
         ann_income     = final_val * (rate_annual if rate_annual > 0 else 0.05)
 
         scenarios = {}
@@ -1280,7 +1682,7 @@ with tab_income:
         fig_grow.add_trace(go.Scatter(
             x=years_x, y=values, mode="lines", name="มูลค่าพอร์ต",
             fill="tonexty", fillcolor="rgba(46,230,160,0.12)",
-            line=dict(color="#2ee6a0", width=2.5)
+            line=dict(color="#2ee6a0", width=2.5, shape="spline")
         ))
         dark_layout(fig_grow, height=320, title=f"การเติบโตของพอร์ต {years_inv} ปี")
         fig_grow.update_layout(xaxis_title="ปี", yaxis_title="มูลค่า")
@@ -1292,9 +1694,14 @@ with tab_income:
         conf_level  = st.select_slider("Confidence Level", [90, 95, 99], value=95)
         returns_full = m["df"]["Close"].pct_change().dropna()
         var_pct  = np.percentile(returns_full, (1 - conf_level/100) * 100) * 100
-        es_pct   = returns_full[returns_full <= var_pct/100].mean() * 100
+        tail_r   = returns_full[returns_full <= var_pct/100]
+        es_pct   = tail_r.mean() * 100 if len(tail_r) else var_pct
         var_thb  = invest_amt * abs(var_pct) / 100
         es_thb   = invest_amt * abs(es_pct)  / 100
+
+        # Kelly ที่ถูกต้องขึ้น: f* = W - (1-W)/R, R = avg win / avg loss (ใช้ 1.0 เป็นค่าฐานปลอดภัย)
+        W = bt["winrate"] / 100
+        kelly = max(0.0, (W - (1 - W) / 1.0)) * 100  # R≈1 (1.5%TP/1.5%SL) → conservative
 
         st.markdown(f"""
         <div class="calc-result" style="margin-top:0">
@@ -1308,19 +1715,19 @@ with tab_income:
           <div class="calc-row"><span>Max Loss เงิน (DD)</span>
             <span>{invest_amt * abs(m['mdd'])/100:,.0f}</span></div>
           <div class="calc-row"><span>Kelly Criterion</span>
-            <span>{max(0, (bt['winrate']/100 - (1-bt['winrate']/100))*100):.1f}% ของพอร์ต</span></div>
+            <span>{kelly:.1f}% ของพอร์ต</span></div>
         </div>
         """, unsafe_allow_html=True)
 
 # ══════════════════════════════════════════════════════════════
-#  TAB 5 — AI CHAT  (Claude)
+#  TAB 6 — AI CHAT  (Claude) — เพื่อนคุย + ที่ปรึกษา
 # ══════════════════════════════════════════════════════════════
 with tab_chat:
     col_ch, _ = st.columns([3, 2])
     with col_ch:
-        st.markdown('<div class="section-title">🤖 AI Investment Assistant (Claude)</div>',
+        st.markdown('<div class="section-title">🤖 AI ที่ปรึกษาการลงทุน (Claude)</div>',
                     unsafe_allow_html=True)
-        st.caption("วิเคราะห์จากตัวเลขคณิตศาสตร์ของ DGV · ขับเคลื่อนโดย Claude (Anthropic) · ไม่ใช้ข่าวสาร")
+        st.caption("คุยสบาย ๆ เหมือนเพื่อนที่เก่งคณิตศาสตร์การเงิน · วิเคราะห์จากตัวเลข DGV · ขับเคลื่อนโดย Claude")
 
         rt_ctx = ""
         if rt_quote:
@@ -1328,35 +1735,65 @@ with tab_chat:
 • ราคา Real-time (Finnhub): {fmt_p(rt_quote['c'])} (เปลี่ยน {price_chg:+.2f} / {price_chg_pct:+.2f}%)
 • High วันนี้: {fmt_p(rt_quote['h'])} · Low: {fmt_p(rt_quote['l'])} · Open: {fmt_p(rt_quote['o'])}"""
 
-        sys_ctx = f"""คุณคือ DGV Investment Analyst ผู้เชี่ยวชาญด้านคณิตศาสตร์การเงิน
-วิเคราะห์เฉพาะข้อมูลเชิงปริมาณ ไม่ใช้ข่าว
+        sys_ctx = f"""คุณคือ "DGV" — เพื่อนคู่คิดด้านการลงทุนที่อบอุ่น เป็นกันเอง และเก่งคณิตศาสตร์การเงินมาก
+คุณคุยกับผู้ใช้เหมือนเพื่อนสนิทที่ไว้ใจได้ ไม่ใช่หุ่นยนต์ที่อ่านตัวเลขแห้ง ๆ
 
-ข้อมูลปัจจุบัน ({symbol}):{rt_ctx}
+บุคลิกของคุณ:
+• อบอุ่น เป็นกันเอง พูดคุยลื่นไหล เหมือนนั่งคุยกันที่ร้านกาแฟ — ใช้ "ครับ" และอิโมจิพอประมาณ (ไม่เยอะเกิน)
+• เป็นที่ปรึกษาที่ดี: ฟังก่อน เข้าใจเป้าหมาย/ความกังวลของเขา แล้วค่อยให้มุมมอง
+• ซื่อสัตย์เรื่องความเสี่ยงเสมอ — ไม่เชียร์เกินจริง ไม่ขู่เกินจริง ให้ภาพที่สมดุล
+• อ้างอิงตัวเลขจริงด้านล่างเสมอเวลาวิเคราะห์ อธิบายให้เข้าใจง่ายว่าตัวเลขนั้นแปลว่าอะไรในชีวิตจริง
+• ถ้าผู้ใช้ดูกังวล/เครียดเรื่องเงิน ให้ใจเย็น ปลอบใจอย่างจริงใจ และเตือนให้ลงทุนเท่าที่รับความเสี่ยงไหว
+• ถามคำถามต่อเนื่องเพื่อเข้าใจเขามากขึ้น (เช่น เป้าหมาย ระยะเวลา ความเสี่ยงที่รับได้) เมื่อเหมาะสม
+• ตอบกระชับ อ่านง่าย ไม่ยัดศัพท์เทคนิคจนงง — ถ้าใช้ศัพท์ ให้ขยายความสั้น ๆ
+
+ข้อมูลเชิงปริมาณปัจจุบันของ {symbol}:{rt_ctx}
 • CAGR: {m['cagr']:+.1f}%/ปี | Sharpe: {m['sharpe']:.2f} | Sortino: {m['sortino']:.2f} | Calmar: {m['calmar']:.2f}
-• Max Drawdown: {m['mdd']:.1f}% | VaR 95%: {m['var95']:.2f}%/วัน
+• Max Drawdown: {m['mdd']:.1f}% | VaR 95%: {m['var95']:.2f}%/วัน | Expected Shortfall: {m['es95']:.2f}%
 • Win Rate Backtest: {bt['winrate']}% ({bt['wins']}W/{bt['losses']}L)
 • Momentum Score: {m['momentum']:+.1f}% | Z-Score: {m['zscore']:+.2f}
 • RSI: {m['rsi']:.1f} | MACD: {'Bullish' if m['macd']>m['macd_sig'] else 'Bearish'}
 • Linear Trend: {m['trend_slope']:+.1f}%/ปี | R²={m['r2']:.2f}
 • Volatility: Short={m['vol_s']:.1f}% Long={m['vol_l']:.1f}%
+• ผลตอบแทน: 1M {m['ret_1m']:+.1f}% · 3M {m['ret_3m']:+.1f}% · 1Y {m['ret_1y']:+.1f}%
 • Composite Score: {m['score']}/100 → {m['verdict']}
 
-ตอบภาษาไทย กระชับ ใช้ตัวเลขที่ให้ไว้ ระบุว่าเป็นการวิเคราะห์เพื่อประกอบการตัดสินใจ ไม่ใช่คำแนะนำการลงทุน"""
+สำคัญ: ตอบภาษาไทย ทุกครั้งที่ให้ความเห็นการลงทุน ให้จบด้วยการเตือนสั้น ๆ ว่านี่เป็นข้อมูลประกอบการตัดสินใจ
+ไม่ใช่คำแนะนำการลงทุนที่รับประกันผล และการลงทุนมีความเสี่ยง ผู้ลงทุนควรตัดสินใจด้วยตัวเอง"""
 
+        # Quick prompts (ปุ่มเริ่มต้นบทสนทนา)
+        st.markdown("**💬 เริ่มจากคำถามยอดฮิต:**")
+        qp1, qp2, qp3 = st.columns(3)
+        quick = None
+        with qp1:
+            if st.button(f"📈 {symbol} น่าลงทุนไหม?", use_container_width=True):
+                quick = f"ช่วยสรุปหน่อยว่า {symbol} ตอนนี้น่าลงทุนไหม จากตัวเลขที่มี?"
+        with qp2:
+            if st.button("⚠️ เสี่ยงแค่ไหน?", use_container_width=True):
+                quick = f"{symbol} มีความเสี่ยงระดับไหน ถ้าผมลงเงินไป จะขาดทุนหนักสุดได้แค่ไหน?"
+        with qp3:
+            if st.button("💡 ควรลงเท่าไหร่?", use_container_width=True):
+                quick = f"ถ้าผมมีเงินก้อนหนึ่ง ควรแบ่งลงทุนใน {symbol} สัดส่วนเท่าไหร่ดี?"
+
+        # Chat history render
         chat_html = '<div class="chat-wrap">'
         for msg in st.session_state.chat:
+            content = msg["content"].replace(chr(10), "<br>")
             if msg["role"] == "assistant":
-                chat_html += f'<div class="msg-row"><div class="av ai">C</div><div class="bub ai-b">{msg["content"].replace(chr(10),"<br>")}</div></div>'
+                chat_html += f'<div class="msg-row"><div class="av ai">C</div><div class="bub ai-b">{content}</div></div>'
             else:
-                chat_html += f'<div class="msg-row u"><div class="av usr">คุณ</div><div class="bub u-b">{msg["content"].replace(chr(10),"<br>")}</div></div>'
+                chat_html += f'<div class="msg-row u"><div class="av usr">คุณ</div><div class="bub u-b">{content}</div></div>'
         chat_html += '</div>'
         st.markdown(chat_html, unsafe_allow_html=True)
 
-        if q := st.chat_input("ถามเรื่องตัวเลข, ความเสี่ยง, Sharpe, ผลตอบแทน...", key="main_chat"):
-            st.session_state.chat.append({"role": "user", "content": q})
+        typed = st.chat_input("คุยกับ DGV ได้เลย... ถามเรื่องความเสี่ยง ผลตอบแทน หรือขอคำปรึกษา 😊",
+                              key="main_chat")
+        user_msg = quick or typed
+
+        if user_msg:
+            st.session_state.chat.append({"role": "user", "content": user_msg})
             try:
                 client = get_claude_client()
-                # ประวัติสนทนา: ข้าม greeting ตัวแรก และข้อความ q ที่เพิ่งเพิ่ม (จะต่อท้ายเอง)
                 hist = [
                     {"role": m_["role"], "content": m_["content"]}
                     for m_ in st.session_state.chat[1:-1]
@@ -1365,23 +1802,61 @@ with tab_chat:
                     model=CLAUDE_MODEL,
                     max_tokens=1024,
                     system=sys_ctx,
-                    messages=hist + [{"role": "user", "content": q}],
+                    messages=hist + [{"role": "user", "content": user_msg}],
                 )
                 reply = "".join(
                     block.text for block in resp.content if block.type == "text"
                 )
             except Exception as e:
-                reply = f"ขออภัย: {e}"
+                reply = (f"ขออภัยครับ ตอนนี้ผมเชื่อมต่อ AI ไม่ได้ 😅 "
+                         f"(ลองเช็คว่าตั้งค่า ANTHROPIC_API_KEY ใน secrets แล้วหรือยัง)\n\n`{e}`")
             st.session_state.chat.append({"role": "assistant", "content": reply})
             st.rerun()
 
+        if st.button("🗑️ ล้างบทสนทนา"):
+            st.session_state.chat = st.session_state.chat[:1]
+            st.rerun()
+
+# ─────────────────────────────────────────────────────────────
+#  REAL-TIME GUIDE (Expander) — แนะนำการหากราฟเรียลไทม์
+# ─────────────────────────────────────────────────────────────
+with st.expander("📡 วิธีดู/หากราฟแบบเรียลไทม์ (Real-time) — คำแนะนำ"):
+    st.markdown("""
+**ในแอปนี้:** แผงราคาด้านบนและกราฟสด (intraday tick) อัปเดตเองทุก ~2 วินาทีผ่าน Finnhub
+โดยไม่ต้องรีเฟรชหน้า — รองรับหุ้นสหรัฐ, Bitcoin, และคู่เงิน Forex หลัก
+
+**ถ้าอยากได้กราฟเรียลไทม์ละเอียดขึ้น แนะนำ:**
+
+1. **ตั้งค่า Finnhub API Key** ใน `secrets.toml` → `FINNHUB_API_KEY = "..."`
+   ฟรีได้ที่ finnhub.io (60 req/นาที) ก็พอสำหรับ live ticker
+
+2. **Symbol ที่รองรับ real-time** ผ่าน Finnhub ในแอปนี้:
+   - หุ้นสหรัฐ: `AAPL`, `NVDA`, `MSFT`, `TSLA` ฯลฯ
+   - คริปโต: `BTC-USD` (→ BINANCE:BTCUSDT)
+   - Forex: `EURUSD=X`, `GBPUSD=X`, `USDJPY=X`
+   - ⚠️ ทองคำ `GC=F` และดัชนี `^GSPC` ใช้ราคาปิดล่าสุดจาก yfinance (Finnhub free ไม่รองรับ)
+
+3. **อยากได้กราฟ candlestick real-time แบบ intraday** (1m/5m):
+   อัปเกรดเป็น Finnhub paid หรือใช้ websocket (`finnhub.Client` รองรับ `/stock/candle`
+   และ websocket stream) — แล้วนำมา plot ด้วย Plotly เหมือนแท็บ "กราฟวิเคราะห์"
+
+4. **แหล่ง real-time ทางเลือกอื่น:** Polygon.io, Alpaca, Twelve Data, Binance API (คริปโต)
+   — ทุกตัวมี free tier และเสียบเข้าโครงสร้างเดิมได้ง่าย (แก้แค่ฟังก์ชัน `fetch_realtime_quote`)
+    """)
+
 # ─────────────────────────────────────────────────────────────
 #  FOOTER
-#  แผงราคาอัปเดตเองทุก 2 วินาทีผ่าน fragment (ไม่ต้องรีเฟรชทั้งหน้า)
-#  ปุ่มนี้ใช้โหลดข้อมูลย้อนหลัง + ตัวเลขวิเคราะห์ใหม่ทั้งหมด
 # ─────────────────────────────────────────────────────────────
 st.markdown("<br>", unsafe_allow_html=True)
-if st.button("🔄 โหลดข้อมูลวิเคราะห์ใหม่ทั้งหมด"):
-    fetch_realtime_quote.clear()
-    fetch_data.clear()
-    st.rerun()
+fcol1, fcol2 = st.columns([1, 3])
+with fcol1:
+    if st.button("🔄 โหลดข้อมูลวิเคราะห์ใหม่ทั้งหมด"):
+        fetch_realtime_quote.clear()
+        fetch_data.clear()
+        fetch_watchlist_scores.clear()
+        monte_carlo_forecast.clear()
+        st.rerun()
+with fcol2:
+    st.caption("แผงราคา + กราฟสดอัปเดตเองทุก 2 วินาที (fragment) · "
+               "ปุ่มนี้โหลดข้อมูลย้อนหลัง + ตัวเลขวิเคราะห์ + พยากรณ์ใหม่ทั้งหมด · "
+               "DGV เป็นเครื่องมือวิเคราะห์เชิงปริมาณ ไม่ใช่คำแนะนำการลงทุน")
