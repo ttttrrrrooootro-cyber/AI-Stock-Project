@@ -2131,9 +2131,9 @@ with tab_income:
 
     with col_calc1:
         st.markdown("#### 📊 คำนวณผลตอบแทนตามสถานการณ์")
-        capital     = st.number_input("เงินลงทุนเริ่มต้น (฿ หรือ $)", min_value=1000,
+        capital     = st.number_input("เงินลงทุนเริ่มต้น (USD)", min_value=1000,
                                        max_value=100_000_000, value=100_000, step=10_000)
-        monthly_add = st.number_input("เงินเพิ่มต่อเดือน", min_value=0,
+        monthly_add = st.number_input("เงินเพิ่มต่อเดือน (USD)", min_value=0,
                                        max_value=1_000_000, value=5_000, step=1_000)
         years_inv   = st.slider("ระยะเวลาลงทุน (ปี)", 1, 30, 10)
         use_cagr    = st.checkbox(f"ใช้ CAGR จริงของ {symbol} ({m['cagr']:.1f}%/ปี)", value=True)
@@ -2171,12 +2171,12 @@ with tab_income:
         <div class="calc-result">
           <div style="font-size:11px;letter-spacing:2px;text-transform:uppercase;
                       color:#9aa6b8;margin-bottom:10px">ผลการคำนวณ · {years_inv} ปี</div>
-          <div class="calc-row"><span>มูลค่าสุดท้าย</span><span>{final_val:,.0f}</span></div>
-          <div class="calc-row"><span>เงินลงทุนรวม</span><span>{total_contrib:,.0f}</span></div>
-          <div class="calc-row"><span>กำไรสะสม</span><span>{total_gain:,.0f}</span></div>
+          <div class="calc-row"><span>มูลค่าสุดท้าย</span><span>${final_val:,.0f}</span></div>
+          <div class="calc-row"><span>เงินลงทุนรวม</span><span>${total_contrib:,.0f}</span></div>
+          <div class="calc-row"><span>กำไรสะสม</span><span>${total_gain:,.0f}</span></div>
           <div class="calc-row"><span>ผลตอบแทนรวม</span><span>{total_return_pct:+.1f}%</span></div>
-          <div class="calc-row"><span>รายได้ต่อปี</span><span>{ann_income:,.0f}</span></div>
-          <div class="calc-row"><span>รายได้ต่อเดือน</span><span>{ann_income/12:,.0f}</span></div>
+          <div class="calc-row"><span>รายได้ต่อปี</span><span>${ann_income:,.0f}</span></div>
+          <div class="calc-row"><span>รายได้ต่อเดือน</span><span>${ann_income/12:,.0f}</span></div>
           <div style="margin-top:12px;padding-top:10px;border-top:1px solid rgba(255,255,255,0.12)">
             <div style="font-size:10px;color:#9aa6b8;margin-bottom:6px">SCENARIOS ({years_inv} ปี)</div>
         """, unsafe_allow_html=True)
@@ -2185,7 +2185,7 @@ with tab_income:
             st.markdown(f"""
             <div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0">
               <span style="color:#c3cbd9">{label}</span>
-              <span style="font-family:'JetBrains Mono',monospace;color:{col_s}">{sv:,.0f}</span>
+              <span style="font-family:'JetBrains Mono',monospace;color:{col_s}">${sv:,.0f}</span>
             </div>""", unsafe_allow_html=True)
         st.markdown("</div></div>", unsafe_allow_html=True)
 
@@ -2203,11 +2203,11 @@ with tab_income:
             line=dict(color="#2ee6a0", width=2.5, shape="spline")
         ))
         dark_layout(fig_grow, height=320, title=f"การเติบโตของพอร์ต {years_inv} ปี")
-        fig_grow.update_layout(xaxis_title="ปี", yaxis_title="มูลค่า")
+        fig_grow.update_layout(xaxis_title="ปี", yaxis_title="มูลค่า (USD)")
         st.plotly_chart(fig_grow, use_container_width=True, config={"displayModeBar": False})
 
         st.markdown("#### ⚠️ คำนวณความเสี่ยง")
-        invest_amt  = st.number_input("เงินลงทุน (สำหรับคำนวณ VaR)", min_value=1000,
+        invest_amt  = st.number_input("เงินลงทุน (สำหรับคำนวณ VaR) (USD)", min_value=1000,
                                        max_value=10_000_000, value=100_000, step=10_000)
         conf_level  = st.select_slider("Confidence Level", [90, 95, 99], value=95)
         returns_full = m["df"]["Close"].pct_change().dropna()
@@ -2226,12 +2226,12 @@ with tab_income:
           <div style="font-size:11px;letter-spacing:2px;text-transform:uppercase;
                       color:#9aa6b8;margin-bottom:10px">RISK METRICS · {conf_level}% Confidence</div>
           <div class="calc-row"><span>VaR/วัน ({conf_level}%)</span><span>{var_pct:.2f}%</span></div>
-          <div class="calc-row"><span>VaR เงิน</span><span>{var_thb:,.0f}</span></div>
+          <div class="calc-row"><span>VaR เงิน</span><span>${var_thb:,.0f}</span></div>
           <div class="calc-row"><span>Expected Shortfall</span><span>{es_pct:.2f}%</span></div>
-          <div class="calc-row"><span>ES เงิน</span><span>{es_thb:,.0f}</span></div>
+          <div class="calc-row"><span>ES เงิน</span><span>${es_thb:,.0f}</span></div>
           <div class="calc-row"><span>Max Drawdown</span><span>{m['mdd']:.1f}%</span></div>
           <div class="calc-row"><span>Max Loss เงิน (DD)</span>
-            <span>{invest_amt * abs(m['mdd'])/100:,.0f}</span></div>
+            <span>${invest_amt * abs(m['mdd'])/100:,.0f}</span></div>
           <div class="calc-row"><span>Kelly Criterion</span>
             <span>{kelly:.1f}% ของพอร์ต</span></div>
         </div>
