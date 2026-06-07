@@ -903,6 +903,7 @@ def advanced_forecast(price_list, horizon=252, top_k=5, test_frac=0.2):
     }
 
 # ─────────────────────────────────────────────────────────────
+@st.cache_data(ttl=300, show_spinner=False)
 def winrate_backtest(df, strategy="ma_cross"):
     d = df.copy()
     d["MA20"] = d["Close"].rolling(20).mean()
@@ -929,6 +930,7 @@ def winrate_backtest(df, strategy="ma_cross"):
     wr = round(wins / total * 100, 1) if total else 0
     return {"wins": wins, "losses": losses, "total": total, "winrate": wr, "entries": entries}
 
+@st.cache_data(ttl=300, show_spinner=False)
 def full_math_analysis(df, symbol):
     d = df.copy()
     prices  = d["Close"].dropna()
@@ -2331,12 +2333,13 @@ with tab_chat:
                     {"role": m_["role"], "content": m_["content"]}
                     for m_ in st.session_state.chat[1:-1]
                 ]
-                resp = client.messages.create(
-                    model=CLAUDE_MODEL,
-                    max_tokens=1024,
-                    system=sys_ctx,
-                    messages=hist + [{"role": "user", "content": user_msg}],
-                )
+                with st.spinner("🤖 DGV กำลังวิเคราะห์ตัวเลขและเรียบเรียงคำตอบ..."):
+                    resp = client.messages.create(
+                        model=CLAUDE_MODEL,
+                        max_tokens=1024,
+                        system=sys_ctx,
+                        messages=hist + [{"role": "user", "content": user_msg}],
+                    )
                 reply = "".join(
                     block.text for block in resp.content if block.type == "text"
                 )
