@@ -1164,6 +1164,8 @@ def fetch_watchlist_scores(symbols=None):
         try:
             mm = full_math_analysis(df, sym)
             bt2 = winrate_backtest(df)
+            n_items = fetch_company_news(sym, days=14)
+            n_sent, _n_pos, _n_neg = news_sentiment(n_items)
             results.append({
                 "sym": sym, "name": name,
                 "score": mm["score"], "verdict": mm["verdict"],
@@ -1171,6 +1173,7 @@ def fetch_watchlist_scores(symbols=None):
                 "mdd": mm["mdd"], "winrate": bt2["winrate"],
                 "momentum": mm["momentum"], "vol": mm["vol_l"],
                 "cur": mm["cur"],
+                "news_sent": n_sent, "news_count": len(n_items),
             })
         except Exception:
             continue
@@ -2052,13 +2055,17 @@ with tab_news:
 #  TAB 4 — RANKING
 # ══════════════════════════════════════════════════════════════
 with tab_rank:
-    st.markdown('<div class="section-title">🏆 อันดับสินทรัพย์ (Composite Score · คณิตศาสตร์ล้วน)</div>',
+    st.markdown('<div class="section-title">🏆 อันดับสินทรัพย์ (Composite Score · คณิตศาสตร์ + ข่าว)</div>',
                 unsafe_allow_html=True)
-    st.caption("คำนวณจาก Sharpe, CAGR, Drawdown, Momentum, MA Alignment, Z-Score — ไม่มีปัจจัยข่าว")
+    st.caption("คำนวณจาก Sharpe, CAGR, Drawdown, Momentum, MA Alignment, Z-Score "
+               "แล้วปรับด้วย News Sentiment (เปิด/ปิดได้ด้านล่าง)")
 
     rk_group = st.selectbox("เลือกหมวดสินทรัพย์", list(ASSET_GROUPS.keys()),
                             index=0, key="rank_group")
     rk_syms = list(ASSET_GROUPS[rk_group].keys())
+
+    use_news = st.checkbox("📰 รวมปัจจัยข่าว (News Sentiment) ในการให้คะแนนและจัดอันดับ",
+                           value=True, key="rank_use_news")
 
     with st.spinner(f"กำลังดึงและวิเคราะห์ {len(rk_syms)} สินทรัพย์ในหมวด «{rk_group}»..."):
         rankings = fetch_watchlist_scores(rk_syms)
@@ -2066,16 +2073,36 @@ with tab_rank:
     if not rankings:
         st.warning("ไม่สามารถดึงข้อมูลได้")
     else:
+        # ── ปรับคะแนนด้วยข่าว: sentiment -100..+100 → ปรับ ±10 คะแนน ──
+        for r in rankings:
+            ns = r.get("news_sent", 0)
+            adj = max(-10, min(10, round(ns / 10)))
+            r["news_adj"] = adj
+            r["score_final"] = max(0, min(100, r["score"] + (adj if use_news else 0)))
+        rankings = sorted(rankings, key=lambda x: x["score_final"], reverse=True)
+
         medals = ["🥇","🥈","🥉"] + [""] * 20
         verdict_icon = {"Strong Buy":"🚀","Buy":"📈","Hold/Watch":"⏳","Underweight":"⚠️","Avoid":"🚫"}
         score_bg = lambda s: "rgba(46,230,160,0.18)" if s>=75 else "rgba(230,195,92,0.18)" if s>=50 else "rgba(255,93,108,0.18)"
 
         html_rows = ""
         for i, r in enumerate(rankings):
-            sc_bg  = score_bg(r["score"])
+            disp_score = r["score_final"]
+            sc_bg  = score_bg(disp_score)
             v_icon = verdict_icon.get(r["verdict"], "")
             cagr_c = "#2ee6a0" if r["cagr"]>=0 else "#ff5d6c"
             mom_c  = "#2ee6a0" if r["momentum"]>=0 else "#ff5d6c"
+
+            # ── คอลัมน์ข่าว ──
+            ns = r.get("news_sent", 0); ncnt = r.get("news_count", 0)
+            if ncnt == 0:
+                news_html = '<span style="color:var(--muted)">—</span>'
+            else:
+                news_c = "#2ee6a0" if ns > 15 else "#ff5d6c" if ns < -15 else "#e6c35c"
+                news_html = (f'<span style="color:{news_c};font-family:\'JetBrains Mono\',monospace;'
+                             f'font-weight:600">{ns:+d}</span>'
+                             f'<div style="font-size:9px;color:var(--muted)">{ncnt} ข่าว</div>')
+
             reasons = []
             if r["sharpe"] >= 1.5:  reasons.append(f"Sharpe สูง ({r['sharpe']:.1f})")
             elif r["sharpe"] < 0.5: reasons.append(f"Sharpe ต่ำ ({r['sharpe']:.1f})")
@@ -2086,7 +2113,16 @@ with tab_rank:
             if r["momentum"] >= 15: reasons.append("Momentum แรง")
             elif r["momentum"] < -10: reasons.append("Momentum ติดลบ")
             if r["winrate"] >= 60:  reasons.append(f"Win Rate {r['winrate']:.0f}%")
+            if use_news and ncnt > 0:
+                if ns > 15:    reasons.append(f"ข่าวเชิงบวก ({ns:+d})")
+                elif ns < -15: reasons.append(f"ข่าวเชิงลบ ({ns:+d})")
             reason_str = " · ".join(reasons[:3]) if reasons else "ตัวชี้วัดปานกลาง"
+
+            # ── เดลตาคะแนนจากข่าว (โชว์ใต้ SCORE) ──
+            delta_html = ""
+            if use_news and r["news_adj"] != 0:
+                dcol = "#2ee6a0" if r["news_adj"] > 0 else "#ff5d6c"
+                delta_html = f'<div style="font-size:9px;color:{dcol};margin-top:2px">{r["news_adj"]:+d} จากข่าว</div>'
 
             html_rows += f"""
             <tr>
@@ -2098,14 +2134,15 @@ with tab_rank:
               <td style="text-align:center">
                 <span style="background:{sc_bg};padding:3px 11px;border-radius:20px;
                              font-family:'JetBrains Mono',monospace;font-weight:600;font-size:13px;color:#fff">
-                  {r['score']}
-                </span>
+                  {disp_score}
+                </span>{delta_html}
               </td>
               <td style="font-family:'JetBrains Mono',monospace;color:{cagr_c}">{r['cagr']:+.1f}%</td>
               <td style="font-family:'JetBrains Mono',monospace">{r['sharpe']:.2f}</td>
               <td style="font-family:'JetBrains Mono',monospace;color:#ff5d6c">{r['mdd']:.1f}%</td>
               <td style="font-family:'JetBrains Mono',monospace;color:{mom_c}">{r['momentum']:+.1f}%</td>
               <td style="font-family:'JetBrains Mono',monospace">{r['winrate']:.0f}%</td>
+              <td style="text-align:center">{news_html}</td>
               <td>{v_icon} {r['verdict']}</td>
               <td style="font-size:11px;color:var(--muted);max-width:200px">{reason_str}</td>
             </tr>"""
@@ -2115,13 +2152,19 @@ with tab_rank:
           <thead><tr>
             <th>#</th><th>สินทรัพย์</th><th>SCORE</th>
             <th>CAGR</th><th>SHARPE</th><th>MAX DD</th>
-            <th>MOMENTUM</th><th>WIN RATE</th><th>สัญญาณ</th><th>เหตุผล</th>
+            <th>MOMENTUM</th><th>WIN RATE</th><th>NEWS</th><th>สัญญาณ</th><th>เหตุผล</th>
           </tr></thead>
           <tbody>{html_rows}</tbody>
         </table>
         """, unsafe_allow_html=True)
         st.markdown("<br>", unsafe_allow_html=True)
-        st.info("📌 หมายเหตุ: อันดับนี้ใช้ข้อมูลราคาย้อนหลัง 10 ปีเท่านั้น ไม่รวมปัจจัยพื้นฐานหรือข่าว")
+        if use_news:
+            st.info("📌 SCORE รวมปัจจัยข่าวแล้ว — ปรับ ±10 คะแนนตาม News Sentiment (heuristic นับคำจากข่าว Finnhub "
+                    "ย้อนหลัง 14 วัน) · คอลัมน์ NEWS = คะแนนข่าว −100 ถึง +100 · «—» = ไม่มีข่าวบริษัท "
+                    "(คริปโต/forex/ดัชนี/ETF บางตัว) จึงไม่ปรับคะแนน")
+        else:
+            st.info("📌 หมายเหตุ: อันดับนี้ใช้ข้อมูลราคาย้อนหลังเท่านั้น ไม่รวมปัจจัยข่าว — "
+                    "ติ๊กกล่อง «รวมปัจจัยข่าว» ด้านบนเพื่อให้ข่าวมีผลต่อคะแนน")
 
 # ══════════════════════════════════════════════════════════════
 #  TAB 5 — INCOME CALCULATOR
