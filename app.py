@@ -1403,6 +1403,90 @@ def fetch_usdthb():
     return 36.0
 
 # ─────────────────────────────────────────────────────────────
+#  MY PORTFOLIO — วิเคราะห์พอร์ตจริงของผู้ใช้ (มูลค่า/PnL/ความเสี่ยง)
+# ─────────────────────────────────────────────────────────────
+@st.cache_data(ttl=120, show_spinner=False)
+def analyze_holdings(holdings_tuple, rf=0.05):
+    """holdings_tuple: tuple ของ (ticker, shares, avg_cost) → คืนรายตัว + เมตริกระดับพอร์ต"""
+    rows = []
+    for tk, sh, cost in holdings_tuple:
+        tk = str(tk).upper().replace("/", "").strip()
+        try:
+            sh = float(sh); cost = float(cost or 0)
+        except (TypeError, ValueError):
+            continue
+        if not tk or sh <= 0:
+            continue
+        d = fetch_data(tk)
+        if d is None or len(d) < 30:
+            rows.append({"ticker": tk, "shares": sh, "avg_cost": cost, "price": None,
+                         "value": 0.0, "cost_value": sh * cost, "pnl": 0.0,
+                         "pnl_pct": 0.0, "ok": False})
+            continue
+        q = fetch_realtime_quote(tk)
+        price = float(q["c"]) if q and q.get("c", 0) > 0 else float(d["Close"].iloc[-1])
+        val = price * sh
+        costv = cost * sh
+        rows.append({"ticker": tk, "shares": sh, "avg_cost": cost, "price": price,
+                     "value": val, "cost_value": costv, "pnl": val - costv,
+                     "pnl_pct": ((val - costv) / costv * 100 if costv > 0 else 0.0),
+                     "ok": True})
+
+    total_val = sum(r["value"] for r in rows)
+    total_cost = sum(r["cost_value"] for r in rows)
+    for r in rows:
+        r["weight"] = (r["value"] / total_val * 100) if total_val > 0 else 0.0
+
+    metrics = None
+    ok_ticks = [r["ticker"] for r in rows if r["ok"] and r["value"] > 0]
+    if ok_ticks and total_val > 0:
+        try:
+            if len(ok_ticks) >= 2:
+                rdf = portfolio_returns_frame(ok_ticks)
+            else:
+                d1 = fetch_data(ok_ticks[0])
+                rdf = pd.DataFrame({ok_ticks[0]: _naive_index(d1["Close"].pct_change().dropna())}).dropna()
+            if rdf is not None and len(rdf) >= 60:
+                wmap = {r["ticker"]: r["value"] for r in rows if r["ticker"] in rdf.columns}
+                wsum = sum(wmap.values())
+                w = np.array([wmap[c] / wsum for c in rdf.columns])
+                port_ret = (rdf.values * w).sum(axis=1)
+                port_ret = pd.Series(port_ret, index=rdf.index)
+                yrs = len(port_ret) / 252
+                cum = float((1 + port_ret).prod())
+                cagr_v = (cum ** (1 / yrs) - 1) * 100 if yrs > 0 and cum > 0 else 0.0
+                vol = float(port_ret.std() * np.sqrt(252) * 100)
+                sharpe = float((port_ret.mean() - rf / 252) / (port_ret.std() + 1e-12) * np.sqrt(252))
+                eq = (1 + port_ret).cumprod()
+                mdd = float(((eq - eq.cummax()) / eq.cummax()).min() * 100)
+                # beta vs S&P 500
+                beta = None
+                bench = fetch_data("^GSPC")
+                if bench is not None:
+                    bret = _naive_index(bench["Close"].pct_change().dropna())
+                    j = pd.concat([port_ret.rename("p"), bret.rename("b")], axis=1).dropna()
+                    if len(j) >= 60:
+                        cov = np.cov(j["p"].values, j["b"].values)
+                        if cov[1, 1] > 0:
+                            beta = round(float(cov[0, 1] / cov[1, 1]), 3)
+                # avg correlation (diversification)
+                avg_corr = None
+                if len(rdf.columns) >= 2:
+                    cm = rdf.corr().values
+                    iu = np.triu_indices_from(cm, k=1)
+                    avg_corr = round(float(np.mean(cm[iu])), 3)
+                metrics = {"cagr": round(cagr_v, 1), "vol": round(vol, 1),
+                           "sharpe": round(sharpe, 2), "mdd": round(mdd, 1),
+                           "beta": beta, "avg_corr": avg_corr, "n_days": len(port_ret)}
+        except Exception:
+            metrics = None
+
+    return {"rows": rows, "total_val": total_val, "total_cost": total_cost,
+            "total_pnl": total_val - total_cost,
+            "total_pnl_pct": ((total_val - total_cost) / total_cost * 100) if total_cost > 0 else 0.0,
+            "metrics": metrics}
+
+# ─────────────────────────────────────────────────────────────
 #  INPUT BAR
 # ─────────────────────────────────────────────────────────────
 c1, c2, c3 = st.columns([2, 1, 1])
@@ -1622,7 +1706,7 @@ with st.spinner("กำลังวิเคราะห์คณิตศาส
 #  TABS
 # ─────────────────────────────────────────────────────────────
 (tab_overview, tab_fund, tab_chart, tab_forecast, tab_news,
- tab_rank, tab_portfolio, tab_income, tab_chat) = st.tabs([
+ tab_rank, tab_portfolio, tab_myport, tab_income, tab_chat) = st.tabs([
     "📐 ภาพรวมคณิตศาสตร์",
     "🏛️ ปัจจัยพื้นฐาน",
     "📈 กราฟวิเคราะห์",
@@ -1630,6 +1714,7 @@ with st.spinner("กำลังวิเคราะห์คณิตศาส
     "📰 ข่าว & อนาคต",
     "🏆 อันดับสินทรัพย์",
     "🧺 พอร์ต & กระจายเสี่ยง",
+    "💼 พอร์ตของฉัน",
     "💰 คำนวณรายได้",
     "🤖 AI ที่ปรึกษา",
 ])
@@ -2617,8 +2702,148 @@ with tab_portfolio:
                 "(อดีตไม่การันตีอนาคต และไม่รวมค่าธรรมเนียม/ภาษี)")
 
 
-with tab_income:
-    st.markdown('<div class="section-title">💰 เครื่องคำนวณรายได้การลงทุน</div>', unsafe_allow_html=True)
+# ══════════════════════════════════════════════════════════════
+#  TAB — MY PORTFOLIO (พอร์ตจริงของผู้ใช้)
+# ══════════════════════════════════════════════════════════════
+with tab_myport:
+    st.markdown('<div class="section-title">💼 พอร์ตของฉัน — ติดตามการลงทุนจริง</div>',
+                unsafe_allow_html=True)
+    st.caption("ใส่สิ่งที่คุณถือจริง (สัญลักษณ์ · จำนวนหน่วย · ราคาทุนเฉลี่ย เป็น USD) "
+               "แล้วดูมูลค่าปัจจุบัน กำไร/ขาดทุน สัดส่วน และความเสี่ยงระดับพอร์ต — รองรับหุ้น/ETF/คริปโต/ทอง")
+
+    if "my_holdings" not in st.session_state:
+        st.session_state.my_holdings = pd.DataFrame({
+            "Ticker":  ["AAPL", "NVDA", "BTC-USD"],
+            "Shares":  [10.0, 5.0, 0.10],
+            "AvgCost": [180.0, 120.0, 60000.0],
+        })
+
+    edited = st.data_editor(
+        st.session_state.my_holdings, num_rows="dynamic", use_container_width=True,
+        key="holdings_editor",
+        column_config={
+            "Ticker":  st.column_config.TextColumn("สัญลักษณ์", help="เช่น AAPL, NVDA, BTC-USD, GLD"),
+            "Shares":  st.column_config.NumberColumn("จำนวนหน่วย", min_value=0.0, step=0.01, format="%.4f"),
+            "AvgCost": st.column_config.NumberColumn("ราคาทุนเฉลี่ย (USD)", min_value=0.0, step=0.01, format="%.2f"),
+        })
+    st.session_state.my_holdings = edited
+
+    holdings_tuple = tuple(
+        (str(getattr(r, "Ticker", "") or ""), getattr(r, "Shares", 0), getattr(r, "AvgCost", 0))
+        for r in edited.itertuples(index=False)
+        if str(getattr(r, "Ticker", "") or "").strip()
+    )
+
+    if not holdings_tuple:
+        st.info("เพิ่มรายการที่คุณถือในตารางด้านบน (กดที่แถวว่างล่างสุดเพื่อเพิ่ม) เพื่อเริ่มวิเคราะห์พอร์ต")
+    else:
+        with st.spinner("กำลังดึงราคาและวิเคราะห์พอร์ต..."):
+            pf = analyze_holdings(holdings_tuple)
+        usdthb_p = fetch_usdthb()
+
+        tot_v, tot_c, tot_p = pf["total_val"], pf["total_cost"], pf["total_pnl"]
+        pnl_cls = "pos" if tot_p >= 0 else "neg"
+
+        # ── การ์ดสรุป ──
+        pc1, pc2, pc3, pc4 = st.columns(4)
+        with pc1:
+            st.markdown(f"""<div class="mcard gold"><div class="mcard-label">มูลค่าพอร์ตรวม</div>
+              <div class="mcard-value">${tot_v:,.0f}</div>
+              <div class="mcard-sub">≈ ฿{tot_v*usdthb_p:,.0f}</div></div>""", unsafe_allow_html=True)
+        with pc2:
+            st.markdown(f"""<div class="mcard"><div class="mcard-label">เงินทุนรวม</div>
+              <div class="mcard-value">${tot_c:,.0f}</div>
+              <div class="mcard-sub">ราคาทุนที่ลงไป</div></div>""", unsafe_allow_html=True)
+        with pc3:
+            st.markdown(f"""<div class="mcard {pnl_cls}"><div class="mcard-label">กำไร/ขาดทุน</div>
+              <div class="mcard-value">${tot_p:,.0f}</div>
+              <div class="mcard-sub">{pf['total_pnl_pct']:+.1f}% ของทุน</div></div>""", unsafe_allow_html=True)
+        with pc4:
+            n_ok = sum(1 for r in pf["rows"] if r["ok"])
+            st.markdown(f"""<div class="mcard blue"><div class="mcard-label">จำนวนสินทรัพย์</div>
+              <div class="mcard-value">{n_ok}</div>
+              <div class="mcard-sub">ในพอร์ต</div></div>""", unsafe_allow_html=True)
+
+        # ── ตารางรายตัว ──
+        st.markdown('<div class="section-title" style="font-size:17px;margin-top:14px">📋 รายการถือครอง</div>',
+                    unsafe_allow_html=True)
+        rows_h = ""
+        for r in sorted(pf["rows"], key=lambda x: x["value"], reverse=True):
+            if not r["ok"]:
+                rows_h += (f'<tr><td class="rank-ticker">{r["ticker"]}</td>'
+                           f'<td colspan="6" style="color:var(--muted)">ดึงข้อมูลไม่ได้ (เช็คสัญลักษณ์)</td></tr>')
+                continue
+            pcol = "#2ee6a0" if r["pnl"] >= 0 else "#ff5d6c"
+            rows_h += f"""
+            <tr>
+              <td class="rank-ticker">{r['ticker']}</td>
+              <td style="font-family:'JetBrains Mono',monospace">{r['shares']:g}</td>
+              <td style="font-family:'JetBrains Mono',monospace">${r['avg_cost']:,.2f}</td>
+              <td style="font-family:'JetBrains Mono',monospace">${r['price']:,.2f}</td>
+              <td style="font-family:'JetBrains Mono',monospace">${r['value']:,.0f}</td>
+              <td style="font-family:'JetBrains Mono',monospace;color:{pcol}">${r['pnl']:,.0f} ({r['pnl_pct']:+.1f}%)</td>
+              <td style="font-family:'JetBrains Mono',monospace">{r['weight']:.1f}%</td>
+            </tr>"""
+        st.markdown(f"""<table class="rank-table"><thead><tr>
+            <th>สินทรัพย์</th><th>หน่วย</th><th>ทุนเฉลี่ย</th><th>ราคาล่าสุด</th>
+            <th>มูลค่า</th><th>กำไร/ขาดทุน</th><th>สัดส่วน</th>
+          </tr></thead><tbody>{rows_h}</tbody></table>""", unsafe_allow_html=True)
+
+        # ── สัดส่วน (Pie) + ความเสี่ยงพอร์ต ──
+        colpie, colrisk = st.columns([1, 1])
+        with colpie:
+            ok_rows = [r for r in pf["rows"] if r["ok"] and r["value"] > 0]
+            if ok_rows:
+                fig_pie = go.Figure(data=[go.Pie(
+                    labels=[r["ticker"] for r in ok_rows],
+                    values=[r["value"] for r in ok_rows], hole=0.5,
+                    textinfo="label+percent", textfont=dict(size=11),
+                    marker=dict(line=dict(color="#0b0f1a", width=2)))])
+                fig_pie.update_layout(height=320, margin=dict(l=10, r=10, t=30, b=10),
+                    title=dict(text="สัดส่วนการลงทุน", font=dict(size=14, color="#e9eef7")),
+                    plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
+                    font=dict(family="Space Grotesk", color="#c3cbd9"), showlegend=False)
+                st.plotly_chart(fig_pie, use_container_width=True, config={"displayModeBar": False})
+        with colrisk:
+            mt = pf["metrics"]
+            st.markdown('<div class="section-title" style="font-size:15px">⚖️ ความเสี่ยงระดับพอร์ต</div>',
+                        unsafe_allow_html=True)
+            if not mt:
+                st.caption("ต้องมีสินทรัพย์ที่มีข้อมูลพอ (≥60 วัน) เพื่อคำนวณความเสี่ยงพอร์ต")
+            else:
+                beta_s = f"{mt['beta']:.2f}" if mt['beta'] is not None else "—"
+                corr_s = (f"{mt['avg_corr']:.2f}" if mt['avg_corr'] is not None else "—")
+                div_note = ""
+                if mt['avg_corr'] is not None:
+                    div_note = ("กระจายเสี่ยงดี" if mt['avg_corr'] < 0.4
+                                else "กระจายเสี่ยงปานกลาง" if mt['avg_corr'] < 0.7
+                                else "กระจุกตัว (สินทรัพย์เคลื่อนไหวคล้ายกัน)")
+                st.markdown(f"""
+                <div class="calc-result" style="margin-top:0">
+                  <div class="calc-row"><span>ผลตอบแทนพอร์ต (CAGR)</span><span>{mt['cagr']:+.1f}%/ปี</span></div>
+                  <div class="calc-row"><span>ความผันผวนพอร์ต</span><span>{mt['vol']:.1f}%/ปี</span></div>
+                  <div class="calc-row"><span>Sharpe Ratio พอร์ต</span><span>{mt['sharpe']:.2f}</span></div>
+                  <div class="calc-row"><span>Max Drawdown พอร์ต</span><span>{mt['mdd']:.1f}%</span></div>
+                  <div class="calc-row"><span>Beta เทียบ S&amp;P 500</span><span>{beta_s}</span></div>
+                  <div class="calc-row"><span>Correlation เฉลี่ย</span><span>{corr_s}</span></div>
+                </div>
+                <div style="font-size:12px;color:var(--muted);margin-top:6px">{('🔗 ' + div_note) if div_note else ''}</div>
+                """, unsafe_allow_html=True)
+
+        # ── บันทึก/โหลดพอร์ต ──
+        st.markdown("<br>", unsafe_allow_html=True)
+        dl1, dl2 = st.columns([1, 2])
+        with dl1:
+            st.download_button("⬇️ บันทึกพอร์ต (CSV)", edited.to_csv(index=False),
+                               "my_portfolio.csv", "text/csv", use_container_width=True)
+        with dl2:
+            st.caption("พอร์ตเก็บไว้ระหว่างเซสชันนี้ · กดบันทึก CSV เพื่อเก็บถาวร แล้วเปิดวางในตารางใหม่ภายหลังได้")
+
+        st.info("📌 ราคาล่าสุดเป็น real-time (Finnhub) หรือราคาปิดล่าสุด · ความเสี่ยงพอร์ตคำนวณจากน้ำหนักปัจจุบัน "
+                "และความสัมพันธ์ของสินทรัพย์ย้อนหลัง — Beta พอร์ตบอกว่าพอร์ตคุณอ่อนไหวต่อตลาดรวมแค่ไหน · "
+                "ตัวเลข USD (≈ {:.2f} บาท/ดอลลาร์)".format(usdthb_p))
+
+
 
     col_calc1, col_calc2 = st.columns(2)
 
@@ -2791,6 +3016,24 @@ with tab_chat:
         except NameError:
             pass
 
+        # ── บริบทพอร์ตจริงของผู้ใช้ (จากแท็บพอร์ตของฉัน) ──
+        port_ctx = ""
+        try:
+            if pf and pf["total_val"] > 0:
+                hold_str = ", ".join(
+                    f"{r['ticker']} {r['weight']:.0f}% ({r['pnl_pct']:+.0f}%)"
+                    for r in sorted(pf["rows"], key=lambda x: x["value"], reverse=True) if r["ok"]
+                )
+                port_ctx = (f"\n• พอร์ตจริงของผู้ใช้: มูลค่า ${pf['total_val']:,.0f} "
+                            f"กำไร/ขาดทุนรวม {pf['total_pnl_pct']:+.1f}% | ถือ: {hold_str}")
+                if pf.get("metrics"):
+                    _mt = pf["metrics"]
+                    _bt = f"{_mt['beta']:.2f}" if _mt.get("beta") is not None else "—"
+                    port_ctx += (f" | ความเสี่ยงพอร์ต: CAGR {_mt['cagr']:+.1f}% "
+                                 f"Vol {_mt['vol']:.0f}% Sharpe {_mt['sharpe']:.2f} Beta {_bt}")
+        except NameError:
+            pass
+
         sys_ctx = f"""คุณคือ "DGV" ผู้ช่วยวิเคราะห์การลงทุนเชิงปริมาณ ตอบในสไตล์ผู้ช่วย AI มืออาชีพ แบบเดียวกับ ChatGPT หรือ Gemini — เป็นกลาง กระชับ ชัดเจน ตรงประเด็น และมีโครงสร้างอ่านง่าย
 
 แนวทางการตอบ:
@@ -2800,6 +3043,7 @@ with tab_chat:
 • อ้างอิงตัวเลขจริงด้านล่างเสมอเวลาวิเคราะห์ และอธิบายความหมายของตัวเลขสั้น ๆ
 • ให้ภาพที่สมดุล ระบุทั้งจุดแข็งและความเสี่ยง ไม่เชียร์เกินจริงและไม่ขู่เกินจริง
 • เชื่อมโยงข่าว (ถ้ามี) เข้ากับแนวโน้มราคาเมื่อผู้ใช้ถามถึงอนาคต/ข่าว
+• ถ้าผู้ใช้ถามถึง "พอร์ตของฉัน/พอร์ตผม" ให้อ้างอิงข้อมูลพอร์ตจริงด้านล่าง (สัดส่วน กำไร/ขาดทุน ความเสี่ยง Beta) วิเคราะห์การกระจุกตัว/กระจายเสี่ยง และให้มุมมองอย่างสมดุล
 • ตอบเป็นภาษาไทยเป็นค่าเริ่มต้น และสลับภาษาตามที่ผู้ใช้ใช้
 
 ข้อมูลเชิงปริมาณปัจจุบันของ {symbol}:{rt_ctx}
@@ -2811,11 +3055,11 @@ with tab_chat:
 • Linear Trend: {m['trend_slope']:+.1f}%/ปี | R²={m['r2']:.2f}
 • Volatility: Short={m['vol_s']:.1f}% Long={m['vol_l']:.1f}%
 • ผลตอบแทน: 1M {m['ret_1m']:+.1f}% · 3M {m['ret_3m']:+.1f}% · 1Y {m['ret_1y']:+.1f}%
-• Composite Score: {m['score']}/100 → {m['verdict']}{fc_ctx}{news_ctx}"""
+• Composite Score: {m['score']}/100 → {m['verdict']}{fc_ctx}{news_ctx}{port_ctx}"""
 
         # Quick prompts (ปุ่มเริ่มต้นบทสนทนา)
         st.markdown("**💬 เริ่มจากคำถามยอดฮิต:**")
-        qp1, qp2, qp3 = st.columns(3)
+        qp1, qp2, qp3, qp4 = st.columns(4)
         quick = None
         with qp1:
             if st.button(f"📈 {symbol} น่าลงทุนไหม?", use_container_width=True):
@@ -2826,6 +3070,9 @@ with tab_chat:
         with qp3:
             if st.button("💡 ควรลงเท่าไหร่?", use_container_width=True):
                 quick = f"ถ้าผมมีเงินก้อนหนึ่ง ควรแบ่งลงทุนใน {symbol} สัดส่วนเท่าไหร่ดี?"
+        with qp4:
+            if st.button("💼 วิเคราะห์พอร์ตของฉัน", use_container_width=True):
+                quick = "ช่วยวิเคราะห์พอร์ตของฉันหน่อย — กระจายความเสี่ยงดีไหม มีตัวไหนกระจุกหรือเสี่ยงเกินไป และควรปรับอะไร?"
 
         # Chat history render
         chat_html = '<div class="chat-wrap">'
