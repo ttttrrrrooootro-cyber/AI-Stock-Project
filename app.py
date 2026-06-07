@@ -748,7 +748,8 @@ def expected_shortfall(returns, confidence=0.95):
 @st.cache_data(ttl=300)
 def monte_carlo_forecast(price_list, days=252, n_sims=300, seed=42):
     """
-    จำลองเส้นทางราคาในอนาคตด้วย Geometric Brownian Motion
+    จำลองเส้นทางราคาในอนาคตด้วย Geometric Brownian Motion + หางอ้วน (Student-t)
+    ปรับองศาอิสระ (ν) จาก kurtosis จริงของผลตอบแทน → จำลองวันที่ตลาดร่วงแรง/วิกฤตได้สมจริงกว่า normal
     คืนค่าเปอร์เซ็นไทล์ (5/25/50/75/95) + ตัวอย่างเส้นทาง
     """
     prices = pd.Series(price_list).dropna()
@@ -759,12 +760,21 @@ def monte_carlo_forecast(price_list, days=252, n_sims=300, seed=42):
     sigma = returns.std()
     last  = float(prices.iloc[-1])
 
+    # ── ประมาณความอ้วนของหาง (fat tail) จาก excess kurtosis ──
+    # Student-t: excess kurtosis = 6/(ν-4) สำหรับ ν>4  →  ν = 4 + 6/exk
+    exk = float(returns.kurtosis())   # Fisher excess kurtosis
+    if exk > 0.5:
+        nu = float(min(max(4.0 + 6.0 / exk, 3.0), 30.0))
+    else:
+        nu = 30.0                      # หางบาง ≈ normal
+    t_scale = np.sqrt((nu - 2.0) / nu) if nu > 2 else 1.0   # ปรับให้ variance = 1
+
     rng = np.random.default_rng(seed)
     sims = np.zeros((n_sims, days + 1))
     sims[:, 0] = last
     drift = (mu - 0.5 * sigma ** 2)
     for t in range(1, days + 1):
-        z = rng.standard_normal(n_sims)
+        z = rng.standard_t(nu, size=n_sims) * t_scale   # shock หางอ้วน variance≈1
         sims[:, t] = sims[:, t - 1] * np.exp(drift + sigma * z)
 
     pct = lambda p: np.percentile(sims, p, axis=0)
@@ -776,6 +786,7 @@ def monte_carlo_forecast(price_list, days=252, n_sims=300, seed=42):
         "p75": pct(75), "p95": pct(95),
         "samples": sims[sample_idx],
         "mu": float(mu), "sigma": float(sigma), "last": last, "days": days,
+        "nu": round(nu, 1), "exkurt": round(exk, 2),
         "final_median": float(np.median(final_prices)),
         "final_p5":  float(np.percentile(final_prices, 5)),
         "final_p95": float(np.percentile(final_prices, 95)),
@@ -869,7 +880,17 @@ def advanced_forecast(price_list, horizon=252, top_k=5, test_frac=0.2):
         return None
     split = int(len(y) * (1 - test_frac))
     y_tr, y_te = y[:split], y[split:]
-    lo, hi = y.min() * 0.3, y.max() * 3.0   # ขอบเขตกันค่าระเบิด
+    last_y = float(y[-1])
+
+    # ── กรอบความผันผวน 3-sigma (diffusion cone) — กันโมเดลเหวี่ยงหลุดจริง ──
+    # ขอบกว้างขึ้นตาม sqrt(เวลา) เหมือนความไม่แน่นอนจริง · poly deg-2/3 ที่ระเบิดจะถูกจำกัดที่นี่
+    dret = pd.Series(y).pct_change().dropna()
+    dsig = float(dret.std()) if len(dret) > 2 and dret.std() > 0 else 0.02
+    steps = np.arange(1, horizon + 1)
+    cone = 3.0 * dsig * np.sqrt(steps)
+    lo_arr = last_y * np.exp(-cone)
+    hi_arr = last_y * np.exp(+cone)
+
     results = []
     for name, (fn, color) in _FORECAST_MODELS.items():
         try:
@@ -878,12 +899,15 @@ def advanced_forecast(price_list, horizon=252, top_k=5, test_frac=0.2):
                 continue
             mape = float(np.mean(np.abs((y_te - pred_te) / (y_te + 1e-9))) * 100)
             rmse = float(np.sqrt(np.mean((y_te - pred_te) ** 2)))
-            fut = np.clip(fn(y, horizon), lo, hi)
-            if not np.isfinite(fut).all():
+            raw_fut = fn(y, horizon)
+            if not np.isfinite(raw_fut).all():
                 continue
+            fut = np.clip(raw_fut, lo_arr, hi_arr)
+            # โดนกรอบจำกัดเกิน 10% ของจุด = โมเดลพยายามเหวี่ยงเกินจริง
+            clipped = bool(np.mean(np.abs(raw_fut - fut) > 1e-6) > 0.10)
             results.append({
                 "name": name, "color": color, "mape": mape, "rmse": rmse,
-                "forecast": fut, "end": float(fut[-1]),
+                "forecast": fut, "end": float(fut[-1]), "clipped": clipped,
                 "ret": float((fut[-1] / y[-1] - 1) * 100),
             })
         except Exception:
@@ -1180,6 +1204,205 @@ def fetch_watchlist_scores(symbols=None):
     return sorted(results, key=lambda x: x["score"], reverse=True)
 
 # ─────────────────────────────────────────────────────────────
+#  FUNDAMENTALS (Finnhub) — ปัจจัยพื้นฐาน
+# ─────────────────────────────────────────────────────────────
+@st.cache_data(ttl=3600, show_spinner=False)
+def fetch_fundamentals(yf_symbol):
+    """ดึงปัจจัยพื้นฐานจาก Finnhub (P/E, EPS, margin, ปันผล ฯลฯ) — เฉพาะหุ้น/ETF สหรัฐ"""
+    if finnhub_client is None:
+        return None
+    fh = get_finnhub_symbol(yf_symbol)
+    if fh is None or ":" in fh:   # crypto/forex/index/commodity → ไม่มีพื้นฐาน
+        return None
+    try:
+        prof = finnhub_client.company_profile2(symbol=fh) or {}
+        bf   = finnhub_client.company_basic_financials(fh, "all") or {}
+        me   = (bf.get("metric") or {})
+        g = lambda *keys: next((me[k] for k in keys if me.get(k) is not None), None)
+        return {
+            "name":         prof.get("name"),
+            "industry":     prof.get("finnhubIndustry"),
+            "exchange":     prof.get("exchange"),
+            "currency":     prof.get("currency"),
+            "market_cap":   prof.get("marketCapitalization"),   # ล้าน USD
+            "pe":           g("peTTM", "peBasicExclExtraTTM", "peAnnual"),
+            "pb":           g("pbQuarterly", "pbAnnual"),
+            "ps":           g("psTTM", "psAnnual"),
+            "eps":          g("epsTTM", "epsBasicExclExtraItemsTTM", "epsAnnual"),
+            "roe":          g("roeTTM", "roeAnnual"),
+            "roa":          g("roaTTM", "roaAnnual"),
+            "gross_margin": g("grossMarginTTM", "grossMarginAnnual"),
+            "net_margin":   g("netProfitMarginTTM", "netProfitMarginAnnual"),
+            "debt_equity":  g("totalDebt/totalEquityQuarterly", "totalDebt/totalEquityAnnual",
+                              "longTermDebt/equityQuarterly"),
+            "current_ratio":g("currentRatioQuarterly", "currentRatioAnnual"),
+            "div_yield":    g("dividendYieldIndicatedAnnual", "currentDividendYieldTTM"),
+            "rev_growth":   g("revenueGrowthTTMYoy", "revenueGrowthQuarterlyYoy"),
+            "eps_growth":   g("epsGrowthTTMYoy", "epsGrowthQuarterlyYoy"),
+            "wk52_high":    g("52WeekHigh"),
+            "wk52_low":     g("52WeekLow"),
+            "beta_fh":      g("beta"),
+        }
+    except Exception:
+        return None
+
+# ─────────────────────────────────────────────────────────────
+#  BETA / ALPHA vs BENCHMARK (เทียบดัชนีอ้างอิง เช่น S&P 500)
+# ─────────────────────────────────────────────────────────────
+def _naive_index(series):
+    idx = pd.to_datetime(series.index)
+    try:
+        if idx.tz is not None:
+            idx = idx.tz_localize(None)
+    except (TypeError, AttributeError):
+        pass
+    return pd.Series(series.values, index=idx)
+
+@st.cache_data(ttl=300, show_spinner=False)
+def beta_alpha_vs_benchmark(yf_symbol, bench="^GSPC", rf=0.05):
+    """คำนวณ Beta, Alpha (annualized %), correlation เทียบดัชนีอ้างอิง"""
+    if yf_symbol == bench:
+        return None
+    asset_df = fetch_data(yf_symbol)
+    bench_df = fetch_data(bench)
+    if asset_df is None or bench_df is None:
+        return None
+    a = _naive_index(asset_df["Close"].pct_change().dropna())
+    b = _naive_index(bench_df["Close"].pct_change().dropna())
+    df = pd.concat([a, b], axis=1, keys=["a", "b"]).dropna()
+    if len(df) < 60:
+        return None
+    cov = np.cov(df["a"].values, df["b"].values)
+    var_b = cov[1, 1]
+    if var_b <= 0:
+        return None
+    beta = cov[0, 1] / var_b
+    rf_d = rf / 252
+    alpha_d = (df["a"].mean() - rf_d) - beta * (df["b"].mean() - rf_d)
+    alpha_ann = alpha_d * 252 * 100
+    corr = float(df["a"].corr(df["b"]))
+    # ผลตอบแทนช่วงเดียวกัน (เทียบ benchmark) ปีล่าสุด
+    n1y = min(252, len(df))
+    asset_1y = float((1 + df["a"].tail(n1y)).prod() - 1) * 100
+    bench_1y = float((1 + df["b"].tail(n1y)).prod() - 1) * 100
+    return {
+        "beta": round(float(beta), 3),
+        "alpha": round(float(alpha_ann), 2),
+        "corr": round(corr, 3),
+        "r2": round(corr ** 2, 3),
+        "asset_1y": round(asset_1y, 1),
+        "bench_1y": round(bench_1y, 1),
+        "excess_1y": round(asset_1y - bench_1y, 1),
+    }
+
+# ─────────────────────────────────────────────────────────────
+#  PORTFOLIO — correlation + efficient frontier (Markowitz, numpy)
+# ─────────────────────────────────────────────────────────────
+@st.cache_data(ttl=300, show_spinner=False)
+def portfolio_returns_frame(symbols):
+    """รวมผลตอบแทนรายวันของหลายสินทรัพย์ จัดแนวตามวันที่ตรงกัน"""
+    series = {}
+    for s in symbols:
+        d = fetch_data(s)
+        if d is None or len(d) < 252:
+            continue
+        series[s] = _naive_index(d["Close"].pct_change().dropna())
+    if len(series) < 2:
+        return None
+    df = pd.DataFrame(series).dropna()
+    return df if len(df) >= 60 else None
+
+@st.cache_data(ttl=300, show_spinner=False)
+def efficient_frontier(symbols, n_port=4000, rf=0.05, seed=42):
+    """สุ่มพอร์ตหลายพันแบบ → คืนจุด risk/return + พอร์ต Max-Sharpe และ Min-Vol"""
+    rdf = portfolio_returns_frame(symbols)
+    if rdf is None:
+        return None
+    cols = list(rdf.columns)
+    mean = rdf.mean().values * 252
+    cov = rdf.cov().values * 252
+    n = len(cols)
+    rng = np.random.default_rng(seed)
+    W = rng.random((n_port, n))
+    W = W / W.sum(axis=1, keepdims=True)
+    rets = W @ mean
+    vols = np.sqrt(np.einsum("ij,jk,ik->i", W, cov, W))
+    sharpes = (rets - rf) / (vols + 1e-12)
+    i_sharpe = int(np.argmax(sharpes))
+    i_minvol = int(np.argmin(vols))
+    pack = lambda i: {
+        "ret": round(float(rets[i] * 100), 2),
+        "vol": round(float(vols[i] * 100), 2),
+        "sharpe": round(float(sharpes[i]), 3),
+        "weights": {cols[j]: round(float(W[i, j] * 100), 1) for j in range(n)},
+    }
+    # correlation matrix
+    corr = rdf.corr()
+    return {
+        "cols": cols,
+        "rets": (rets * 100).tolist(),
+        "vols": (vols * 100).tolist(),
+        "sharpes": sharpes.tolist(),
+        "max_sharpe": pack(i_sharpe),
+        "min_vol": pack(i_minvol),
+        "corr": corr.values.tolist(),
+        "n_days": len(rdf),
+    }
+
+# ─────────────────────────────────────────────────────────────
+#  STRATEGY vs BUY-AND-HOLD (เทียบกลยุทธ์กับการถือยาว สุทธิหลังค่าธรรมเนียม)
+# ─────────────────────────────────────────────────────────────
+@st.cache_data(ttl=300, show_spinner=False)
+def strategy_vs_buyhold(df, fee=0.001):
+    """กลยุทธ์ MA20>MA50 = ถือ, ไม่งั้นถือเงินสด · หักค่าธรรมเนียมทุกครั้งที่สลับสถานะ"""
+    d = df.copy()
+    d["MA20"] = d["Close"].rolling(20).mean()
+    d["MA50"] = d["Close"].rolling(50).mean()
+    d = d.dropna(subset=["MA20", "MA50", "Close"])
+    if len(d) < 60:
+        return None
+    ret = d["Close"].pct_change().fillna(0.0)
+    signal = (d["MA20"] > d["MA50"]).astype(int).shift(1).fillna(0.0)   # เข้าตลาดวันถัดไป
+    switches = signal.diff().abs().fillna(0.0)
+    strat_ret = signal * ret - switches * fee
+    strat_eq = (1 + strat_ret).cumprod()
+    bh_eq = (1 + ret).cumprod()
+
+    def _metrics(eq, r):
+        yrs = len(eq) / 252
+        cagr_v = (eq.iloc[-1] ** (1 / yrs) - 1) * 100 if yrs > 0 else 0.0
+        sh = (r.mean() / (r.std() + 1e-12)) * np.sqrt(252) if r.std() > 0 else 0.0
+        mdd = ((eq - eq.cummax()) / eq.cummax()).min() * 100
+        return round(float(cagr_v), 1), round(float(sh), 2), round(float(mdd), 1)
+
+    s_cagr, s_sh, s_mdd = _metrics(strat_eq, strat_ret)
+    b_cagr, b_sh, b_mdd = _metrics(bh_eq, ret)
+    n_trades = int(switches.sum())
+    return {
+        "index": list(d.index),
+        "strat_eq": strat_eq.tolist(), "bh_eq": bh_eq.tolist(),
+        "s_cagr": s_cagr, "s_sharpe": s_sh, "s_mdd": s_mdd,
+        "b_cagr": b_cagr, "b_sharpe": b_sh, "b_mdd": b_mdd,
+        "n_trades": n_trades,
+        "strat_final": round(float(strat_eq.iloc[-1]), 2),
+        "bh_final": round(float(bh_eq.iloc[-1]), 2),
+        "beats": bool(strat_eq.iloc[-1] > bh_eq.iloc[-1]),
+    }
+
+# ─────────────────────────────────────────────────────────────
+#  USD/THB rate (สำหรับมุมนักลงทุนไทย) — ค่าเริ่มต้นถ้าดึงไม่ได้
+# ─────────────────────────────────────────────────────────────
+@st.cache_data(ttl=900, show_spinner=False)
+def fetch_usdthb():
+    q = fetch_realtime_quote("USDTHB=X")
+    if q and q.get("c", 0) > 0:
+        return float(q["c"])
+    d = fetch_data("USDTHB=X")
+    if d is not None and len(d):
+        return float(d["Close"].iloc[-1])
+    return 36.0
+
+# ─────────────────────────────────────────────────────────────
 #  INPUT BAR
 # ─────────────────────────────────────────────────────────────
 c1, c2, c3 = st.columns([2, 1, 1])
@@ -1398,12 +1621,15 @@ with st.spinner("กำลังวิเคราะห์คณิตศาส
 # ─────────────────────────────────────────────────────────────
 #  TABS
 # ─────────────────────────────────────────────────────────────
-tab_overview, tab_chart, tab_forecast, tab_news, tab_rank, tab_income, tab_chat = st.tabs([
+(tab_overview, tab_fund, tab_chart, tab_forecast, tab_news,
+ tab_rank, tab_portfolio, tab_income, tab_chat) = st.tabs([
     "📐 ภาพรวมคณิตศาสตร์",
+    "🏛️ ปัจจัยพื้นฐาน",
     "📈 กราฟวิเคราะห์",
     "🔮 พยากรณ์อนาคต",
     "📰 ข่าว & อนาคต",
     "🏆 อันดับสินทรัพย์",
+    "🧺 พอร์ต & กระจายเสี่ยง",
     "💰 คำนวณรายได้",
     "🤖 AI ที่ปรึกษา",
 ])
@@ -1520,6 +1746,19 @@ with tab_overview:
               ">+2: Overbought | <-2: Oversold",
               "neg" if abs(m['zscore'])>2 else "pos")
 
+        # ── Beta / Alpha เทียบ S&P 500 ──
+        ba = beta_alpha_vs_benchmark(symbol, bench="^GSPC")
+        if ba:
+            mcard("BETA (เทียบ S&P 500)", f"{ba['beta']:.2f}",
+                  ">1 = ผันผวนกว่าตลาด · <1 = นิ่งกว่าตลาด",
+                  "neg" if ba['beta'] > 1.3 else "pos")
+            mcard("ALPHA (ส่วนเกินตลาด/ปี)", f"{ba['alpha']:+.1f}%",
+                  f"Correlation {ba['corr']:.2f} · R²={ba['r2']:.2f}",
+                  "pos" if ba['alpha'] > 0 else "neg")
+            mcard("ชนะ/แพ้ตลาด (1 ปี)", f"{ba['excess_1y']:+.1f}%",
+                  f"{symbol} {ba['asset_1y']:+.1f}% vs S&P {ba['bench_1y']:+.1f}%",
+                  "pos" if ba['excess_1y'] >= 0 else "neg")
+
         st.markdown('<div class="section-title" style="margin-top:16px">📅 ผลตอบแทนย้อนหลัง</div>',
                     unsafe_allow_html=True)
         for label, val in [("1 เดือน", m["ret_1m"]), ("3 เดือน", m["ret_3m"]),
@@ -1534,10 +1773,81 @@ with tab_overview:
             </div>""", unsafe_allow_html=True)
 
 # ══════════════════════════════════════════════════════════════
-#  TAB 2 — CHART
+#  TAB — FUNDAMENTALS (ปัจจัยพื้นฐาน)
 # ══════════════════════════════════════════════════════════════
-with tab_chart:
-    col_ctrl, _ = st.columns([2, 3])
+with tab_fund:
+    st.markdown('<div class="section-title">🏛️ ปัจจัยพื้นฐาน (Fundamentals)</div>',
+                unsafe_allow_html=True)
+    st.caption("ข้อมูลพื้นฐานจาก Finnhub — P/E, EPS, อัตรากำไร, ปันผล, หนี้สิน ฯลฯ "
+               "(มีเฉพาะหุ้น/ETF สหรัฐ · คริปโต/forex/ดัชนี/ทองคำ จะไม่มี)")
+
+    with st.spinner("กำลังดึงปัจจัยพื้นฐาน..."):
+        fund = fetch_fundamentals(symbol)
+
+    if not fund:
+        st.info(f"ไม่มีข้อมูลปัจจัยพื้นฐานสำหรับ {symbol} — "
+                "ลองหุ้น/ETF สหรัฐ เช่น AAPL, NVDA, MSFT (คริปโต/forex/ดัชนี/ทองคำ ไม่มีงบการเงิน)")
+    else:
+        head = f"{fund['name'] or symbol}"
+        sub = " · ".join([x for x in [fund.get("industry"), fund.get("exchange")] if x])
+        st.markdown(f"""<div class="fc-banner"><b>{head}</b>
+          <span style="color:var(--muted);font-size:12px"> &nbsp; {sub}</span></div>""",
+          unsafe_allow_html=True)
+
+        def fcard(label, value, sub="", cls=""):
+            st.markdown(f"""<div class="mcard {cls}" style="margin-bottom:10px">
+              <div class="mcard-label">{label}</div>
+              <div class="mcard-value">{value}</div>
+              {'<div class="mcard-sub">'+sub+'</div>' if sub else ''}
+            </div>""", unsafe_allow_html=True)
+
+        def fnum(v, suf="", dec=2):
+            return f"{v:,.{dec}f}{suf}" if isinstance(v, (int, float)) else "—"
+
+        fc_a, fc_b, fc_c = st.columns(3)
+        with fc_a:
+            st.markdown('<div class="section-title" style="font-size:16px">💵 มูลค่า (Valuation)</div>',
+                        unsafe_allow_html=True)
+            mc = fund.get("market_cap")
+            mc_str = f"${mc/1000:,.1f}B" if isinstance(mc, (int, float)) and mc else "—"
+            fcard("MARKET CAP", mc_str, "มูลค่าตลาดรวม")
+            pe = fund.get("pe")
+            fcard("P/E (TTM)", fnum(pe), "ราคา/กำไร · ต่ำ=ถูก สูง=คาดโตสูง",
+                  "neg" if isinstance(pe,(int,float)) and pe > 40 else "pos" if isinstance(pe,(int,float)) and 0 < pe < 20 else "")
+            fcard("P/B", fnum(fund.get("pb")), "ราคา/มูลค่าทางบัญชี")
+            fcard("P/S", fnum(fund.get("ps")), "ราคา/ยอดขาย")
+        with fc_b:
+            st.markdown('<div class="section-title" style="font-size:16px">📈 กำไร (Profitability)</div>',
+                        unsafe_allow_html=True)
+            fcard("EPS (TTM)", f"${fnum(fund.get('eps'))}" if isinstance(fund.get('eps'),(int,float)) else "—",
+                  "กำไรต่อหุ้น")
+            roe = fund.get("roe")
+            fcard("ROE", fnum(roe, "%"), "ผลตอบแทนต่อส่วนผู้ถือหุ้น",
+                  "pos" if isinstance(roe,(int,float)) and roe > 15 else "")
+            fcard("GROSS MARGIN", fnum(fund.get("gross_margin"), "%"), "อัตรากำไรขั้นต้น")
+            nm = fund.get("net_margin")
+            fcard("NET MARGIN", fnum(nm, "%"), "อัตรากำไรสุทธิ",
+                  "pos" if isinstance(nm,(int,float)) and nm > 15 else "")
+        with fc_c:
+            st.markdown('<div class="section-title" style="font-size:16px">🏦 สุขภาพ & เติบโต</div>',
+                        unsafe_allow_html=True)
+            de = fund.get("debt_equity")
+            fcard("D/E (หนี้สิน/ทุน)", fnum(de), "ต่ำ = หนี้น้อย",
+                  "neg" if isinstance(de,(int,float)) and de > 2 else "pos" if isinstance(de,(int,float)) and de < 1 else "")
+            dv = fund.get("div_yield")
+            fcard("DIVIDEND YIELD", fnum(dv, "%"), "ผลตอบแทนปันผล/ปี",
+                  "pos" if isinstance(dv,(int,float)) and dv > 2 else "")
+            rg = fund.get("rev_growth")
+            fcard("รายได้โต (YoY)", fnum(rg, "%"), "การเติบโตของยอดขาย",
+                  "pos" if isinstance(rg,(int,float)) and rg > 0 else "neg" if isinstance(rg,(int,float)) else "")
+            eg = fund.get("eps_growth")
+            fcard("กำไรโต (YoY)", fnum(eg, "%"), "การเติบโตของ EPS",
+                  "pos" if isinstance(eg,(int,float)) and eg > 0 else "neg" if isinstance(eg,(int,float)) else "")
+
+        st.info("📌 ปัจจัยพื้นฐานสะท้อน 'มูลค่ากิจการ' ส่วนแท็บอื่นวิเคราะห์ 'พฤติกรรมราคา' — "
+                "นักลงทุนระยะยาวควรดูทั้งสองด้านประกอบกัน · ข้อมูลพื้นฐานอัปเดตช้ากว่าราคา (ตามรอบงบการเงิน)")
+
+
     with col_ctrl:
         tf = st.select_slider("ช่วงเวลา (ปี)",
                                options=[1, 2, 3, 5, 10],
@@ -1698,9 +2008,50 @@ with tab_chart:
         dark_layout(fig_bt, height=280)
         st.plotly_chart(fig_bt, use_container_width=True, config={"displayModeBar": False})
 
-# ══════════════════════════════════════════════════════════════
-#  TAB 3 — FORECAST (Monte Carlo)  [NEW]
-# ══════════════════════════════════════════════════════════════
+    # ── กลยุทธ์ vs ถือยาว (Buy & Hold) สุทธิหลังค่าธรรมเนียม ──
+    st.markdown('<div class="section-title" style="margin-top:18px">⚔️ กลยุทธ์ vs ถือยาว (Buy & Hold)</div>',
+                unsafe_allow_html=True)
+    fee_bps = st.select_slider("ค่าธรรมเนียมต่อการสลับสถานะ",
+                               options=[0.0, 0.05, 0.1, 0.25, 0.5],
+                               value=0.1, format_func=lambda x: f"{x:.2f}%", key="bt_fee")
+    sb = strategy_vs_buyhold(m["df"], fee=fee_bps / 100)
+    if sb is None:
+        st.caption("ข้อมูลไม่พอสำหรับเปรียบเทียบกลยุทธ์")
+    else:
+        fig_sb = go.Figure()
+        fig_sb.add_trace(go.Scatter(x=sb["index"], y=sb["bh_eq"], mode="lines",
+            name="ถือยาว (Buy & Hold)", line=dict(color="#5b8def", width=2)))
+        fig_sb.add_trace(go.Scatter(x=sb["index"], y=sb["strat_eq"], mode="lines",
+            name="กลยุทธ์ MA20>MA50", line=dict(color="#e6c35c", width=2)))
+        dark_layout(fig_sb, height=340,
+                    title="Equity Curve — เริ่มต้นที่ 1.0 (เท่ากับลงทุนเท่ากัน)")
+        st.plotly_chart(fig_sb, use_container_width=True, config={"displayModeBar": False})
+
+        verdict_sb = ("✅ กลยุทธ์ชนะการถือยาว" if sb["beats"]
+                      else "❌ กลยุทธ์แพ้การถือยาว (ถือเฉย ๆ ดีกว่า)")
+        v_col = "#2ee6a0" if sb["beats"] else "#ff5d6c"
+        st.markdown(f"""
+        <table class="rank-table">
+          <thead><tr><th>วิธี</th><th>เงินเป็น (x เท่า)</th><th>CAGR</th><th>SHARPE</th><th>MAX DD</th></tr></thead>
+          <tbody>
+            <tr><td><b>ถือยาว (Buy &amp; Hold)</b></td>
+              <td style="font-family:'JetBrains Mono',monospace">{sb['bh_final']:.2f}x</td>
+              <td style="font-family:'JetBrains Mono',monospace">{sb['b_cagr']:+.1f}%</td>
+              <td style="font-family:'JetBrains Mono',monospace">{sb['b_sharpe']:.2f}</td>
+              <td style="font-family:'JetBrains Mono',monospace;color:#ff5d6c">{sb['b_mdd']:.1f}%</td></tr>
+            <tr><td><b>กลยุทธ์ MA Cross</b> <span style="color:var(--muted);font-size:11px">({sb['n_trades']} ครั้งเทรด)</span></td>
+              <td style="font-family:'JetBrains Mono',monospace">{sb['strat_final']:.2f}x</td>
+              <td style="font-family:'JetBrains Mono',monospace">{sb['s_cagr']:+.1f}%</td>
+              <td style="font-family:'JetBrains Mono',monospace">{sb['s_sharpe']:.2f}</td>
+              <td style="font-family:'JetBrains Mono',monospace;color:#ff5d6c">{sb['s_mdd']:.1f}%</td></tr>
+          </tbody>
+        </table>
+        <div style="margin-top:10px;font-weight:600;color:{v_col}">{verdict_sb}</div>
+        """, unsafe_allow_html=True)
+        st.info("📌 หักค่าธรรมเนียมทุกครั้งที่สลับเข้า/ออกตลาดแล้ว (ยังไม่รวม slippage/ภาษี) — "
+                "การเทียบกับ Buy & Hold เป็นมาตรฐานสำคัญ: กลยุทธ์ที่ดีต้องชนะการถือเฉย ๆ หลังหักต้นทุน")
+
+
 with tab_forecast:
     # ══════════ ส่วนที่ 1: 5 เส้นแนวโน้มที่ดีที่สุด (Advanced Models) ══════════
     st.markdown('<div class="section-title">🎯 5 เส้นแนวโน้มที่ดีที่สุด (คณิตศาสตร์ขั้นสูง)</div>',
@@ -1774,7 +2125,7 @@ with tab_forecast:
             rows_html += f"""
             <tr>
               <td><span class="rank-num">{star}</span></td>
-              <td><span style="color:{r['color']};font-weight:600">{r['name']}</span></td>
+              <td><span style="color:{r['color']};font-weight:600">{r['name']}{' †' if r.get('clipped') else ''}</span></td>
               <td style="font-family:'JetBrains Mono',monospace">{r['mape']:.2f}%</td>
               <td style="font-family:'JetBrains Mono',monospace">{fmt_p(r['end'])}</td>
               <td style="font-family:'JetBrains Mono',monospace;color:{ret_c}">{r['ret']:+.1f}%</td>
@@ -1799,7 +2150,9 @@ with tab_forecast:
         st.info(f"📌 โมเดลที่แม่นที่สุดในอดีตคือ **{adv['best_name']}** (MAPE {adv['best_mape']:.2f}%) — "
                 f"มุมมองรวม (Consensus) ชี้ว่า {symbol} มีแนวโน้ม "
                 f"**{'ขึ้น' if adv['consensus_ret']>=0 else 'ลง'}** ราว {adv['consensus_ret']:+.1f}% "
-                f"ใน {adv_horizon_label} · MAPE ต่ำ = โมเดลเคยพยากรณ์ช่วงทดสอบได้แม่น แต่ไม่รับประกันอนาคต")
+                f"ใน {adv_horizon_label} · MAPE ต่ำ = โมเดลเคยพยากรณ์ช่วงทดสอบได้แม่น แต่ไม่รับประกันอนาคต · "
+                "เส้นทุกโมเดลถูกจำกัดอยู่ในกรอบความผันผวน 3σ (กันโพลีโนเมียลเหวี่ยงหลุดจริง) — "
+                "เครื่องหมาย † = โมเดลพยายามเหวี่ยงเกินกรอบจึงถูกตัด")
 
     st.markdown("<hr style='border-color:rgba(255,255,255,0.08);margin:26px 0'>",
                 unsafe_allow_html=True)
@@ -1808,10 +2161,10 @@ with tab_forecast:
     st.markdown('<div class="section-title">🔮 พยากรณ์ความน่าจะเป็น (Monte Carlo)</div>', unsafe_allow_html=True)
     st.markdown("""
     <div class="fc-banner">
-      จำลองอนาคตด้วย <b>Monte Carlo (Geometric Brownian Motion)</b> — สุ่มเส้นทางราคาหลายร้อยเส้น
-      จากค่าเฉลี่ยผลตอบแทน (μ) และความผันผวน (σ) ในอดีต แล้วสรุปเป็น
-      <b>แถบความเชื่อมั่น</b> (5%–95%) — ใช้ดู "ช่วงความเสี่ยง" ที่ราคาอาจไปได้
-      <br><span style="color:var(--muted);font-size:12px">⚠️ เป็นการจำลองเชิงสถิติ (มีการสุ่ม) ไม่ใช่การทำนายแน่นอน — ต่างจาก 5 เส้นด้านบนที่เป็น deterministic</span>
+      จำลองอนาคตด้วย <b>Monte Carlo (GBM + หางอ้วน Student-t)</b> — สุ่มเส้นทางราคาหลายร้อยเส้น
+      จากค่าเฉลี่ยผลตอบแทน (μ) และความผันผวน (σ) ในอดีต โดยใช้การแจกแจงแบบ <b>หางอ้วน</b>
+      ที่ปรับองศาอิสระ (ν) จาก kurtosis จริง — จึงจำลอง <b>วันที่ตลาดร่วงแรง/วิกฤต</b> ได้สมจริงกว่าการสุ่มแบบ normal
+      <br><span style="color:var(--muted);font-size:12px">⚠️ เป็นการจำลองเชิงสถิติ (มีการสุ่ม) ไม่ใช่การทำนายแน่นอน — ต่างจาก 5 เส้นด้านบนที่เป็น deterministic · ν ยิ่งต่ำ = หางยิ่งอ้วน (เสี่ยงสุดขั้วมากขึ้น)</span>
     </div>
     """, unsafe_allow_html=True)
 
@@ -1925,13 +2278,16 @@ with tab_forecast:
             st.markdown(f"""<div class="mcard">
               <div class="mcard-label">ช่วงราคา 90% CI</div>
               <div class="mcard-value" style="font-size:15px">{fmt_p(fc['final_p5'])} – {fmt_p(fc['final_p95'])}</div>
-              <div class="mcard-sub">μ={fc['mu']*100:.3f}% σ={fc['sigma']*100:.2f}%/วัน</div></div>""",
+              <div class="mcard-sub">μ={fc['mu']*100:.3f}% σ={fc['sigma']*100:.2f}%/วัน · ν={fc['nu']}</div></div>""",
               unsafe_allow_html=True)
 
+        _tail_note = (f"หางอ้วนชัด (ν={fc['nu']}, excess kurtosis {fc['exkurt']}) — โมเดลเผื่อโอกาสร่วงแรงไว้แล้ว"
+                      if fc['nu'] < 10 else
+                      f"หางค่อนข้างปกติ (ν={fc['nu']})")
         st.info(f"📌 ตีความ: จากการจำลอง {n_sims} เส้นทาง ราคา {symbol} มีแนวโน้ม "
                 f"**{'เพิ่มขึ้น' if fc['exp_return']>=0 else 'ลดลง'}** เฉลี่ย {fc['exp_return']:+.1f}% "
                 f"ใน {horizon_label} โดยมีโอกาส {fc['prob_up']:.0f}% ที่จะจบสูงกว่าราคาปัจจุบัน — "
-                "ยิ่งช่วงเวลายาว แถบความไม่แน่นอนยิ่งกว้าง (ความเสี่ยงสูงขึ้น)")
+                f"ยิ่งช่วงเวลายาว แถบความไม่แน่นอนยิ่งกว้าง · {_tail_note}")
 
 # ══════════════════════════════════════════════════════════════
 #  TAB · NEWS — ข่าว + วิเคราะห์เชื่อมโยงอนาคตด้วย AI
@@ -2167,8 +2523,100 @@ with tab_rank:
                     "ติ๊กกล่อง «รวมปัจจัยข่าว» ด้านบนเพื่อให้ข่าวมีผลต่อคะแนน")
 
 # ══════════════════════════════════════════════════════════════
-#  TAB 5 — INCOME CALCULATOR
+#  TAB — PORTFOLIO (กระจายความเสี่ยง: correlation + efficient frontier)
 # ══════════════════════════════════════════════════════════════
+with tab_portfolio:
+    st.markdown('<div class="section-title">🧺 พอร์ต & การกระจายความเสี่ยง</div>',
+                unsafe_allow_html=True)
+    st.caption("วิเคราะห์ระดับพอร์ต (ไม่ใช่รายตัว) — ความสัมพันธ์ระหว่างสินทรัพย์ (Correlation) "
+               "และการจัดสรรน้ำหนักที่เหมาะสมที่สุดด้วยทฤษฎี Markowitz (Efficient Frontier)")
+
+    pf_group = st.selectbox("เลือกหมวดสินทรัพย์สำหรับสร้างพอร์ต", list(ASSET_GROUPS.keys()),
+                            index=0, key="pf_group")
+    pf_syms = list(ASSET_GROUPS[pf_group].keys())
+
+    with st.spinner(f"กำลังจัดแนวข้อมูลและคำนวณพอร์ตจาก {len(pf_syms)} สินทรัพย์..."):
+        ef = efficient_frontier(pf_syms)
+
+    if ef is None:
+        st.warning("ข้อมูลไม่พอสำหรับวิเคราะห์พอร์ต (ต้องมีอย่างน้อย 2 สินทรัพย์ที่มีข้อมูลพอ)")
+    else:
+        cols = ef["cols"]
+
+        # ── Correlation heatmap ──
+        st.markdown('<div class="section-title" style="font-size:17px">🔗 Correlation Matrix</div>',
+                    unsafe_allow_html=True)
+        st.caption("ค่าใกล้ +1 = เคลื่อนไหวไปทางเดียวกัน (กระจายเสี่ยงได้น้อย) · "
+                   "ใกล้ 0 หรือติดลบ = ช่วยกระจายเสี่ยงได้ดี")
+        fig_corr = go.Figure(data=go.Heatmap(
+            z=ef["corr"], x=cols, y=cols, zmin=-1, zmax=1,
+            colorscale=[[0, "#2ee6a0"], [0.5, "#15203a"], [1, "#ff5d6c"]],
+            text=[[f"{v:.2f}" for v in row] for row in ef["corr"]],
+            texttemplate="%{text}", textfont=dict(size=10, family="JetBrains Mono"),
+            colorbar=dict(title="corr")))
+        fig_corr.update_layout(height=380, margin=dict(l=10, r=10, t=10, b=10),
+            plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
+            font=dict(family="JetBrains Mono", color="#c3cbd9", size=10))
+        st.plotly_chart(fig_corr, use_container_width=True, config={"displayModeBar": False})
+
+        # ── Efficient Frontier ──
+        st.markdown('<div class="section-title" style="font-size:17px;margin-top:14px">🎯 Efficient Frontier</div>',
+                    unsafe_allow_html=True)
+        st.caption(f"สุ่มพอร์ต {len(ef['rets']):,} แบบ (ปรับน้ำหนักสุ่ม) · จุดยิ่งสูง-ซ้าย = "
+                   "ผลตอบแทนสูง ความเสี่ยงต่ำ (ดี) · ใช้ข้อมูล {} วันทำการ".format(ef["n_days"]))
+        ms, mv = ef["max_sharpe"], ef["min_vol"]
+        fig_ef = go.Figure()
+        fig_ef.add_trace(go.Scatter(
+            x=ef["vols"], y=ef["rets"], mode="markers",
+            marker=dict(size=4, color=ef["sharpes"], colorscale="Viridis",
+                        showscale=True, colorbar=dict(title="Sharpe"), opacity=0.55),
+            name="พอร์ตสุ่ม", hovertemplate="ความเสี่ยง %{x:.1f}%<br>ผลตอบแทน %{y:.1f}%<extra></extra>"))
+        fig_ef.add_trace(go.Scatter(
+            x=[ms["vol"]], y=[ms["ret"]], mode="markers",
+            marker=dict(size=16, color="#e6c35c", symbol="star", line=dict(color="#fff", width=1)),
+            name="⭐ Max Sharpe"))
+        fig_ef.add_trace(go.Scatter(
+            x=[mv["vol"]], y=[mv["ret"]], mode="markers",
+            marker=dict(size=14, color="#2ee6a0", symbol="diamond", line=dict(color="#fff", width=1)),
+            name="🛡️ Min Volatility"))
+        dark_layout(fig_ef, height=440, title="ความเสี่ยง (แกน X) vs ผลตอบแทนคาดหวัง (แกน Y) ต่อปี")
+        fig_ef.update_layout(xaxis_title="ความผันผวน/ปี (%)", yaxis_title="ผลตอบแทนคาดหวัง/ปี (%)")
+        st.plotly_chart(fig_ef, use_container_width=True, config={"displayModeBar": False})
+
+        # ── น้ำหนักพอร์ตแนะนำ ──
+        def weights_rows(weights):
+            items = sorted(weights.items(), key=lambda kv: kv[1], reverse=True)
+            return "".join(
+                f'<tr><td class="rank-ticker">{s}</td>'
+                f'<td style="font-family:\'JetBrains Mono\',monospace">{w:.1f}%</td>'
+                f'<td><div class="pb-bg"><div class="pb-fill" style="width:{min(w,100):.0f}%;'
+                f'background:#e6c35c;color:#e6c35c"></div></div></td></tr>'
+                for s, w in items if w >= 0.1)
+
+        pcol1, pcol2 = st.columns(2)
+        with pcol1:
+            st.markdown('<div class="section-title" style="font-size:15px">⭐ พอร์ต Max Sharpe</div>',
+                        unsafe_allow_html=True)
+            st.markdown(f'<div style="font-size:12px;color:var(--muted);margin-bottom:6px">'
+                        f'ผลตอบแทน {ms["ret"]:+.1f}%/ปี · ความเสี่ยง {ms["vol"]:.1f}% · Sharpe {ms["sharpe"]:.2f}</div>',
+                        unsafe_allow_html=True)
+            st.markdown(f'<table class="rank-table"><tbody>{weights_rows(ms["weights"])}</tbody></table>',
+                        unsafe_allow_html=True)
+        with pcol2:
+            st.markdown('<div class="section-title" style="font-size:15px">🛡️ พอร์ต Min Volatility</div>',
+                        unsafe_allow_html=True)
+            st.markdown(f'<div style="font-size:12px;color:var(--muted);margin-bottom:6px">'
+                        f'ผลตอบแทน {mv["ret"]:+.1f}%/ปี · ความเสี่ยง {mv["vol"]:.1f}% · Sharpe {mv["sharpe"]:.2f}</div>',
+                        unsafe_allow_html=True)
+            st.markdown(f'<table class="rank-table"><tbody>{weights_rows(mv["weights"])}</tbody></table>',
+                        unsafe_allow_html=True)
+
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.info("📌 Max Sharpe = พอร์ตที่ให้ผลตอบแทนต่อความเสี่ยงดีที่สุด · Min Volatility = พอร์ตที่นิ่งที่สุด · "
+                "คำนวณจากผลตอบแทน/ความผันผวน/ความสัมพันธ์ย้อนหลัง — เป็นจุดเริ่มต้นการจัดพอร์ต ไม่ใช่สูตรสำเร็จ "
+                "(อดีตไม่การันตีอนาคต และไม่รวมค่าธรรมเนียม/ภาษี)")
+
+
 with tab_income:
     st.markdown('<div class="section-title">💰 เครื่องคำนวณรายได้การลงทุน</div>', unsafe_allow_html=True)
 
@@ -2183,9 +2631,21 @@ with tab_income:
         years_inv   = st.slider("ระยะเวลาลงทุน (ปี)", 1, 30, 10)
         use_cagr    = st.checkbox(f"ใช้ CAGR จริงของ {symbol} ({m['cagr']:.1f}%/ปี)", value=True)
         rate_input  = m["cagr"] if use_cagr else st.slider(
-            "อัตราผลตอบแทนต่อปี (%)", -20.0, 50.0, 10.0, step=0.5)
+            "อัตราผลตอบแทนต่อปี (%) — จากราคา", -20.0, 50.0, 10.0, step=0.5)
 
-        rate_annual  = rate_input / 100
+        # ── ปัจจัยจริงสำหรับนักลงทุน: ปันผล / ภาษี / ค่าธรรมเนียม ──
+        with st.expander("⚙️ ปัจจัยจริง: ปันผล · ภาษี · ค่าธรรมเนียม (กดเพื่อปรับ)", expanded=False):
+            _f = fetch_fundamentals(symbol)
+            _dv_default = float(_f["div_yield"]) if _f and isinstance(_f.get("div_yield"), (int, float)) else 0.0
+            div_yield_pct  = st.number_input("เงินปันผล/ปี (%)", min_value=0.0, max_value=20.0,
+                                             value=round(min(_dv_default, 20.0), 2), step=0.1)
+            wht_pct        = st.slider("ภาษีหัก ณ ที่จ่ายปันผล (%) — หุ้น US สำหรับคนไทย", 0, 30, 15)
+            fee_annual_pct = st.slider("ค่าธรรมเนียม/ค่าบริหารต่อปี (%)", 0.0, 3.0, 0.5, step=0.1)
+
+        div_net        = div_yield_pct * (1 - wht_pct / 100)        # ปันผลสุทธิหลังภาษี
+        net_rate_input = rate_input + div_net - fee_annual_pct      # อัตราสุทธิต่อปี (%)
+
+        rate_annual  = net_rate_input / 100
         rate_monthly = (1 + rate_annual) ** (1/12) - 1
 
         total = capital
@@ -2201,11 +2661,12 @@ with tab_income:
         total_gain     = final_val - total_contrib
         total_return_pct = (final_val / total_contrib - 1) * 100 if total_contrib else 0
         ann_income     = final_val * (rate_annual if rate_annual > 0 else 0.05)
+        usdthb         = fetch_usdthb()
 
         scenarios = {}
-        for label, r in [("แย่ (CAGR-5%)", rate_input-5),
-                         ("ฐาน (CAGR)", rate_input),
-                         ("ดี (CAGR+5%)", rate_input+5)]:
+        for label, r in [("แย่ (สุทธิ −5%)", net_rate_input-5),
+                         ("ฐาน (สุทธิ)", net_rate_input),
+                         ("ดี (สุทธิ +5%)", net_rate_input+5)]:
             rm = (1 + r/100) ** (1/12) - 1
             v  = capital
             for _ in range(years_inv * 12):
@@ -2217,11 +2678,19 @@ with tab_income:
           <div style="font-size:11px;letter-spacing:2px;text-transform:uppercase;
                       color:#9aa6b8;margin-bottom:10px">ผลการคำนวณ · {years_inv} ปี</div>
           <div class="calc-row"><span>มูลค่าสุดท้าย</span><span>${final_val:,.0f}</span></div>
+          <div class="calc-row"><span>≈ คิดเป็นเงินบาท</span><span>฿{final_val*usdthb:,.0f}</span></div>
           <div class="calc-row"><span>เงินลงทุนรวม</span><span>${total_contrib:,.0f}</span></div>
           <div class="calc-row"><span>กำไรสะสม</span><span>${total_gain:,.0f}</span></div>
           <div class="calc-row"><span>ผลตอบแทนรวม</span><span>{total_return_pct:+.1f}%</span></div>
           <div class="calc-row"><span>รายได้ต่อปี</span><span>${ann_income:,.0f}</span></div>
           <div class="calc-row"><span>รายได้ต่อเดือน</span><span>${ann_income/12:,.0f}</span></div>
+          <div style="margin-top:10px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.12)">
+            <div style="font-size:10px;color:#9aa6b8;margin-bottom:4px">อัตราผลตอบแทนสุทธิที่ใช้คำนวณ</div>
+            <div class="calc-row"><span>ราคา</span><span>{rate_input:+.1f}%</span></div>
+            <div class="calc-row"><span>+ ปันผลสุทธิ (หักภาษี {wht_pct}%)</span><span>{div_net:+.2f}%</span></div>
+            <div class="calc-row"><span>− ค่าธรรมเนียม</span><span>−{fee_annual_pct:.1f}%</span></div>
+            <div class="calc-row"><span><b>= สุทธิต่อปี</b></span><span><b>{net_rate_input:+.1f}%</b></span></div>
+          </div>
           <div style="margin-top:12px;padding-top:10px;border-top:1px solid rgba(255,255,255,0.12)">
             <div style="font-size:10px;color:#9aa6b8;margin-bottom:6px">SCENARIOS ({years_inv} ปี)</div>
         """, unsafe_allow_html=True)
@@ -2281,6 +2750,11 @@ with tab_income:
             <span>{kelly:.1f}% ของพอร์ต</span></div>
         </div>
         """, unsafe_allow_html=True)
+
+    st.info(f"📌 มุมนักลงทุนไทย: ตัวเลขเป็น USD (≈ {usdthb:.2f} บาท/ดอลลาร์ ณ ปัจจุบัน) — "
+            "การลงทุนหุ้น US มีความเสี่ยงค่าเงิน USD/THB เพิ่มอีกชั้น (บาทแข็ง = ผลตอบแทนจริงลดลง) · "
+            "ภาษีหัก ณ ที่จ่ายปันผลตั้งค่าเริ่มต้น 15% ตามอนุสัญญาภาษีซ้อนไทย-สหรัฐ (ปรับได้) · "
+            "ยังไม่รวมภาษี capital gains และค่าธรรมเนียมแปลงเงิน")
 
 # ══════════════════════════════════════════════════════════════
 #  TAB 6 — AI CHAT  (Claude) — เพื่อนคุย + ที่ปรึกษา
