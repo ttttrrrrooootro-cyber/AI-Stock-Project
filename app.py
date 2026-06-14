@@ -1,11 +1,10 @@
 """
-DGV Investment Analyzer — Mathematical Deep Analysis (Enhanced Edition)
+DGV Investment Analyzer — Mathematical Deep Analysis (Clean Edition)
 วิเคราะห์การลงทุนด้วยคณิตศาสตร์ย้อนหลัง 10 ปี
 ราคา Real-time จาก Finnhub | ข้อมูลย้อนหลังจาก yfinance + Stooq | AI โดย Claude (Anthropic)
 
-✨ Enhanced: อนิเมชั่นลื่นไหล · UI สวยขึ้น · ระบบเสถียรขึ้น ·
-   กราฟ Real-time จริง (intraday) · 5 เส้นแนวโน้มที่ดีที่สุด (Advanced Models) ·
-   กองทุน/ETF/คริปโตเพิ่มเติม · ข่าว + วิเคราะห์อนาคตด้วย AI · AI ที่ปรึกษาเป็นกันเอง
+✨ Clean Edition: เมนูย้ายมาด้านซ้าย (sidebar) · โหมดมือใหม่ที่ซ่อนของขั้นสูง ·
+   ดีไซน์เท่ขึ้น เรียบขึ้น · อนิเมชั่นเท่าที่จำเป็น · ฟังก์ชันคณิตศาสตร์ครบเหมือนเดิม
 """
 
 import time
@@ -20,17 +19,17 @@ import finnhub
 import anthropic
 
 # ─────────────────────────────────────────────────────────────
-#  PAGE CONFIG
+#  PAGE CONFIG  —  เปิด sidebar ค้างไว้ (เมนูอยู่ซ้าย)
 # ─────────────────────────────────────────────────────────────
 st.set_page_config(
     page_title="DGV · Investment Analyzer",
     page_icon="📊",
     layout="wide",
-    initial_sidebar_state="collapsed",
+    initial_sidebar_state="expanded",
 )
 
 # ─────────────────────────────────────────────────────────────
-#  GLOBAL CSS  —  Dark "Terminal" theme + Rich Animations
+#  GLOBAL CSS  —  Dark "Terminal" theme (calmer + left nav)
 # ─────────────────────────────────────────────────────────────
 st.markdown("""
 <style>
@@ -55,117 +54,113 @@ st.markdown("""
   --purple:    #a877e6;
 }
 
-/* ═══════════════ KEYFRAMES (Animations) ═══════════════ */
+/* ═══════════════ KEYFRAMES (เหลือเท่าที่จำเป็น) ═══════════════ */
 @keyframes fadeInUp {
-  from { opacity:0; transform: translateY(18px); }
+  from { opacity:0; transform: translateY(14px); }
   to   { opacity:1; transform: translateY(0); }
 }
-@keyframes fadeIn {
-  from { opacity:0; } to { opacity:1; }
-}
+@keyframes fadeIn { from { opacity:0; } to { opacity:1; } }
 @keyframes slideInLeft {
-  from { opacity:0; transform: translateX(-16px); }
+  from { opacity:0; transform: translateX(-14px); }
   to   { opacity:1; transform: translateX(0); }
 }
 @keyframes scaleIn {
-  from { opacity:0; transform: scale(.92); }
+  from { opacity:0; transform: scale(.94); }
   to   { opacity:1; transform: scale(1); }
 }
 @keyframes pulse {
   0%,100% { opacity:1; transform: scale(1); }
   50%     { opacity:.35; transform: scale(.7); }
 }
-@keyframes glowPulse {
-  0%,100% { box-shadow: 0 0 14px var(--glow-gold); }
-  50%     { box-shadow: 0 0 28px rgba(230,195,92,.45); }
-}
-@keyframes shimmer {
-  0%   { background-position: -200% 0; }
-  100% { background-position:  200% 0; }
-}
-@keyframes float {
-  0%,100% { transform: translateY(0); }
-  50%     { transform: translateY(-6px); }
-}
-@keyframes bgShift {
-  0%   { background-position: 0% 50%, 100% 50%, 0 0; }
-  50%  { background-position: 40% 60%, 60% 40%, 0 0; }
-  100% { background-position: 0% 50%, 100% 50%, 0 0; }
-}
 @keyframes ringSweep {
   from { stroke-dashoffset: var(--dash-full); }
   to   { stroke-dashoffset: var(--dash-target); }
 }
-@keyframes gradientText {
-  0%,100% { background-position: 0% 50%; }
-  50%     { background-position: 100% 50%; }
-}
-@keyframes blink {
-  0%,100% { opacity:1; } 50% { opacity:.2; }
-}
+@keyframes blink { 0%,100% { opacity:1; } 50% { opacity:.2; } }
 
-/* App background — animated radial glow */
+/* App background — radial glow แบบนิ่ง (ไม่เลื่อนไปมา) */
 html, body, [class*="css"], .stApp {
   font-family: 'Space Grotesk','DM Sans', sans-serif !important;
   color: var(--ink) !important;
 }
 .stApp {
   background:
-    radial-gradient(1100px 520px at 18% -8%, rgba(230,195,92,0.08), transparent 60%),
-    radial-gradient(900px 520px at 95% 8%, rgba(52,227,196,0.06), transparent 55%),
+    radial-gradient(1100px 520px at 18% -8%, rgba(230,195,92,0.07), transparent 60%),
+    radial-gradient(900px 520px at 95% 8%, rgba(52,227,196,0.05), transparent 55%),
     var(--bg) !important;
-  background-size: 200% 200%, 200% 200%, 100% 100% !important;
-  animation: bgShift 22s ease-in-out infinite;
 }
-.block-container { padding-top: 1rem; animation: fadeIn .6s ease both; }
+.block-container { padding-top: 1.2rem; animation: fadeIn .5s ease both; }
 
-/* Headings + numbers */
 .dm-serif { font-family:'DM Serif Display',serif; }
 .mono { font-family:'JetBrains Mono',monospace; }
 
-/* ── Masthead ───────────────────────────────────────── */
-.dgv-masthead {
-  position: relative;
-  background: linear-gradient(135deg, #0c1120 0%, #131b2e 60%, #0c1120 100%);
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  padding: 22px 30px 20px;
-  margin: -8px 0 26px;
-  display: flex;
-  align-items: center;
-  gap: 18px;
-  overflow: hidden;
-  box-shadow: 0 8px 40px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.04);
-  animation: fadeInUp .7s cubic-bezier(.21,.6,.35,1) both;
+/* ── Sidebar (เมนูซ้าย) ────────────────────────────── */
+section[data-testid="stSidebar"] {
+  background: linear-gradient(180deg, #0a0e18 0%, #0b0f1a 100%) !important;
+  border-right: 1px solid var(--border) !important;
 }
-.dgv-masthead::before {
-  content:''; position:absolute; inset:0;
-  background: linear-gradient(110deg, transparent 30%, rgba(255,255,255,0.05) 50%, transparent 70%);
-  background-size: 200% 100%;
-  animation: shimmer 6s linear infinite;
-  pointer-events:none;
-}
-.dgv-masthead::after {
-  content:''; position:absolute; left:0; right:0; bottom:0; height:2px;
-  background: linear-gradient(90deg, transparent, var(--gold), var(--cyan), transparent);
-  background-size: 200% 100%;
-  animation: shimmer 4s linear infinite;
-  opacity:.85;
-}
-.dgv-wordmark {
-  font-family:'DM Serif Display',serif;
-  font-size: 40px; line-height:1; letter-spacing:-2px;
-  background: linear-gradient(120deg, var(--gold) 0%, #fff4cf 45%, var(--gold-dim) 90%);
-  background-size: 200% auto;
+section[data-testid="stSidebar"] > div { padding-top: 14px; }
+.side-brand { padding: 2px 6px 12px; }
+.side-mark {
+  font-family:'DM Serif Display',serif; font-size: 30px; line-height:1; letter-spacing:-1.5px;
+  background: linear-gradient(120deg, var(--gold), #fff4cf 50%, var(--gold-dim));
   -webkit-background-clip:text; background-clip:text; color:transparent;
-  filter: drop-shadow(0 2px 14px var(--glow-gold));
-  animation: gradientText 5s ease infinite, float 6s ease-in-out infinite;
+  filter: drop-shadow(0 1px 10px var(--glow-gold));
 }
-.dgv-tagline {
-  font-family:'JetBrains Mono',monospace;
-  font-size: 11px; color: var(--gold); letter-spacing: 4px; text-transform: uppercase;
+.side-brand-sub {
+  font-family:'JetBrains Mono',monospace; font-size:9.5px; letter-spacing:3px;
+  text-transform:uppercase; color: var(--muted); margin-top:3px;
 }
-.dgv-sub { font-size: 12px; color: var(--muted); margin-top: 4px; }
+.side-divider { height:1px; background: var(--border); margin: 12px 0; }
+.side-cap { font-size:11px; color: var(--muted); line-height:1.6; }
+
+/* radio → vertical nav (ซ่อนวงกลม + ทำเป็นเมนู) */
+section[data-testid="stSidebar"] [role="radiogroup"] { gap: 3px; }
+section[data-testid="stSidebar"] [role="radiogroup"] > label {
+  padding: 9px 13px !important; border-radius: 10px; cursor: pointer;
+  font-family:'Space Grotesk',sans-serif; font-size: 14px !important; font-weight:500;
+  color: var(--muted) !important; transition: background .15s ease, color .15s ease;
+  border: 1px solid transparent;
+}
+section[data-testid="stSidebar"] [role="radiogroup"] > label:hover {
+  background: rgba(255,255,255,0.04); color: var(--ink) !important;
+}
+section[data-testid="stSidebar"] [role="radiogroup"] > label > div:first-child { display:none !important; }
+section[data-testid="stSidebar"] [role="radiogroup"] > label:has(input:checked) {
+  background: linear-gradient(100deg, rgba(230,195,92,0.16), rgba(230,195,92,0.04));
+  color: var(--gold) !important; border-color: rgba(230,195,92,0.22);
+  box-shadow: inset 2px 0 0 var(--gold);
+}
+
+/* ── Compact top header (แทน masthead เดิม) ─────────── */
+.top-head {
+  display:flex; align-items:center; gap: 22px; flex-wrap:wrap;
+  background: linear-gradient(135deg, rgba(255,255,255,0.035), rgba(255,255,255,0.01));
+  border: 1px solid var(--border); border-radius: 14px;
+  padding: 14px 20px; margin: -4px 0 18px;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.3);
+  animation: fadeInUp .5s ease both;
+}
+.th-left { display:flex; align-items:baseline; gap:10px; }
+.th-sym { font-family:'JetBrains Mono',monospace; font-weight:700; font-size:22px; color:#fff; letter-spacing:.5px; }
+.th-name { font-size:13px; color: var(--muted); }
+.th-price { display:flex; align-items:baseline; gap:12px; }
+.th-px { font-family:'JetBrains Mono',monospace; font-weight:600; font-size:22px; color: var(--gold); }
+.th-chg { font-family:'JetBrains Mono',monospace; font-size:13px; font-weight:600; }
+.th-chg.pos { color: var(--green); } .th-chg.neg { color: var(--red); }
+.th-meta { margin-left:auto; text-align:right; }
+.th-page { font-family:'DM Serif Display',serif; font-size:16px; color: var(--ink); }
+.th-src { font-size:10px; color: var(--muted); font-family:'JetBrains Mono',monospace; letter-spacing:.5px; }
+
+/* ── Beginner hint ─────────────────────────────────── */
+.beginner-hint {
+  background: linear-gradient(135deg, rgba(46,230,160,0.08), rgba(52,227,196,0.04));
+  border: 1px solid rgba(46,230,160,0.2); border-left: 3px solid var(--green);
+  border-radius: 10px; padding: 11px 15px; margin-bottom: 16px;
+  font-size: 13px; color: var(--ink); line-height:1.6;
+  animation: fadeInUp .5s ease both;
+}
+.beginner-hint b { color: var(--green); }
 
 /* ── Real-time badge / dot ──────────────────────────── */
 .rt-badge {
@@ -187,9 +182,9 @@ html, body, [class*="css"], .stApp {
   border-radius: 14px; padding: 16px 20px; margin-bottom: 18px;
   display: grid; grid-template-columns: repeat(auto-fit, minmax(112px,1fr)); gap: 14px;
   box-shadow: 0 6px 30px rgba(0,0,0,0.35);
-  animation: fadeInUp .6s ease both;
+  animation: fadeInUp .5s ease both;
 }
-.rt-item { animation: scaleIn .5s ease both; }
+.rt-item { animation: scaleIn .4s ease both; }
 .rt-item-label { font-size:10px; letter-spacing:1.5px; text-transform:uppercase;
   color: var(--muted); margin-bottom:4px; font-family:'JetBrains Mono',monospace; }
 .rt-item-val { font-family:'JetBrains Mono',monospace; font-size:17px; font-weight:600; color:#fff;
@@ -202,7 +197,7 @@ html, body, [class*="css"], .stApp {
 .section-title {
   font-family:'DM Serif Display',serif; font-size: 21px; color: var(--ink);
   margin-bottom: 14px; display:flex; align-items:center; gap:10px;
-  animation: slideInLeft .5s ease both;
+  animation: slideInLeft .4s ease both;
 }
 .section-title::before {
   content:''; width:4px; height:20px; border-radius:3px;
@@ -216,16 +211,12 @@ html, body, [class*="css"], .stApp {
   border: 1px solid var(--border); border-radius: 12px;
   padding: 13px 15px; position: relative; overflow:hidden;
   transition: transform .2s cubic-bezier(.2,.8,.2,1), box-shadow .2s ease, border-color .2s ease;
-  animation: fadeInUp .5s ease both;
+  animation: fadeInUp .45s ease both;
 }
 .mcard:hover { transform: translateY(-3px) scale(1.012);
   box-shadow:0 12px 30px rgba(0,0,0,.45); border-color: var(--border-hi); }
 .mcard::before { content:''; position:absolute; top:0; left:0; bottom:0; width:3px;
   background: var(--gold); box-shadow: 0 0 14px var(--glow-gold); }
-.mcard::after { content:''; position:absolute; inset:0;
-  background: linear-gradient(110deg, transparent 40%, rgba(255,255,255,0.04) 50%, transparent 60%);
-  background-size: 220% 100%; opacity:0; transition: opacity .3s ease; }
-.mcard:hover::after { opacity:1; animation: shimmer 1.2s linear; }
 .mcard-label { font-size:10px; letter-spacing:1.5px; text-transform:uppercase;
   color: var(--muted); margin-bottom:5px; }
 .mcard-value { font-family:'JetBrains Mono',monospace; font-size:21px; font-weight:600; color: var(--ink); }
@@ -244,20 +235,18 @@ html, body, [class*="css"], .stApp {
   border: 1px solid var(--border); border-radius: 16px;
   padding: 20px 26px; margin-bottom: 18px; position:relative; overflow:hidden;
   box-shadow: inset 0 1px 0 rgba(255,255,255,.05);
-  animation: scaleIn .6s cubic-bezier(.2,.8,.2,1) both;
+  animation: scaleIn .5s cubic-bezier(.2,.8,.2,1) both;
 }
 .score-ring::after { content:''; position:absolute; right:-40px; top:-40px;
   width:180px; height:180px; border-radius:50%;
-  background: radial-gradient(var(--glow-gold), transparent 70%);
-  animation: glowPulse 4s ease-in-out infinite; }
+  background: radial-gradient(var(--glow-gold), transparent 70%); }
 
-/* circular gauge svg */
 .gauge-wrap { position:relative; width:120px; height:120px; flex-shrink:0; }
 .gauge-svg { transform: rotate(-90deg); }
 .gauge-track { fill:none; stroke: rgba(255,255,255,0.07); stroke-width:11; }
 .gauge-prog  { fill:none; stroke-width:11; stroke-linecap:round;
   stroke-dasharray: var(--circ);
-  animation: ringSweep 1.4s cubic-bezier(.2,.8,.2,1) forwards;
+  animation: ringSweep 1.3s cubic-bezier(.2,.8,.2,1) forwards;
   filter: drop-shadow(0 0 8px currentColor); }
 .gauge-center { position:absolute; inset:0; display:flex; flex-direction:column;
   align-items:center; justify-content:center; }
@@ -268,13 +257,12 @@ html, body, [class*="css"], .stApp {
 .gauge-max { font-size:10px; color:#7d8799; margin-top:-2px; }
 
 .score-label { font-size:11px; color: var(--muted); letter-spacing:2px; text-transform:uppercase; }
-.score-verdict { font-size:22px; font-weight:700; color:#fff; margin-top:4px;
-  animation: fadeInUp .8s ease both; }
+.score-verdict { font-size:22px; font-weight:700; color:#fff; margin-top:4px; }
 
 /* ── Signal rows ────────────────────────────────────── */
 .sig-row { display:flex; align-items:center; gap:11px; padding:8px 0;
   border-bottom:1px solid var(--border); font-size:13px;
-  animation: slideInLeft .45s ease both; transition: background .2s ease; }
+  animation: slideInLeft .4s ease both; transition: background .2s ease; }
 .sig-row:hover { background: rgba(255,255,255,0.02); }
 .sig-icon { font-size:16px; width:22px; text-align:center; }
 .sig-text { flex:1; color: var(--ink); }
@@ -290,7 +278,7 @@ html, body, [class*="css"], .stApp {
 .chat-wrap::-webkit-scrollbar { width:7px; }
 .chat-wrap::-webkit-scrollbar-thumb { background: rgba(230,195,92,0.25); border-radius:6px; }
 .msg-row { display:flex; gap:8px; margin-bottom:12px; align-items:flex-start;
-  animation: fadeInUp .4s ease both; }
+  animation: fadeInUp .35s ease both; }
 .msg-row.u { flex-direction: row-reverse; }
 .av { width:30px; height:30px; border-radius:9px; display:flex; align-items:center;
   justify-content:center; font-size:11px; font-weight:700; flex-shrink:0; margin-top:2px; }
@@ -312,7 +300,7 @@ html, body, [class*="css"], .stApp {
 /* ── Calc result ────────────────────────────────────── */
 .calc-result { background: linear-gradient(135deg,#0d1322,#15203a);
   border:1px solid var(--border); color:#fff; border-radius:14px; padding:16px 20px;
-  animation: fadeInUp .5s ease both; }
+  animation: fadeInUp .45s ease both; }
 .calc-row { display:flex; justify-content:space-between; padding:6px 0;
   border-bottom:1px solid var(--border); font-size:13px; }
 .calc-row:last-child { border-bottom:none; }
@@ -321,14 +309,12 @@ html, body, [class*="css"], .stApp {
 /* ── Progress bar ───────────────────────────────────── */
 .pb-bg { background: rgba(255,255,255,0.07); border-radius:6px; height:10px; width:100%; overflow:hidden; }
 .pb-fill { height:10px; border-radius:6px; transition: width 1s cubic-bezier(.2,.8,.2,1);
-  box-shadow:0 0 12px currentColor;
-  background-image: linear-gradient(90deg, transparent, rgba(255,255,255,0.25), transparent);
-  background-size: 200% 100%; animation: shimmer 2.4s linear infinite; }
+  box-shadow:0 0 12px currentColor; }
 
 /* ── Rank table ─────────────────────────────────────── */
 .rank-table { width:100%; border-collapse: collapse; font-size:13px;
   background: rgba(255,255,255,0.02); border-radius:12px; overflow:hidden;
-  animation: fadeInUp .6s ease both; }
+  animation: fadeInUp .5s ease both; }
 .rank-table th { background: rgba(255,255,255,0.04); color: var(--gold); padding:11px 12px;
   text-align:left; font-family:'JetBrains Mono',monospace; font-weight:600;
   font-size:11px; letter-spacing:1px; border-bottom:1px solid var(--border); }
@@ -341,7 +327,7 @@ html, body, [class*="css"], .stApp {
 /* ── Info pill / forecast box ───────────────────────── */
 .fc-banner { background: linear-gradient(135deg, rgba(91,141,239,0.10), rgba(168,119,230,0.06));
   border:1px solid var(--border); border-radius:14px; padding:14px 18px; margin-bottom:14px;
-  font-size:13px; color:var(--ink); animation: fadeInUp .5s ease both; }
+  font-size:13px; color:var(--ink); animation: fadeInUp .45s ease both; }
 .fc-banner b { color: var(--gold); }
 
 /* ── Streamlit widgets (dark) ───────────────────────── */
@@ -371,17 +357,6 @@ html, body, [class*="css"], .stApp {
   border-color: var(--gold) !important; transform: translateY(-1px);
   box-shadow: 0 6px 18px rgba(0,0,0,.4), 0 0 14px var(--glow-gold) !important; color: var(--gold) !important; }
 
-/* ── Tabs ───────────────────────────────────────────── */
-.stTabs [data-baseweb="tab-list"] { gap:6px; border-bottom:1px solid var(--border); }
-.stTabs [data-baseweb="tab"] {
-  font-family:'Space Grotesk',sans-serif !important; font-size:13px !important; font-weight:600 !important;
-  padding:9px 18px !important; border-radius:10px 10px 0 0 !important; color: var(--muted) !important;
-  transition: all .2s ease; }
-.stTabs [data-baseweb="tab"]:hover { color: var(--ink) !important; background: rgba(255,255,255,0.03) !important; }
-.stTabs [aria-selected="true"] {
-  background: linear-gradient(160deg, rgba(230,195,92,0.14), rgba(255,255,255,0.02)) !important;
-  color: var(--gold) !important; border-bottom:2px solid var(--gold) !important; }
-
 /* alerts */
 .stAlert { background: rgba(255,255,255,0.04) !important; border:1px solid var(--border) !important;
   border-radius:12px !important; color: var(--ink) !important; }
@@ -390,22 +365,6 @@ html, body, [class*="css"], .stApp {
 .streamlit-expanderHeader, [data-testid="stExpander"] summary {
   background: rgba(255,255,255,0.03) !important; border-radius:10px !important; color: var(--ink) !important; }
 </style>
-""", unsafe_allow_html=True)
-
-# ─────────────────────────────────────────────────────────────
-#  MASTHEAD
-# ─────────────────────────────────────────────────────────────
-st.markdown("""
-<div class="dgv-masthead">
-  <div class="dgv-wordmark">DGV</div>
-  <div>
-    <div class="dgv-tagline">Mathematical Investment Analyzer</div>
-    <div class="dgv-sub">
-      วิเคราะห์การลงทุนด้วยคณิตศาสตร์ · ย้อนหลัง 10 ปี · ราคา Real-time จาก Finnhub ·
-      พยากรณ์อนาคต Monte Carlo · AI โดย Claude
-    </div>
-  </div>
-</div>
 """, unsafe_allow_html=True)
 
 # ─────────────────────────────────────────────────────────────
@@ -446,7 +405,7 @@ for k, v in [
         st.session_state[k] = v
 
 # ─────────────────────────────────────────────────────────────
-#  ASSET GROUPS (กองทุน/ETF/คริปโต/หุ้น/ดัชนี เพิ่มเติม)
+#  ASSET GROUPS (กองทุน/ETF/คริปโต/หุ้น/ดัชนี)
 # ─────────────────────────────────────────────────────────────
 ASSET_GROUPS = {
     "หุ้นเทคใหญ่ (Mega-cap Tech)": {
@@ -524,7 +483,7 @@ def get_finnhub_symbol(yf_symbol: str) -> str | None:
     return None
 
 # ─────────────────────────────────────────────────────────────
-#  REAL-TIME QUOTE (Finnhub) — เสถียรขึ้น
+#  REAL-TIME QUOTE (Finnhub)
 # ─────────────────────────────────────────────────────────────
 @st.cache_data(ttl=2)   # cache 2 วินาที — อัปเดตถี่สำหรับ live ticker
 def fetch_realtime_quote(yf_symbol: str) -> dict | None:
@@ -569,7 +528,7 @@ def fetch_intraday(yf_symbol: str, interval: str = "5m", period: str = "5d"):
     return None
 
 # ─────────────────────────────────────────────────────────────
-#  NEWS (Finnhub) — ข่าวบริษัท + ข่าวตลาด/สงคราม/มหภาค
+#  NEWS (Finnhub)
 # ─────────────────────────────────────────────────────────────
 @st.cache_data(ttl=600, show_spinner=False)
 def fetch_company_news(yf_symbol: str, days: int = 21):
@@ -743,7 +702,7 @@ def expected_shortfall(returns, confidence=0.95):
     return round(tail.mean() * 100, 3)
 
 # ─────────────────────────────────────────────────────────────
-#  FORECAST — Monte Carlo (GBM) + Linear extrapolation  [NEW]
+#  FORECAST — Monte Carlo (GBM + fat tail) + Linear extrapolation
 # ─────────────────────────────────────────────────────────────
 @st.cache_data(ttl=300)
 def monte_carlo_forecast(price_list, days=252, n_sims=300, seed=42):
@@ -1090,7 +1049,7 @@ def score_color(score):
     if score >= 50: return "#e6c35c"
     return "#ff5d6c"
 
-# Plotly dark theme helper — สวยขึ้น (hover, spike, unified)
+# Plotly dark theme helper
 def dark_layout(fig, height=580, title=None):
     fig.update_layout(
         height=height,
@@ -1116,7 +1075,7 @@ def dark_layout(fig, height=580, title=None):
     return fig
 
 # ─────────────────────────────────────────────────────────────
-#  FETCH DATA (historical) — yfinance + Stooq fallback (เสถียร)
+#  FETCH DATA (historical) — yfinance + Stooq fallback
 # ─────────────────────────────────────────────────────────────
 def _from_yfinance(symbol, period):
     try:
@@ -1390,7 +1349,7 @@ def strategy_vs_buyhold(df, fee=0.001):
     }
 
 # ─────────────────────────────────────────────────────────────
-#  USD/THB rate (สำหรับมุมนักลงทุนไทย) — ค่าเริ่มต้นถ้าดึงไม่ได้
+#  USD/THB rate (สำหรับมุมนักลงทุนไทย)
 # ─────────────────────────────────────────────────────────────
 @st.cache_data(ttl=900, show_spinner=False)
 def fetch_usdthb():
@@ -1403,7 +1362,7 @@ def fetch_usdthb():
     return 36.0
 
 # ─────────────────────────────────────────────────────────────
-#  MY PORTFOLIO — วิเคราะห์พอร์ตจริงของผู้ใช้ (มูลค่า/PnL/ความเสี่ยง)
+#  MY PORTFOLIO — วิเคราะห์พอร์ตจริงของผู้ใช้
 # ─────────────────────────────────────────────────────────────
 @st.cache_data(ttl=120, show_spinner=False)
 def analyze_holdings(holdings_tuple, rf=0.05):
@@ -1487,16 +1446,59 @@ def analyze_holdings(holdings_tuple, rf=0.05):
             "metrics": metrics}
 
 # ─────────────────────────────────────────────────────────────
-#  INPUT BAR
+#  SIDEBAR — เมนูหลัก (ย้ายมาด้านซ้าย) + โหมดมือใหม่
 # ─────────────────────────────────────────────────────────────
-c1, c2, c3 = st.columns([2, 1, 1])
-with c1:
+NAV = [
+    ("overview", "ภาพรวม",         "🏠"),
+    ("fund",     "ปัจจัยพื้นฐาน",   "🏛️"),
+    ("chart",    "กราฟราคา",        "📈"),
+    ("forecast", "พยากรณ์อนาคต",    "🔮"),
+    ("news",     "ข่าว",            "📰"),
+    ("rank",     "อันดับสินทรัพย์",  "🏆"),
+    ("portfolio","จัดพอร์ต",        "🧺"),
+    ("myport",   "พอร์ตของฉัน",     "💼"),
+    ("income",   "วางแผนเงิน",      "💰"),
+    ("chat",     "ถาม AI",          "🤖"),
+]
+SIMPLE_PAGES = {"overview", "chart", "forecast", "income", "chat"}
+_NAV_TITLE = {k: f"{ic} {lbl}" for k, lbl, ic in NAV}
+
+with st.sidebar:
+    st.markdown("""
+    <div class="side-brand">
+      <div class="side-mark">DGV</div>
+      <div class="side-brand-sub">Investment Analyzer</div>
+    </div>
+    """, unsafe_allow_html=True)
+
     symbol = st.text_input(
-        "🔍 กรอกสัญลักษณ์",
-        "AAPL",
-        placeholder="เช่น AAPL, BTC-USD, GC=F, EURUSD=X",
+        "ค้นหาสินทรัพย์", "AAPL",
+        placeholder="เช่น AAPL, BTC-USD, GLD",
         label_visibility="collapsed",
     ).upper().replace("/", "").strip()
+
+    simple_mode = st.toggle(
+        "โหมดมือใหม่ · เรียบง่าย", value=True,
+        help="ซ่อนเครื่องมือขั้นสูง แสดงเฉพาะสิ่งที่จำเป็น เหมาะกับผู้เริ่มต้น "
+             "ปิดสวิตช์เพื่อปลดล็อกทุกเครื่องมือ")
+
+    st.markdown('<div class="side-divider"></div>', unsafe_allow_html=True)
+
+    visible = [(k, lbl, ic) for k, lbl, ic in NAV
+               if (not simple_mode or k in SIMPLE_PAGES)]
+    labels = [f"{ic}  {lbl}" for _, lbl, ic in visible]
+    choice = st.radio("เมนู", labels, label_visibility="collapsed")
+    page = visible[labels.index(choice)][0]
+
+    st.markdown('<div class="side-divider"></div>', unsafe_allow_html=True)
+    if simple_mode:
+        st.markdown('<div class="side-cap">กำลังใช้ <b style="color:#2ee6a0">โหมดมือใหม่</b> — '
+                    'เปิดสวิตช์ด้านบนเพื่อปลดล็อกเครื่องมือขั้นสูง '
+                    '(ปัจจัยพื้นฐาน · ข่าว · อันดับ · จัดพอร์ต · พยากรณ์หลายโมเดล)</div>',
+                    unsafe_allow_html=True)
+    else:
+        st.markdown('<div class="side-cap"><b style="color:#e6c35c">โหมดมืออาชีพ</b> — '
+                    'แสดงทุกเครื่องมือและตัวเลขเชิงลึก</div>', unsafe_allow_html=True)
 
 # ─────────────────────────────────────────────────────────────
 #  FETCH: Historical + Real-time
@@ -1537,21 +1539,40 @@ else:
 
 fmt_p = lambda v: f"{v:,.4f}" if is_fx else f"${v:,.2f}"
 
-with c2:
-    delta_str = (f"{price_chg:+.4f} ({price_chg_pct:+.2f}%)" if is_fx
-                 else f"${price_chg:+.2f} ({price_chg_pct:+.2f}%)")
-    st.metric(f"{symbol}", fmt_p(cur_price), delta=delta_str)
-
-with c3:
-    data_years = len(data) / 252
-    source_label = "🟢 Finnhub Real-time" if price_source == "finnhub" else "📊 yfinance (ล่าสุด)"
-    st.caption(f"{source_label}\n📅 Historical {data_years:.1f} ปี | {len(data):,} วัน")
+# ─────────────────────────────────────────────────────────────
+#  COMPACT TOP HEADER (แทน masthead เดิม)
+# ─────────────────────────────────────────────────────────────
+_name    = WATCHLIST.get(symbol, symbol)
+_chg_cls = "pos" if price_chg >= 0 else "neg"
+_arrow   = "▲" if price_chg >= 0 else "▼"
+_delta   = (f"{price_chg:+.4f} ({price_chg_pct:+.2f}%)" if is_fx
+            else f"{price_chg:+.2f} ({price_chg_pct:+.2f}%)")
+_src     = "Finnhub · real-time" if price_source == "finnhub" else "yfinance · ล่าสุด"
+st.markdown(f"""
+<div class="top-head">
+  <div class="th-left">
+    <div class="th-sym">{symbol}</div>
+    <div class="th-name">{_name}</div>
+  </div>
+  <div class="th-price">
+    <div class="th-px">{fmt_p(cur_price)}</div>
+    <div class="th-chg {_chg_cls}">{_arrow} {_delta}</div>
+  </div>
+  <div class="th-meta">
+    <div class="th-page">{_NAV_TITLE.get(page, "")}</div>
+    <div class="th-src">{_src} · ข้อมูล {len(data)/252:.1f} ปี ({len(data):,} วัน)</div>
+  </div>
+</div>
+""", unsafe_allow_html=True)
 
 # ─────────────────────────────────────────────────────────────
-#  REAL-TIME PANEL + LIVE INTRADAY CHART (ข้อมูลจริง) — อัปเดตทุก 3 วินาที
+#  REAL-TIME PANEL + LIVE INTRADAY CHART (เฉพาะหน้าภาพรวม/กราฟ)
 # ─────────────────────────────────────────────────────────────
-# ตัวเลือกช่วง/สไตล์กราฟ real-time (อยู่นอก fragment เพื่อไม่ให้รีเซ็ตทุกวินาที)
-if get_finnhub_symbol(symbol) is not None or not is_fx:
+_RT_INTERVAL, _RT_PERIOD, _rt_style = "5m", "5d", "เส้น"
+_show_live = page in ("overview", "chart")
+
+# ตัวเลือกช่วง/สไตล์กราฟ — โชว์เฉพาะโหมดมืออาชีพ (มือใหม่ใช้ค่าเริ่มต้น สะอาดตา)
+if _show_live and not simple_mode and (get_finnhub_symbol(symbol) is not None or not is_fx):
     iv_col1, iv_col2 = st.columns([3, 1])
     with iv_col1:
         _iv_label = st.radio(
@@ -1568,8 +1589,6 @@ if get_finnhub_symbol(symbol) is not None or not is_fx:
         "1 ชม. · 1 เดือน":  ("60m", "1mo"),
     }
     _RT_INTERVAL, _RT_PERIOD = _IV_MAP[_iv_label]
-else:
-    _RT_INTERVAL, _RT_PERIOD, _rt_style = "5m", "5d", "เส้น"
 
 
 @st.fragment(run_every=3)
@@ -1673,10 +1692,10 @@ def realtime_panel():
     st.caption(f"📡 กราฟ Real-time จริง · {_RT_INTERVAL} bars จาก yfinance ({len(intra)} แท่ง) · "
                f"จุดทอง = ราคา live ล่าสุดจาก Finnhub · เส้นประขาว = ราคาปิดก่อนหน้า")
 
-# แสดงแผง live (Finnhub) หรืออย่างน้อยกราฟ intraday (yfinance) สำหรับหุ้น/ETF
-if get_finnhub_symbol(symbol) is not None:
+# แสดงแผง live เฉพาะหน้าภาพรวม/กราฟ
+if _show_live and get_finnhub_symbol(symbol) is not None:
     realtime_panel()
-else:
+elif _show_live:
     # สินทรัพย์ที่ Finnhub free ไม่รองรับ → ยังโชว์กราฟ intraday จริงจาก yfinance ได้
     _intra0 = fetch_intraday(symbol, interval=_RT_INTERVAL, period=_RT_PERIOD)
     if _intra0 is not None and not _intra0.empty and len(_intra0) >= 2:
@@ -1702,27 +1721,18 @@ with st.spinner("กำลังวิเคราะห์คณิตศาส
     m   = full_math_analysis(data, symbol)
     bt  = winrate_backtest(data)
 
-# ─────────────────────────────────────────────────────────────
-#  TABS
-# ─────────────────────────────────────────────────────────────
-(tab_overview, tab_fund, tab_chart, tab_forecast, tab_news,
- tab_rank, tab_portfolio, tab_myport, tab_income, tab_chat) = st.tabs([
-    "📐 ภาพรวมคณิตศาสตร์",
-    "🏛️ ปัจจัยพื้นฐาน",
-    "📈 กราฟวิเคราะห์",
-    "🔮 พยากรณ์อนาคต",
-    "📰 ข่าว & อนาคต",
-    "🏆 อันดับสินทรัพย์",
-    "🧺 พอร์ต & กระจายเสี่ยง",
-    "💼 พอร์ตของฉัน",
-    "💰 คำนวณรายได้",
-    "🤖 AI ที่ปรึกษา",
-])
+# ══════════════════════════════════════════════════════════════
+#  PAGE — OVERVIEW
+# ══════════════════════════════════════════════════════════════
+if page == "overview":
+    if simple_mode:
+        st.markdown(
+            '<div class="beginner-hint">💡 <b>อ่านยังไง:</b> คะแนนรวมด้านซ้าย (0–100) '
+            'สรุปจากสถิติย้อนหลังล้วน ๆ ยิ่งสูงยิ่งแข็งแรงในอดีต '
+            '<b>แต่ไม่ใช่คำทำนายอนาคต</b> · ดูตัวเลขสำคัญทางขวาประกอบ — '
+            'อยากเจาะลึก ปิดสวิตช์ "โหมดมือใหม่" ที่เมนูซ้าย</div>',
+            unsafe_allow_html=True)
 
-# ══════════════════════════════════════════════════════════════
-#  TAB 1 — OVERVIEW
-# ══════════════════════════════════════════════════════════════
-with tab_overview:
     col_left, col_right = st.columns([3, 2])
 
     with col_left:
@@ -1796,6 +1806,7 @@ with tab_overview:
               {'<div class="mcard-sub">'+sub+'</div>' if sub else ''}
             </div>""", unsafe_allow_html=True)
 
+        # ── จำเป็น (โชว์เสมอ) — เลือกเฉพาะตัวที่มือใหม่เข้าใจได้ ──
         if rt_quote:
             mcard("PRICE (REAL-TIME)",
                   fmt_p(rt_quote['c']),
@@ -1803,46 +1814,49 @@ with tab_overview:
                   "pos" if price_chg >= 0 else "neg")
 
         mcard("CAGR (ต่อปี)", f"{m['cagr']:+.1f}%",
-              f"ย้อนหลัง {len(data)/252:.0f} ปี",
+              f"ผลตอบแทนทบต้น · ย้อนหลัง {len(data)/252:.0f} ปี",
               "pos" if m['cagr']>0 else "neg")
         mcard("SHARPE RATIO", f"{m['sharpe']:.2f}",
-              "ผลตอบแทนต่อหน่วยความเสี่ยง",
+              "ผลตอบแทนเทียบความเสี่ยง (>1 ดี)",
               "pos" if m['sharpe']>=1 else "neg" if m['sharpe']<0 else "")
-        mcard("SORTINO RATIO", f"{m['sortino']:.2f}",
-              "ความเสี่ยงขาลงเท่านั้น",
-              "pos" if m['sortino']>=1 else "neg" if m['sortino']<0 else "")
         mcard("MAX DRAWDOWN", f"{m['mdd']:.1f}%",
-              "จุดต่ำสุดจาก Peak",
+              "เคยร่วงแรงสุดจากจุดพีคกี่ %",
               "neg" if m['mdd']<-30 else "")
-        mcard("CALMAR RATIO", f"{m['calmar']:.2f}",
-              "CAGR / |MaxDD|",
-              "pos" if m['calmar']>1 else "")
-        mcard("VALUE AT RISK (95%)", f"{m['var95']:.2f}%",
-              "ขาดทุนสูงสุด/วัน (95% CI)", "neg")
-        mcard("VOLATILITY (30D)", f"{m['vol_s']:.1f}%",
-              f"Long-term: {m['vol_l']:.1f}% · Ratio: {m['vol_r']:.2f}", "")
-        mcard("LINEAR TREND", f"{m['trend_slope']:+.1f}%/ปี",
-              f"R²={m['r2']:.2f} · p={m['pval']:.3f}",
-              "pos" if m['trend_slope']>0 else "neg")
         mcard("MOMENTUM SCORE", f"{m['momentum']:+.1f}%",
-              "Weighted 1M/3M/6M/12M",
+              "แรงส่งราคาช่วงนี้ (บวก=ขาขึ้น)",
               "pos" if m['momentum']>0 else "neg")
-        mcard("Z-SCORE (60D)", f"{m['zscore']:+.2f}",
-              ">+2: Overbought | <-2: Oversold",
-              "neg" if abs(m['zscore'])>2 else "pos")
+        mcard("VOLATILITY (30D)", f"{m['vol_s']:.1f}%",
+              f"ความผันผวน · ระยะยาว {m['vol_l']:.1f}%", "")
 
-        # ── Beta / Alpha เทียบ S&P 500 ──
+        # ── Beta / ชนะตลาด — เข้าใจง่าย เก็บไว้เป็นตัวหลัก ──
         ba = beta_alpha_vs_benchmark(symbol, bench="^GSPC")
         if ba:
             mcard("BETA (เทียบ S&P 500)", f"{ba['beta']:.2f}",
-                  ">1 = ผันผวนกว่าตลาด · <1 = นิ่งกว่าตลาด",
+                  ">1 = เหวี่ยงกว่าตลาด · <1 = นิ่งกว่าตลาด",
                   "neg" if ba['beta'] > 1.3 else "pos")
-            mcard("ALPHA (ส่วนเกินตลาด/ปี)", f"{ba['alpha']:+.1f}%",
-                  f"Correlation {ba['corr']:.2f} · R²={ba['r2']:.2f}",
-                  "pos" if ba['alpha'] > 0 else "neg")
             mcard("ชนะ/แพ้ตลาด (1 ปี)", f"{ba['excess_1y']:+.1f}%",
                   f"{symbol} {ba['asset_1y']:+.1f}% vs S&P {ba['bench_1y']:+.1f}%",
                   "pos" if ba['excess_1y'] >= 0 else "neg")
+
+        # ── ตัวเลขเชิงลึก (พับไว้ ลดความรกสำหรับมือใหม่) ──
+        with st.expander("🔬 ตัวเลขเชิงลึก (ขั้นสูง)", expanded=not simple_mode):
+            mcard("SORTINO RATIO", f"{m['sortino']:.2f}",
+                  "เหมือน Sharpe แต่นับเฉพาะความเสี่ยงขาลง",
+                  "pos" if m['sortino']>=1 else "neg" if m['sortino']<0 else "")
+            mcard("CALMAR RATIO", f"{m['calmar']:.2f}",
+                  "CAGR / |MaxDD|", "pos" if m['calmar']>1 else "")
+            mcard("VALUE AT RISK (95%)", f"{m['var95']:.2f}%",
+                  "ขาดทุนสูงสุด/วัน ที่ระดับเชื่อมั่น 95%", "neg")
+            mcard("LINEAR TREND", f"{m['trend_slope']:+.1f}%/ปี",
+                  f"R²={m['r2']:.2f} · p={m['pval']:.3f}",
+                  "pos" if m['trend_slope']>0 else "neg")
+            mcard("Z-SCORE (60D)", f"{m['zscore']:+.2f}",
+                  ">+2: Overbought | <-2: Oversold",
+                  "neg" if abs(m['zscore'])>2 else "pos")
+            if ba:
+                mcard("ALPHA (ส่วนเกินตลาด/ปี)", f"{ba['alpha']:+.1f}%",
+                      f"Correlation {ba['corr']:.2f} · R²={ba['r2']:.2f}",
+                      "pos" if ba['alpha'] > 0 else "neg")
 
         st.markdown('<div class="section-title" style="margin-top:16px">📅 ผลตอบแทนย้อนหลัง</div>',
                     unsafe_allow_html=True)
@@ -1858,9 +1872,9 @@ with tab_overview:
             </div>""", unsafe_allow_html=True)
 
 # ══════════════════════════════════════════════════════════════
-#  TAB — FUNDAMENTALS (ปัจจัยพื้นฐาน)
+#  PAGE — FUNDAMENTALS (ปัจจัยพื้นฐาน)
 # ══════════════════════════════════════════════════════════════
-with tab_fund:
+elif page == "fund":
     st.markdown('<div class="section-title">🏛️ ปัจจัยพื้นฐาน (Fundamentals)</div>',
                 unsafe_allow_html=True)
     st.caption("ข้อมูลพื้นฐานจาก Finnhub — P/E, EPS, อัตรากำไร, ปันผล, หนี้สิน ฯลฯ "
@@ -1929,14 +1943,13 @@ with tab_fund:
             fcard("กำไรโต (YoY)", fnum(eg, "%"), "การเติบโตของ EPS",
                   "pos" if isinstance(eg,(int,float)) and eg > 0 else "neg" if isinstance(eg,(int,float)) else "")
 
-        st.info("📌 ปัจจัยพื้นฐานสะท้อน 'มูลค่ากิจการ' ส่วนแท็บอื่นวิเคราะห์ 'พฤติกรรมราคา' — "
+        st.info("📌 ปัจจัยพื้นฐานสะท้อน 'มูลค่ากิจการ' ส่วนหน้าอื่นวิเคราะห์ 'พฤติกรรมราคา' — "
                 "นักลงทุนระยะยาวควรดูทั้งสองด้านประกอบกัน · ข้อมูลพื้นฐานอัปเดตช้ากว่าราคา (ตามรอบงบการเงิน)")
 
-
 # ══════════════════════════════════════════════════════════════
-#  TAB 2 — CHART
+#  PAGE — CHART
 # ══════════════════════════════════════════════════════════════
-with tab_chart:
+elif page == "chart":
     col_ctrl, _ = st.columns([2, 3])
     with col_ctrl:
         tf = st.select_slider("ช่วงเวลา (ปี)",
@@ -2141,8 +2154,10 @@ with tab_chart:
         st.info("📌 หักค่าธรรมเนียมทุกครั้งที่สลับเข้า/ออกตลาดแล้ว (ยังไม่รวม slippage/ภาษี) — "
                 "การเทียบกับ Buy & Hold เป็นมาตรฐานสำคัญ: กลยุทธ์ที่ดีต้องชนะการถือเฉย ๆ หลังหักต้นทุน")
 
-
-with tab_forecast:
+# ══════════════════════════════════════════════════════════════
+#  PAGE — FORECAST
+# ══════════════════════════════════════════════════════════════
+elif page == "forecast":
     # ══════════ ส่วนที่ 1: 5 เส้นแนวโน้มที่ดีที่สุด (Advanced Models) ══════════
     st.markdown('<div class="section-title">🎯 5 เส้นแนวโน้มที่ดีที่สุด (คณิตศาสตร์ขั้นสูง)</div>',
                 unsafe_allow_html=True)
@@ -2380,9 +2395,9 @@ with tab_forecast:
                 f"ยิ่งช่วงเวลายาว แถบความไม่แน่นอนยิ่งกว้าง · {_tail_note}")
 
 # ══════════════════════════════════════════════════════════════
-#  TAB · NEWS — ข่าว + วิเคราะห์เชื่อมโยงอนาคตด้วย AI
+#  PAGE — NEWS
 # ══════════════════════════════════════════════════════════════
-with tab_news:
+elif page == "news":
     st.markdown('<div class="section-title">📰 ข่าว & แนวโน้มอนาคต</div>', unsafe_allow_html=True)
     st.caption("ข่าวจริงจาก Finnhub — ข่าวบริษัท + ข่าวตลาด/เศรษฐกิจ/ภูมิรัฐศาสตร์ (สงคราม นโยบาย ฯลฯ) "
                "พร้อมให้ AI ประเมินผลกระทบต่ออนาคตของสินทรัพย์")
@@ -2498,669 +2513,611 @@ with tab_news:
     st.info("📌 ข่าวมาจาก Finnhub แบบ real-time — คลิกพาดหัวเพื่ออ่านฉบับเต็มที่ต้นทาง")
 
 # ══════════════════════════════════════════════════════════════
-#  TAB 4 — RANKING
+#  PAGE — RANK (อันดับสินทรัพย์)
 # ══════════════════════════════════════════════════════════════
-with tab_rank:
-    st.markdown('<div class="section-title">🏆 อันดับสินทรัพย์ (Composite Score · คณิตศาสตร์ + ข่าว)</div>',
+elif page == "rank":
+    st.markdown('<div class="section-title">🏆 อันดับสินทรัพย์ (Composite Ranking)</div>',
                 unsafe_allow_html=True)
-    st.caption("คำนวณจาก Sharpe, CAGR, Drawdown, Momentum, MA Alignment, Z-Score "
-               "แล้วปรับด้วย News Sentiment (เปิด/ปิดได้ด้านล่าง)")
+    st.markdown("""
+    <div class="fc-banner">
+      จัดอันดับสินทรัพย์ในกลุ่มด้วย <b>คะแนนรวม (0–100)</b> ที่สังเคราะห์จากหลายตัวชี้วัด —
+      Sharpe, Max Drawdown, CAGR, โมเมนตัม, การเรียงตัวของเส้นค่าเฉลี่ย ฯลฯ — แล้วเรียงจากแข็งแรงสุดไปอ่อนสุด
+      <br><span style="color:var(--muted);font-size:12px">เลือกเปิด "ปรับด้วยข่าว" เพื่อบวก/ลบคะแนนตาม sentiment ข่าวล่าสุด · ข้อมูลย้อนหลังไม่รับประกันอนาคต</span>
+    </div>
+    """, unsafe_allow_html=True)
 
-    rk_group = st.selectbox("เลือกหมวดสินทรัพย์", list(ASSET_GROUPS.keys()),
-                            index=0, key="rank_group")
-    rk_syms = list(ASSET_GROUPS[rk_group].keys())
+    rc1, rc2 = st.columns([2, 1])
+    with rc1:
+        grp_name = st.selectbox("เลือกกลุ่มสินทรัพย์", list(ASSET_GROUPS.keys()), key="rank_group")
+    with rc2:
+        use_news = st.checkbox("ปรับคะแนนด้วยข่าว", value=False, key="rank_use_news",
+                               help="บวก/ลบคะแนนตาม sentiment ข่าวล่าสุด (เฉพาะหุ้น/ETF ที่มีข่าว)")
 
-    use_news = st.checkbox("📰 รวมปัจจัยข่าว (News Sentiment) ในการให้คะแนนและจัดอันดับ",
-                           value=True, key="rank_use_news")
+    syms = list(ASSET_GROUPS[grp_name].keys())
+    with st.spinner(f"กำลังวิเคราะห์และจัดอันดับ {len(syms)} สินทรัพย์ในกลุ่ม {grp_name}..."):
+        scores = fetch_watchlist_scores(syms)
 
-    with st.spinner(f"กำลังดึงและวิเคราะห์ {len(rk_syms)} สินทรัพย์ในหมวด «{rk_group}»..."):
-        rankings = fetch_watchlist_scores(rk_syms)
-
-    if not rankings:
-        st.warning("ไม่สามารถดึงข้อมูลได้")
+    if not scores:
+        st.warning("ดึงข้อมูลไม่สำเร็จสำหรับกลุ่มนี้ (อาจติด rate limit ของ Yahoo Finance) — ลองรีเฟรชอีกครั้ง")
     else:
-        # ── ปรับคะแนนด้วยข่าว: sentiment -100..+100 → ปรับ ±10 คะแนน ──
-        for r in rankings:
-            ns = r.get("news_sent", 0)
-            adj = max(-10, min(10, round(ns / 10)))
-            r["news_adj"] = adj
-            r["score_final"] = max(0, min(100, r["score"] + (adj if use_news else 0)))
-        rankings = sorted(rankings, key=lambda x: x["score_final"], reverse=True)
+        # ปรับคะแนนด้วย sentiment ข่าว (ถ้าเลือก)
+        for s in scores:
+            s["adj"] = s["score"]
+            if use_news and s.get("news_count", 0) > 0:
+                s["adj"] = int(max(0, min(100, round(s["score"] + s["news_sent"] * 0.15))))
+        ranked = sorted(scores, key=lambda x: (x["adj"] if use_news else x["score"]), reverse=True)
 
-        medals = ["🥇","🥈","🥉"] + [""] * 20
-        verdict_icon = {"Strong Buy":"🚀","Buy":"📈","Hold/Watch":"⏳","Underweight":"⚠️","Avoid":"🚫"}
-        score_bg = lambda s: "rgba(46,230,160,0.18)" if s>=75 else "rgba(230,195,92,0.18)" if s>=50 else "rgba(255,93,108,0.18)"
-
-        html_rows = ""
-        for i, r in enumerate(rankings):
-            disp_score = r["score_final"]
-            sc_bg  = score_bg(disp_score)
-            v_icon = verdict_icon.get(r["verdict"], "")
-            cagr_c = "#2ee6a0" if r["cagr"]>=0 else "#ff5d6c"
-            mom_c  = "#2ee6a0" if r["momentum"]>=0 else "#ff5d6c"
-
-            # ── คอลัมน์ข่าว ──
-            ns = r.get("news_sent", 0); ncnt = r.get("news_count", 0)
-            if ncnt == 0:
-                news_html = '<span style="color:var(--muted)">—</span>'
-            else:
-                news_c = "#2ee6a0" if ns > 15 else "#ff5d6c" if ns < -15 else "#e6c35c"
-                news_html = (f'<span style="color:{news_c};font-family:\'JetBrains Mono\',monospace;'
-                             f'font-weight:600">{ns:+d}</span>'
-                             f'<div style="font-size:9px;color:var(--muted)">{ncnt} ข่าว</div>')
-
-            reasons = []
-            if r["sharpe"] >= 1.5:  reasons.append(f"Sharpe สูง ({r['sharpe']:.1f})")
-            elif r["sharpe"] < 0.5: reasons.append(f"Sharpe ต่ำ ({r['sharpe']:.1f})")
-            if r["cagr"] >= 15:     reasons.append(f"CAGR ดีเยี่ยม ({r['cagr']:.0f}%)")
-            elif r["cagr"] < 5:     reasons.append(f"CAGR ต่ำ ({r['cagr']:.0f}%)")
-            if r["mdd"] > -20:      reasons.append("Drawdown ต่ำ")
-            elif r["mdd"] < -50:    reasons.append(f"MDD สูงมาก ({r['mdd']:.0f}%)")
-            if r["momentum"] >= 15: reasons.append("Momentum แรง")
-            elif r["momentum"] < -10: reasons.append("Momentum ติดลบ")
-            if r["winrate"] >= 60:  reasons.append(f"Win Rate {r['winrate']:.0f}%")
-            if use_news and ncnt > 0:
-                if ns > 15:    reasons.append(f"ข่าวเชิงบวก ({ns:+d})")
-                elif ns < -15: reasons.append(f"ข่าวเชิงลบ ({ns:+d})")
-            reason_str = " · ".join(reasons[:3]) if reasons else "ตัวชี้วัดปานกลาง"
-
-            # ── เดลตาคะแนนจากข่าว (โชว์ใต้ SCORE) ──
-            delta_html = ""
-            if use_news and r["news_adj"] != 0:
-                dcol = "#2ee6a0" if r["news_adj"] > 0 else "#ff5d6c"
-                delta_html = f'<div style="font-size:9px;color:{dcol};margin-top:2px">{r["news_adj"]:+d} จากข่าว</div>'
-
-            html_rows += f"""
+        news_col_head = "<th>ข่าว</th>" if use_news else ""
+        rows_html = ""
+        for i, s in enumerate(ranked, 1):
+            shown_score = s["adj"] if use_news else s["score"]
+            sc_col = score_color(shown_score)
+            cagr_c = "#2ee6a0" if s["cagr"] >= 0 else "#ff5d6c"
+            mom_c  = "#2ee6a0" if s["momentum"] >= 0 else "#ff5d6c"
+            medal  = {1: "🥇", 2: "🥈", 3: "🥉"}.get(i, f"{i}")
+            news_cell = ""
+            if use_news:
+                if s.get("news_count", 0) > 0:
+                    ncol = "#2ee6a0" if s["news_sent"] > 15 else "#ff5d6c" if s["news_sent"] < -15 else "#e6c35c"
+                    news_cell = (f'<td style="font-family:JetBrains Mono,monospace;color:{ncol}">'
+                                 f'{s["news_sent"]:+d}</td>')
+                else:
+                    news_cell = '<td style="color:var(--muted)">—</td>'
+            rows_html += f"""
             <tr>
-              <td><span class="rank-num">{medals[i] or str(i+1)}</span></td>
-              <td>
-                <div class="rank-ticker">{r['sym']}</div>
-                <div style="font-size:11px;color:var(--muted)">{r['name']}</div>
-              </td>
-              <td style="text-align:center">
-                <span style="background:{sc_bg};padding:3px 11px;border-radius:20px;
-                             font-family:'JetBrains Mono',monospace;font-weight:600;font-size:13px;color:#fff">
-                  {disp_score}
-                </span>{delta_html}
-              </td>
-              <td style="font-family:'JetBrains Mono',monospace;color:{cagr_c}">{r['cagr']:+.1f}%</td>
-              <td style="font-family:'JetBrains Mono',monospace">{r['sharpe']:.2f}</td>
-              <td style="font-family:'JetBrains Mono',monospace;color:#ff5d6c">{r['mdd']:.1f}%</td>
-              <td style="font-family:'JetBrains Mono',monospace;color:{mom_c}">{r['momentum']:+.1f}%</td>
-              <td style="font-family:'JetBrains Mono',monospace">{r['winrate']:.0f}%</td>
-              <td style="text-align:center">{news_html}</td>
-              <td>{v_icon} {r['verdict']}</td>
-              <td style="font-size:11px;color:var(--muted);max-width:200px">{reason_str}</td>
+              <td><span class="rank-num">{medal}</span></td>
+              <td><span class="rank-ticker">{s['sym']}</span>
+                  <div style="font-size:11px;color:var(--muted)">{s['name']}</div></td>
+              <td><span style="font-weight:700;color:{sc_col};font-size:16px">{shown_score}</span>
+                  <span style="color:var(--muted);font-size:11px">/100</span></td>
+              <td style="font-weight:600;color:{sc_col}">{s['verdict']}</td>
+              <td style="font-family:JetBrains Mono,monospace;color:{cagr_c}">{s['cagr']:+.1f}%</td>
+              <td style="font-family:JetBrains Mono,monospace">{s['sharpe']:.2f}</td>
+              <td style="font-family:JetBrains Mono,monospace;color:#ff5d6c">{s['mdd']:.0f}%</td>
+              <td style="font-family:JetBrains Mono,monospace">{s['winrate']:.0f}%</td>
+              <td style="font-family:JetBrains Mono,monospace;color:{mom_c}">{s['momentum']:+.0f}%</td>
+              {news_cell}
             </tr>"""
-
         st.markdown(f"""
         <table class="rank-table">
           <thead><tr>
-            <th>#</th><th>สินทรัพย์</th><th>SCORE</th>
-            <th>CAGR</th><th>SHARPE</th><th>MAX DD</th>
-            <th>MOMENTUM</th><th>WIN RATE</th><th>NEWS</th><th>สัญญาณ</th><th>เหตุผล</th>
+            <th>อันดับ</th><th>สินทรัพย์</th><th>คะแนน</th><th>คำตัดสิน</th>
+            <th>CAGR</th><th>SHARPE</th><th>MAX DD</th><th>WIN RATE</th><th>MOMENTUM</th>{news_col_head}
           </tr></thead>
-          <tbody>{html_rows}</tbody>
-        </table>
-        """, unsafe_allow_html=True)
+          <tbody>{rows_html}</tbody>
+        </table>""", unsafe_allow_html=True)
+
+        best = ranked[0]
         st.markdown("<br>", unsafe_allow_html=True)
-        if use_news:
-            st.info("📌 SCORE รวมปัจจัยข่าวแล้ว — ปรับ ±10 คะแนนตาม News Sentiment (heuristic นับคำจากข่าว Finnhub "
-                    "ย้อนหลัง 14 วัน) · คอลัมน์ NEWS = คะแนนข่าว −100 ถึง +100 · «—» = ไม่มีข่าวบริษัท "
-                    "(คริปโต/forex/ดัชนี/ETF บางตัว) จึงไม่ปรับคะแนน")
-        else:
-            st.info("📌 หมายเหตุ: อันดับนี้ใช้ข้อมูลราคาย้อนหลังเท่านั้น ไม่รวมปัจจัยข่าว — "
-                    "ติ๊กกล่อง «รวมปัจจัยข่าว» ด้านบนเพื่อให้ข่าวมีผลต่อคะแนน")
+        st.info(f"📌 ในกลุ่ม **{grp_name}** สินทรัพย์ที่คะแนนสูงสุดคือ **{best['sym']}** "
+                f"({best['name']}) ที่ {best['adj'] if use_news else best['score']}/100 → {best['verdict']} · "
+                "คะแนนสะท้อนความแข็งแรงเชิงสถิติในอดีต ไม่ใช่คำแนะนำให้ซื้อ — "
+                "พิมพ์สัญลักษณ์ในช่องค้นหาด้านซ้ายเพื่อเจาะลึกรายตัว")
 
 # ══════════════════════════════════════════════════════════════
-#  TAB — PORTFOLIO (กระจายความเสี่ยง: correlation + efficient frontier)
+#  PAGE — PORTFOLIO (จัดพอร์ต · Markowitz)
 # ══════════════════════════════════════════════════════════════
-with tab_portfolio:
-    st.markdown('<div class="section-title">🧺 พอร์ต & การกระจายความเสี่ยง</div>',
+elif page == "portfolio":
+    st.markdown('<div class="section-title">🧺 จัดพอร์ตที่เหมาะสม (Efficient Frontier)</div>',
                 unsafe_allow_html=True)
-    st.caption("วิเคราะห์ระดับพอร์ต (ไม่ใช่รายตัว) — ความสัมพันธ์ระหว่างสินทรัพย์ (Correlation) "
-               "และการจัดสรรน้ำหนักที่เหมาะสมที่สุดด้วยทฤษฎี Markowitz (Efficient Frontier)")
+    st.markdown("""
+    <div class="fc-banner">
+      ทฤษฎีพอร์ตของ <b>Markowitz</b> — สุ่มสัดส่วนการลงทุนหลายพันแบบ คำนวณผลตอบแทน/ความเสี่ยงของแต่ละพอร์ต
+      แล้วหา <b>เส้นขอบประสิทธิภาพ (Efficient Frontier)</b> · ชี้จุด <b>Max-Sharpe</b> (คุ้มความเสี่ยงสุด)
+      และ <b>Min-Volatility</b> (เสี่ยงต่ำสุด)
+      <br><span style="color:var(--muted);font-size:12px">เลือกสินทรัพย์ 2–8 ตัวเพื่อกระจายความเสี่ยง · Correlation ต่ำ = กระจายความเสี่ยงได้ดี</span>
+    </div>
+    """, unsafe_allow_html=True)
 
-    pf_group = st.selectbox("เลือกหมวดสินทรัพย์สำหรับสร้างพอร์ต", list(ASSET_GROUPS.keys()),
-                            index=0, key="pf_group")
-    pf_syms = list(ASSET_GROUPS[pf_group].keys())
+    all_syms = list(WATCHLIST.keys())
+    default_pick = [s for s in ["AAPL", "MSFT", "GLD", "QQQ", "BTC-USD"] if s in all_syms][:5]
+    picks = st.multiselect(
+        "เลือกสินทรัพย์เข้าพอร์ต (2–8 ตัว)",
+        options=all_syms,
+        default=default_pick,
+        format_func=lambda s: f"{s} · {WATCHLIST.get(s, s)}",
+        key="pf_picks")
 
-    with st.spinner(f"กำลังจัดแนวข้อมูลและคำนวณพอร์ตจาก {len(pf_syms)} สินทรัพย์..."):
-        ef = efficient_frontier(pf_syms)
-
-    if ef is None:
-        st.warning("ข้อมูลไม่พอสำหรับวิเคราะห์พอร์ต (ต้องมีอย่างน้อย 2 สินทรัพย์ที่มีข้อมูลพอ)")
+    if len(picks) < 2:
+        st.warning("เลือกอย่างน้อย 2 สินทรัพย์เพื่อสร้างพอร์ต")
+    elif len(picks) > 8:
+        st.warning("เลือกไม่เกิน 8 สินทรัพย์ (เพื่อความเร็วและอ่านง่าย)")
     else:
-        cols = ef["cols"]
+        with st.spinner("กำลังคำนวณเส้นขอบประสิทธิภาพ (สุ่ม 4,000 พอร์ต)..."):
+            ef = efficient_frontier(picks)
 
-        # ── Correlation heatmap ──
-        st.markdown('<div class="section-title" style="font-size:17px">🔗 Correlation Matrix</div>',
-                    unsafe_allow_html=True)
-        st.caption("ค่าใกล้ +1 = เคลื่อนไหวไปทางเดียวกัน (กระจายเสี่ยงได้น้อย) · "
-                   "ใกล้ 0 หรือติดลบ = ช่วยกระจายเสี่ยงได้ดี")
-        fig_corr = go.Figure(data=go.Heatmap(
-            z=ef["corr"], x=cols, y=cols, zmin=-1, zmax=1,
-            colorscale=[[0, "#2ee6a0"], [0.5, "#15203a"], [1, "#ff5d6c"]],
-            text=[[f"{v:.2f}" for v in row] for row in ef["corr"]],
-            texttemplate="%{text}", textfont=dict(size=10, family="JetBrains Mono"),
-            colorbar=dict(title="corr")))
-        fig_corr.update_layout(height=380, margin=dict(l=10, r=10, t=10, b=10),
-            plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
-            font=dict(family="JetBrains Mono", color="#c3cbd9", size=10))
-        st.plotly_chart(fig_corr, use_container_width=True, config={"displayModeBar": False})
+        if ef is None:
+            st.warning("ข้อมูลไม่พอ (บางสินทรัพย์มีประวัติสั้นเกินไป หรือติด rate limit) — ลองเปลี่ยนสินทรัพย์/รีเฟรช")
+        else:
+            cols = ef["cols"]
+            pcol1, pcol2 = st.columns([3, 2])
 
-        # ── Efficient Frontier ──
-        st.markdown('<div class="section-title" style="font-size:17px;margin-top:14px">🎯 Efficient Frontier</div>',
-                    unsafe_allow_html=True)
-        st.caption(f"สุ่มพอร์ต {len(ef['rets']):,} แบบ (ปรับน้ำหนักสุ่ม) · จุดยิ่งสูง-ซ้าย = "
-                   "ผลตอบแทนสูง ความเสี่ยงต่ำ (ดี) · ใช้ข้อมูล {} วันทำการ".format(ef["n_days"]))
-        ms, mv = ef["max_sharpe"], ef["min_vol"]
-        fig_ef = go.Figure()
-        fig_ef.add_trace(go.Scatter(
-            x=ef["vols"], y=ef["rets"], mode="markers",
-            marker=dict(size=4, color=ef["sharpes"], colorscale="Viridis",
-                        showscale=True, colorbar=dict(title="Sharpe"), opacity=0.55),
-            name="พอร์ตสุ่ม", hovertemplate="ความเสี่ยง %{x:.1f}%<br>ผลตอบแทน %{y:.1f}%<extra></extra>"))
-        fig_ef.add_trace(go.Scatter(
-            x=[ms["vol"]], y=[ms["ret"]], mode="markers",
-            marker=dict(size=16, color="#e6c35c", symbol="star", line=dict(color="#fff", width=1)),
-            name="⭐ Max Sharpe"))
-        fig_ef.add_trace(go.Scatter(
-            x=[mv["vol"]], y=[mv["ret"]], mode="markers",
-            marker=dict(size=14, color="#2ee6a0", symbol="diamond", line=dict(color="#fff", width=1)),
-            name="🛡️ Min Volatility"))
-        dark_layout(fig_ef, height=440, title="ความเสี่ยง (แกน X) vs ผลตอบแทนคาดหวัง (แกน Y) ต่อปี")
-        fig_ef.update_layout(xaxis_title="ความผันผวน/ปี (%)", yaxis_title="ผลตอบแทนคาดหวัง/ปี (%)")
-        st.plotly_chart(fig_ef, use_container_width=True, config={"displayModeBar": False})
+            with pcol1:
+                # ── Efficient Frontier scatter ──
+                fig_ef = go.Figure()
+                fig_ef.add_trace(go.Scatter(
+                    x=ef["vols"], y=ef["rets"], mode="markers",
+                    marker=dict(size=4, color=ef["sharpes"], colorscale="Viridis",
+                                showscale=True, colorbar=dict(title="Sharpe", thickness=12),
+                                opacity=0.55),
+                    name="พอร์ตสุ่ม", hovertemplate="ความเสี่ยง %{x:.1f}%<br>ผลตอบแทน %{y:.1f}%<extra></extra>"))
+                ms, mv = ef["max_sharpe"], ef["min_vol"]
+                fig_ef.add_trace(go.Scatter(
+                    x=[ms["vol"]], y=[ms["ret"]], mode="markers",
+                    marker=dict(size=18, color="#e6c35c", symbol="star",
+                                line=dict(color="#fff", width=1.5)),
+                    name=f"Max-Sharpe ({ms['sharpe']:.2f})"))
+                fig_ef.add_trace(go.Scatter(
+                    x=[mv["vol"]], y=[mv["ret"]], mode="markers",
+                    marker=dict(size=15, color="#2ee6a0", symbol="diamond",
+                                line=dict(color="#fff", width=1.5)),
+                    name=f"Min-Vol ({mv['vol']:.1f}%)"))
+                dark_layout(fig_ef, height=440, title="Efficient Frontier — ความเสี่ยง (x) vs ผลตอบแทนคาดหวัง (y)")
+                fig_ef.update_xaxes(title="ความผันผวน/ปี (%)")
+                fig_ef.update_yaxes(title="ผลตอบแทนคาดหวัง/ปี (%)")
+                st.plotly_chart(fig_ef, use_container_width=True, config={"displayModeBar": False})
 
-        # ── น้ำหนักพอร์ตแนะนำ ──
-        def weights_rows(weights):
-            items = sorted(weights.items(), key=lambda kv: kv[1], reverse=True)
-            return "".join(
-                f'<tr><td class="rank-ticker">{s}</td>'
-                f'<td style="font-family:\'JetBrains Mono\',monospace">{w:.1f}%</td>'
-                f'<td><div class="pb-bg"><div class="pb-fill" style="width:{min(w,100):.0f}%;'
-                f'background:#e6c35c;color:#e6c35c"></div></div></td></tr>'
-                for s, w in items if w >= 0.1)
+            with pcol2:
+                # ── Correlation heatmap ──
+                fig_cor = go.Figure(go.Heatmap(
+                    z=ef["corr"], x=cols, y=cols,
+                    colorscale="RdBu_r", zmid=0, zmin=-1, zmax=1,
+                    text=[[f"{v:.2f}" for v in row] for row in ef["corr"]],
+                    texttemplate="%{text}", textfont=dict(size=10),
+                    colorbar=dict(title="Corr", thickness=12)))
+                fig_cor.update_layout(
+                    height=440, margin=dict(l=10, r=10, t=46, b=10),
+                    title=dict(text="Correlation Matrix", font=dict(size=15, color="#e9eef7")),
+                    plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
+                    font=dict(family="JetBrains Mono", color="#c3cbd9", size=10))
+                st.plotly_chart(fig_cor, use_container_width=True, config={"displayModeBar": False})
 
-        pcol1, pcol2 = st.columns(2)
-        with pcol1:
-            st.markdown('<div class="section-title" style="font-size:15px">⭐ พอร์ต Max Sharpe</div>',
+            # ── ตารางน้ำหนักพอร์ต ──
+            st.markdown('<div class="section-title" style="font-size:17px;margin-top:8px">⚖️ สัดส่วนพอร์ตที่แนะนำ</div>',
                         unsafe_allow_html=True)
-            st.markdown(f'<div style="font-size:12px;color:var(--muted);margin-bottom:6px">'
-                        f'ผลตอบแทน {ms["ret"]:+.1f}%/ปี · ความเสี่ยง {ms["vol"]:.1f}% · Sharpe {ms["sharpe"]:.2f}</div>',
-                        unsafe_allow_html=True)
-            st.markdown(f'<table class="rank-table"><tbody>{weights_rows(ms["weights"])}</tbody></table>',
-                        unsafe_allow_html=True)
-        with pcol2:
-            st.markdown('<div class="section-title" style="font-size:15px">🛡️ พอร์ต Min Volatility</div>',
-                        unsafe_allow_html=True)
-            st.markdown(f'<div style="font-size:12px;color:var(--muted);margin-bottom:6px">'
-                        f'ผลตอบแทน {mv["ret"]:+.1f}%/ปี · ความเสี่ยง {mv["vol"]:.1f}% · Sharpe {mv["sharpe"]:.2f}</div>',
-                        unsafe_allow_html=True)
-            st.markdown(f'<table class="rank-table"><tbody>{weights_rows(mv["weights"])}</tbody></table>',
-                        unsafe_allow_html=True)
+            wc1, wc2 = st.columns(2)
 
-        st.markdown("<br>", unsafe_allow_html=True)
-        st.info("📌 Max Sharpe = พอร์ตที่ให้ผลตอบแทนต่อความเสี่ยงดีที่สุด · Min Volatility = พอร์ตที่นิ่งที่สุด · "
-                "คำนวณจากผลตอบแทน/ความผันผวน/ความสัมพันธ์ย้อนหลัง — เป็นจุดเริ่มต้นการจัดพอร์ต ไม่ใช่สูตรสำเร็จ "
-                "(อดีตไม่การันตีอนาคต และไม่รวมค่าธรรมเนียม/ภาษี)")
+            def weight_table(title, pack, accent):
+                rows = "".join(
+                    f"""<tr><td><span class="rank-ticker">{c}</span>
+                        <span style="color:var(--muted);font-size:11px"> {WATCHLIST.get(c,'')}</span></td>
+                        <td style="font-family:JetBrains Mono,monospace;color:{accent};font-weight:600">{w:.1f}%</td></tr>"""
+                    for c, w in sorted(pack["weights"].items(), key=lambda x: -x[1]))
+                return f"""
+                <div style="font-weight:600;color:{accent};margin-bottom:8px">{title}</div>
+                <table class="rank-table">
+                  <thead><tr><th>สินทรัพย์</th><th>น้ำหนัก</th></tr></thead>
+                  <tbody>{rows}</tbody>
+                </table>
+                <div style="margin-top:8px;font-size:12px;color:var(--muted)">
+                  ผลตอบแทนคาดหวัง <b style="color:{accent}">{pack['ret']:+.1f}%</b>/ปี ·
+                  ความเสี่ยง <b>{pack['vol']:.1f}%</b> · Sharpe <b>{pack['sharpe']:.2f}</b></div>
+                """
 
+            with wc1:
+                st.markdown(weight_table("🌟 Max-Sharpe (คุ้มความเสี่ยงสุด)", ef["max_sharpe"], "#e6c35c"),
+                            unsafe_allow_html=True)
+            with wc2:
+                st.markdown(weight_table("🛡️ Min-Volatility (เสี่ยงต่ำสุด)", ef["min_vol"], "#2ee6a0"),
+                            unsafe_allow_html=True)
+
+            st.markdown("<br>", unsafe_allow_html=True)
+            st.info(f"📌 คำนวณจากข้อมูลย้อนหลัง {ef['n_days']:,} วันที่ทุกสินทรัพย์มีตรงกัน · "
+                    "พอร์ต Max-Sharpe ให้ผลตอบแทนต่อหน่วยความเสี่ยงสูงสุด ส่วน Min-Vol เน้นเสถียร — "
+                    "เลือกตามระดับความเสี่ยงที่รับได้ · นี่คือการ optimize บนอดีต ไม่รับประกันอนาคต")
 
 # ══════════════════════════════════════════════════════════════
-#  TAB — MY PORTFOLIO (พอร์ตจริงของผู้ใช้)
+#  PAGE — MY PORTFOLIO (พอร์ตของฉัน)
 # ══════════════════════════════════════════════════════════════
-with tab_myport:
-    st.markdown('<div class="section-title">💼 พอร์ตของฉัน — ติดตามการลงทุนจริง</div>',
+elif page == "myport":
+    st.markdown('<div class="section-title">💼 พอร์ตของฉัน (วิเคราะห์พอร์ตจริง)</div>',
                 unsafe_allow_html=True)
-    st.caption("ใส่สิ่งที่คุณถือจริง (สัญลักษณ์ · จำนวนหน่วย · ราคาทุนเฉลี่ย เป็น USD) "
-               "แล้วดูมูลค่าปัจจุบัน กำไร/ขาดทุน สัดส่วน และความเสี่ยงระดับพอร์ต — รองรับหุ้น/ETF/คริปโต/ทอง")
+    st.markdown("""
+    <div class="fc-banner">
+      กรอกหุ้น/ETF/คริปโตที่ถืออยู่จริง (สัญลักษณ์ · จำนวน · ราคาทุนเฉลี่ย) แล้วระบบจะดึงราคาล่าสุด
+      คำนวณ <b>กำไร/ขาดทุน</b> รายตัวและทั้งพอร์ต พร้อมเมตริกความเสี่ยงระดับพอร์ต (Sharpe, ความผันผวน, Beta, การกระจายความเสี่ยง)
+      <br><span style="color:var(--muted);font-size:12px">แก้ไขในตารางได้เลย · เพิ่ม/ลบแถวด้วยปุ่ม + / ไอคอนถังขยะ · ข้อมูลไม่ถูกบันทึก (อยู่แค่ในเซสชันนี้)</span>
+    </div>
+    """, unsafe_allow_html=True)
 
-    if "my_holdings" not in st.session_state:
-        st.session_state.my_holdings = pd.DataFrame({
-            "Ticker":  ["AAPL", "NVDA", "BTC-USD"],
-            "Shares":  [10.0, 5.0, 0.10],
-            "AvgCost": [180.0, 120.0, 60000.0],
-        })
-
+    default_holdings = pd.DataFrame({
+        "สัญลักษณ์":      ["AAPL", "NVDA", "MSFT"],
+        "จำนวนหน่วย":     [10.0, 5.0, 8.0],
+        "ราคาทุนเฉลี่ย":  [180.0, 450.0, 350.0],
+    })
     edited = st.data_editor(
-        st.session_state.my_holdings, num_rows="dynamic", use_container_width=True,
-        key="holdings_editor",
+        default_holdings, num_rows="dynamic", use_container_width=True, key="holdings_editor",
         column_config={
-            "Ticker":  st.column_config.TextColumn("สัญลักษณ์", help="เช่น AAPL, NVDA, BTC-USD, GLD"),
-            "Shares":  st.column_config.NumberColumn("จำนวนหน่วย", min_value=0.0, step=0.01, format="%.4f"),
-            "AvgCost": st.column_config.NumberColumn("ราคาทุนเฉลี่ย (USD)", min_value=0.0, step=0.01, format="%.2f"),
+            "สัญลักษณ์":     st.column_config.TextColumn("สัญลักษณ์", help="เช่น AAPL, BTC-USD, GLD"),
+            "จำนวนหน่วย":    st.column_config.NumberColumn("จำนวนหน่วย", min_value=0.0, format="%.4f"),
+            "ราคาทุนเฉลี่ย": st.column_config.NumberColumn("ราคาทุนเฉลี่ย ($)", min_value=0.0, format="%.2f"),
         })
-    st.session_state.my_holdings = edited
 
-    holdings_tuple = tuple(
-        (str(getattr(r, "Ticker", "") or ""), getattr(r, "Shares", 0), getattr(r, "AvgCost", 0))
-        for r in edited.itertuples(index=False)
-        if str(getattr(r, "Ticker", "") or "").strip()
+    holdings = tuple(
+        (str(r["สัญลักษณ์"]).upper().strip(), float(r["จำนวนหน่วย"] or 0), float(r["ราคาทุนเฉลี่ย"] or 0))
+        for _, r in edited.iterrows()
+        if str(r["สัญลักษณ์"]).strip()
     )
 
-    if not holdings_tuple:
-        st.info("เพิ่มรายการที่คุณถือในตารางด้านบน (กดที่แถวว่างล่างสุดเพื่อเพิ่ม) เพื่อเริ่มวิเคราะห์พอร์ต")
+    if not holdings:
+        st.info("กรอกอย่างน้อย 1 รายการในตารางด้านบนเพื่อเริ่มวิเคราะห์")
     else:
-        with st.spinner("กำลังดึงราคาและวิเคราะห์พอร์ต..."):
-            pf = analyze_holdings(holdings_tuple)
-        usdthb_p = fetch_usdthb()
+        with st.spinner("กำลังดึงราคาล่าสุดและวิเคราะห์พอร์ต..."):
+            pf = analyze_holdings(holdings)
 
-        tot_v, tot_c, tot_p = pf["total_val"], pf["total_cost"], pf["total_pnl"]
-        pnl_cls = "pos" if tot_p >= 0 else "neg"
-
-        # ── การ์ดสรุป ──
-        pc1, pc2, pc3, pc4 = st.columns(4)
-        with pc1:
-            st.markdown(f"""<div class="mcard gold"><div class="mcard-label">มูลค่าพอร์ตรวม</div>
-              <div class="mcard-value">${tot_v:,.0f}</div>
-              <div class="mcard-sub">≈ ฿{tot_v*usdthb_p:,.0f}</div></div>""", unsafe_allow_html=True)
-        with pc2:
-            st.markdown(f"""<div class="mcard"><div class="mcard-label">เงินทุนรวม</div>
-              <div class="mcard-value">${tot_c:,.0f}</div>
-              <div class="mcard-sub">ราคาทุนที่ลงไป</div></div>""", unsafe_allow_html=True)
-        with pc3:
-            st.markdown(f"""<div class="mcard {pnl_cls}"><div class="mcard-label">กำไร/ขาดทุน</div>
-              <div class="mcard-value">${tot_p:,.0f}</div>
-              <div class="mcard-sub">{pf['total_pnl_pct']:+.1f}% ของทุน</div></div>""", unsafe_allow_html=True)
-        with pc4:
-            n_ok = sum(1 for r in pf["rows"] if r["ok"])
-            st.markdown(f"""<div class="mcard blue"><div class="mcard-label">จำนวนสินทรัพย์</div>
-              <div class="mcard-value">{n_ok}</div>
-              <div class="mcard-sub">ในพอร์ต</div></div>""", unsafe_allow_html=True)
-
-        # ── ตารางรายตัว ──
-        st.markdown('<div class="section-title" style="font-size:17px;margin-top:14px">📋 รายการถือครอง</div>',
-                    unsafe_allow_html=True)
-        rows_h = ""
-        for r in sorted(pf["rows"], key=lambda x: x["value"], reverse=True):
-            if not r["ok"]:
-                rows_h += (f'<tr><td class="rank-ticker">{r["ticker"]}</td>'
-                           f'<td colspan="6" style="color:var(--muted)">ดึงข้อมูลไม่ได้ (เช็คสัญลักษณ์)</td></tr>')
-                continue
-            pcol = "#2ee6a0" if r["pnl"] >= 0 else "#ff5d6c"
-            rows_h += f"""
-            <tr>
-              <td class="rank-ticker">{r['ticker']}</td>
-              <td style="font-family:'JetBrains Mono',monospace">{r['shares']:g}</td>
-              <td style="font-family:'JetBrains Mono',monospace">${r['avg_cost']:,.2f}</td>
-              <td style="font-family:'JetBrains Mono',monospace">${r['price']:,.2f}</td>
-              <td style="font-family:'JetBrains Mono',monospace">${r['value']:,.0f}</td>
-              <td style="font-family:'JetBrains Mono',monospace;color:{pcol}">${r['pnl']:,.0f} ({r['pnl_pct']:+.1f}%)</td>
-              <td style="font-family:'JetBrains Mono',monospace">{r['weight']:.1f}%</td>
-            </tr>"""
-        st.markdown(f"""<table class="rank-table"><thead><tr>
-            <th>สินทรัพย์</th><th>หน่วย</th><th>ทุนเฉลี่ย</th><th>ราคาล่าสุด</th>
-            <th>มูลค่า</th><th>กำไร/ขาดทุน</th><th>สัดส่วน</th>
-          </tr></thead><tbody>{rows_h}</tbody></table>""", unsafe_allow_html=True)
-
-        # ── สัดส่วน (Pie) + ความเสี่ยงพอร์ต ──
-        colpie, colrisk = st.columns([1, 1])
-        with colpie:
-            ok_rows = [r for r in pf["rows"] if r["ok"] and r["value"] > 0]
-            if ok_rows:
-                fig_pie = go.Figure(data=[go.Pie(
-                    labels=[r["ticker"] for r in ok_rows],
-                    values=[r["value"] for r in ok_rows], hole=0.5,
-                    textinfo="label+percent", textfont=dict(size=11),
-                    marker=dict(line=dict(color="#0b0f1a", width=2)))])
-                fig_pie.update_layout(height=320, margin=dict(l=10, r=10, t=30, b=10),
-                    title=dict(text="สัดส่วนการลงทุน", font=dict(size=14, color="#e9eef7")),
-                    plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
-                    font=dict(family="Space Grotesk", color="#c3cbd9"), showlegend=False)
-                st.plotly_chart(fig_pie, use_container_width=True, config={"displayModeBar": False})
-        with colrisk:
+        rows = pf["rows"]
+        # ── การ์ดสรุประดับพอร์ต ──
+        pnl_cls = "pos" if pf["total_pnl"] >= 0 else "neg"
+        mc1, mc2, mc3, mc4 = st.columns(4)
+        with mc1:
+            st.markdown(f"""<div class="mcard">
+              <div class="mcard-label">มูลค่าพอร์ตปัจจุบัน</div>
+              <div class="mcard-value">${pf['total_val']:,.2f}</div>
+              <div class="mcard-sub">{len([r for r in rows if r['ok']])} สินทรัพย์</div></div>""",
+              unsafe_allow_html=True)
+        with mc2:
+            st.markdown(f"""<div class="mcard">
+              <div class="mcard-label">ต้นทุนรวม</div>
+              <div class="mcard-value">${pf['total_cost']:,.2f}</div></div>""", unsafe_allow_html=True)
+        with mc3:
+            st.markdown(f"""<div class="mcard {pnl_cls}">
+              <div class="mcard-label">กำไร/ขาดทุนรวม</div>
+              <div class="mcard-value">{'+' if pf['total_pnl']>=0 else ''}${pf['total_pnl']:,.2f}</div>
+              <div class="mcard-sub">{pf['total_pnl_pct']:+.2f}%</div></div>""", unsafe_allow_html=True)
+        with mc4:
             mt = pf["metrics"]
-            st.markdown('<div class="section-title" style="font-size:15px">⚖️ ความเสี่ยงระดับพอร์ต</div>',
-                        unsafe_allow_html=True)
-            if not mt:
-                st.caption("ต้องมีสินทรัพย์ที่มีข้อมูลพอ (≥60 วัน) เพื่อคำนวณความเสี่ยงพอร์ต")
+            if mt:
+                shc = "pos" if mt["sharpe"] >= 1 else "neg" if mt["sharpe"] < 0 else ""
+                st.markdown(f"""<div class="mcard {shc}">
+                  <div class="mcard-label">Sharpe พอร์ต</div>
+                  <div class="mcard-value">{mt['sharpe']:.2f}</div>
+                  <div class="mcard-sub">CAGR {mt['cagr']:+.1f}% · Vol {mt['vol']:.1f}%</div></div>""",
+                  unsafe_allow_html=True)
             else:
-                beta_s = f"{mt['beta']:.2f}" if mt['beta'] is not None else "—"
-                corr_s = (f"{mt['avg_corr']:.2f}" if mt['avg_corr'] is not None else "—")
-                div_note = ""
-                if mt['avg_corr'] is not None:
-                    div_note = ("กระจายเสี่ยงดี" if mt['avg_corr'] < 0.4
-                                else "กระจายเสี่ยงปานกลาง" if mt['avg_corr'] < 0.7
-                                else "กระจุกตัว (สินทรัพย์เคลื่อนไหวคล้ายกัน)")
-                st.markdown(f"""
-                <div class="calc-result" style="margin-top:0">
-                  <div class="calc-row"><span>ผลตอบแทนพอร์ต (CAGR)</span><span>{mt['cagr']:+.1f}%/ปี</span></div>
-                  <div class="calc-row"><span>ความผันผวนพอร์ต</span><span>{mt['vol']:.1f}%/ปี</span></div>
-                  <div class="calc-row"><span>Sharpe Ratio พอร์ต</span><span>{mt['sharpe']:.2f}</span></div>
-                  <div class="calc-row"><span>Max Drawdown พอร์ต</span><span>{mt['mdd']:.1f}%</span></div>
-                  <div class="calc-row"><span>Beta เทียบ S&amp;P 500</span><span>{beta_s}</span></div>
-                  <div class="calc-row"><span>Correlation เฉลี่ย</span><span>{corr_s}</span></div>
-                </div>
-                <div style="font-size:12px;color:var(--muted);margin-top:6px">{('🔗 ' + div_note) if div_note else ''}</div>
-                """, unsafe_allow_html=True)
+                st.markdown("""<div class="mcard">
+                  <div class="mcard-label">Sharpe พอร์ต</div>
+                  <div class="mcard-value">—</div>
+                  <div class="mcard-sub">ข้อมูลไม่พอ</div></div>""", unsafe_allow_html=True)
 
-        # ── บันทึก/โหลดพอร์ต ──
-        st.markdown("<br>", unsafe_allow_html=True)
-        dl1, dl2 = st.columns([1, 2])
-        with dl1:
-            st.download_button("⬇️ บันทึกพอร์ต (CSV)", edited.to_csv(index=False),
-                               "my_portfolio.csv", "text/csv", use_container_width=True)
-        with dl2:
-            st.caption("พอร์ตเก็บไว้ระหว่างเซสชันนี้ · กดบันทึก CSV เพื่อเก็บถาวร แล้วเปิดวางในตารางใหม่ภายหลังได้")
-
-        st.info("📌 ราคาล่าสุดเป็น real-time (Finnhub) หรือราคาปิดล่าสุด · ความเสี่ยงพอร์ตคำนวณจากน้ำหนักปัจจุบัน "
-                "และความสัมพันธ์ของสินทรัพย์ย้อนหลัง — Beta พอร์ตบอกว่าพอร์ตคุณอ่อนไหวต่อตลาดรวมแค่ไหน · "
-                "ตัวเลข USD (≈ {:.2f} บาท/ดอลลาร์)".format(usdthb_p))
-
-
-# ══════════════════════════════════════════════════════════════
-#  TAB — INCOME CALCULATOR
-# ══════════════════════════════════════════════════════════════
-with tab_income:
-    st.markdown('<div class="section-title">💰 เครื่องคำนวณรายได้การลงทุน</div>', unsafe_allow_html=True)
-
-    col_calc1, col_calc2 = st.columns(2)
-
-    with col_calc1:
-        st.markdown("#### 📊 คำนวณผลตอบแทนตามสถานการณ์")
-        capital     = st.number_input("เงินลงทุนเริ่มต้น (USD)", min_value=1000,
-                                       max_value=100_000_000, value=100_000, step=10_000)
-        monthly_add = st.number_input("เงินเพิ่มต่อเดือน (USD)", min_value=0,
-                                       max_value=1_000_000, value=5_000, step=1_000)
-        years_inv   = st.slider("ระยะเวลาลงทุน (ปี)", 1, 30, 10)
-        use_cagr    = st.checkbox(f"ใช้ CAGR จริงของ {symbol} ({m['cagr']:.1f}%/ปี)", value=True)
-        rate_input  = m["cagr"] if use_cagr else st.slider(
-            "อัตราผลตอบแทนต่อปี (%) — จากราคา", -20.0, 50.0, 10.0, step=0.5)
-
-        # ── ปัจจัยจริงสำหรับนักลงทุน: ปันผล / ภาษี / ค่าธรรมเนียม ──
-        with st.expander("⚙️ ปัจจัยจริง: ปันผล · ภาษี · ค่าธรรมเนียม (กดเพื่อปรับ)", expanded=False):
-            _f = fetch_fundamentals(symbol)
-            _dv_default = float(_f["div_yield"]) if _f and isinstance(_f.get("div_yield"), (int, float)) else 0.0
-            div_yield_pct  = st.number_input("เงินปันผล/ปี (%)", min_value=0.0, max_value=20.0,
-                                             value=round(min(_dv_default, 20.0), 2), step=0.1)
-            wht_pct        = st.slider("ภาษีหัก ณ ที่จ่ายปันผล (%) — หุ้น US สำหรับคนไทย", 0, 30, 15)
-            fee_annual_pct = st.slider("ค่าธรรมเนียม/ค่าบริหารต่อปี (%)", 0.0, 3.0, 0.5, step=0.1)
-
-        div_net        = div_yield_pct * (1 - wht_pct / 100)        # ปันผลสุทธิหลังภาษี
-        net_rate_input = rate_input + div_net - fee_annual_pct      # อัตราสุทธิต่อปี (%)
-
-        rate_annual  = net_rate_input / 100
-        rate_monthly = (1 + rate_annual) ** (1/12) - 1
-
-        total = capital
-        values = [total]
-        contributions = [capital]
-        for mo in range(1, years_inv * 12 + 1):
-            total = total * (1 + rate_monthly) + monthly_add
-            values.append(total)
-            contributions.append(capital + monthly_add * mo)
-
-        final_val      = values[-1]
-        total_contrib  = capital + monthly_add * years_inv * 12
-        total_gain     = final_val - total_contrib
-        total_return_pct = (final_val / total_contrib - 1) * 100 if total_contrib else 0
-        ann_income     = final_val * (rate_annual if rate_annual > 0 else 0.05)
-        usdthb         = fetch_usdthb()
-
-        scenarios = {}
-        for label, r in [("แย่ (สุทธิ −5%)", net_rate_input-5),
-                         ("ฐาน (สุทธิ)", net_rate_input),
-                         ("ดี (สุทธิ +5%)", net_rate_input+5)]:
-            rm = (1 + r/100) ** (1/12) - 1
-            v  = capital
-            for _ in range(years_inv * 12):
-                v = v * (1 + rm) + monthly_add
-            scenarios[label] = v
-
-        st.markdown(f"""
-        <div class="calc-result">
-          <div style="font-size:11px;letter-spacing:2px;text-transform:uppercase;
-                      color:#9aa6b8;margin-bottom:10px">ผลการคำนวณ · {years_inv} ปี</div>
-          <div class="calc-row"><span>มูลค่าสุดท้าย</span><span>${final_val:,.0f}</span></div>
-          <div class="calc-row"><span>≈ คิดเป็นเงินบาท</span><span>฿{final_val*usdthb:,.0f}</span></div>
-          <div class="calc-row"><span>เงินลงทุนรวม</span><span>${total_contrib:,.0f}</span></div>
-          <div class="calc-row"><span>กำไรสะสม</span><span>${total_gain:,.0f}</span></div>
-          <div class="calc-row"><span>ผลตอบแทนรวม</span><span>{total_return_pct:+.1f}%</span></div>
-          <div class="calc-row"><span>รายได้ต่อปี</span><span>${ann_income:,.0f}</span></div>
-          <div class="calc-row"><span>รายได้ต่อเดือน</span><span>${ann_income/12:,.0f}</span></div>
-          <div style="margin-top:10px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.12)">
-            <div style="font-size:10px;color:#9aa6b8;margin-bottom:4px">อัตราผลตอบแทนสุทธิที่ใช้คำนวณ</div>
-            <div class="calc-row"><span>ราคา</span><span>{rate_input:+.1f}%</span></div>
-            <div class="calc-row"><span>+ ปันผลสุทธิ (หักภาษี {wht_pct}%)</span><span>{div_net:+.2f}%</span></div>
-            <div class="calc-row"><span>− ค่าธรรมเนียม</span><span>−{fee_annual_pct:.1f}%</span></div>
-            <div class="calc-row"><span><b>= สุทธิต่อปี</b></span><span><b>{net_rate_input:+.1f}%</b></span></div>
-          </div>
-          <div style="margin-top:12px;padding-top:10px;border-top:1px solid rgba(255,255,255,0.12)">
-            <div style="font-size:10px;color:#9aa6b8;margin-bottom:6px">SCENARIOS ({years_inv} ปี)</div>
-        """, unsafe_allow_html=True)
-        for label, sv in scenarios.items():
-            col_s = "#2ee6a0" if sv > total_contrib else "#ff5d6c"
+        pcol1, pcol2 = st.columns([3, 2])
+        with pcol1:
+            # ── ตารางรายตัว ──
+            rows_html = ""
+            for r in rows:
+                if not r["ok"]:
+                    rows_html += f"""<tr><td><span class="rank-ticker">{r['ticker']}</span></td>
+                      <td colspan="5" style="color:var(--muted)">ดึงราคาไม่สำเร็จ</td></tr>"""
+                    continue
+                pcl = "#2ee6a0" if r["pnl"] >= 0 else "#ff5d6c"
+                rows_html += f"""
+                <tr>
+                  <td><span class="rank-ticker">{r['ticker']}</span></td>
+                  <td style="font-family:JetBrains Mono,monospace">{r['shares']:g}</td>
+                  <td style="font-family:JetBrains Mono,monospace">${r['avg_cost']:,.2f}</td>
+                  <td style="font-family:JetBrains Mono,monospace">${r['price']:,.2f}</td>
+                  <td style="font-family:JetBrains Mono,monospace">${r['value']:,.2f}</td>
+                  <td style="font-family:JetBrains Mono,monospace;color:{pcl}">
+                    {r['pnl']:+,.0f} ({r['pnl_pct']:+.1f}%)</td>
+                </tr>"""
             st.markdown(f"""
-            <div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0">
-              <span style="color:#c3cbd9">{label}</span>
-              <span style="font-family:'JetBrains Mono',monospace;color:{col_s}">${sv:,.0f}</span>
-            </div>""", unsafe_allow_html=True)
-        st.markdown("</div></div>", unsafe_allow_html=True)
+            <table class="rank-table">
+              <thead><tr><th>สินทรัพย์</th><th>จำนวน</th><th>ทุนเฉลี่ย</th>
+                <th>ราคาล่าสุด</th><th>มูลค่า</th><th>กำไร/ขาดทุน</th></tr></thead>
+              <tbody>{rows_html}</tbody>
+            </table>""", unsafe_allow_html=True)
 
-    with col_calc2:
-        fig_grow = go.Figure()
-        years_x = [i/12 for i in range(len(values))]
-        fig_grow.add_trace(go.Scatter(
-            x=years_x, y=contributions, mode="lines", name="เงินลงทุนสะสม",
-            fill="tozeroy", fillcolor="rgba(230,195,92,0.10)",
-            line=dict(color="#e6c35c", width=1.5, dash="dash")
-        ))
-        fig_grow.add_trace(go.Scatter(
-            x=years_x, y=values, mode="lines", name="มูลค่าพอร์ต",
-            fill="tonexty", fillcolor="rgba(46,230,160,0.12)",
-            line=dict(color="#2ee6a0", width=2.5, shape="spline")
-        ))
-        dark_layout(fig_grow, height=320, title=f"การเติบโตของพอร์ต {years_inv} ปี")
-        fig_grow.update_layout(xaxis_title="ปี", yaxis_title="มูลค่า (USD)")
-        st.plotly_chart(fig_grow, use_container_width=True, config={"displayModeBar": False})
+            # ── ดาวน์โหลด CSV ──
+            csv = edited.to_csv(index=False).encode("utf-8-sig")
+            st.download_button("⬇️ ดาวน์โหลดพอร์ต (CSV)", csv,
+                               file_name="my_portfolio.csv", mime="text/csv")
 
-        st.markdown("#### ⚠️ คำนวณความเสี่ยง")
-        invest_amt  = st.number_input("เงินลงทุน (สำหรับคำนวณ VaR) (USD)", min_value=1000,
-                                       max_value=10_000_000, value=100_000, step=10_000)
-        conf_level  = st.select_slider("Confidence Level", [90, 95, 99], value=95)
-        returns_full = m["df"]["Close"].pct_change().dropna()
-        var_pct  = np.percentile(returns_full, (1 - conf_level/100) * 100) * 100
-        tail_r   = returns_full[returns_full <= var_pct/100]
-        es_pct   = tail_r.mean() * 100 if len(tail_r) else var_pct
-        var_thb  = invest_amt * abs(var_pct) / 100
-        es_thb   = invest_amt * abs(es_pct)  / 100
+        with pcol2:
+            # ── Pie สัดส่วน ──
+            ok_rows = [r for r in rows if r["ok"] and r["value"] > 0]
+            if ok_rows:
+                fig_pie = go.Figure(go.Pie(
+                    labels=[r["ticker"] for r in ok_rows],
+                    values=[r["value"] for r in ok_rows],
+                    hole=0.55, textinfo="label+percent",
+                    marker=dict(line=dict(color="#0b0f1a", width=2)),
+                    textfont=dict(family="JetBrains Mono", size=11, color="#e9eef7")))
+                fig_pie.update_layout(
+                    height=300, margin=dict(l=10, r=10, t=30, b=10), showlegend=False,
+                    title=dict(text="สัดส่วนพอร์ต", font=dict(size=14, color="#e9eef7")),
+                    plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
+                    colorway=["#e6c35c", "#2ee6a0", "#5b8def", "#a877e6", "#34e3c4",
+                              "#ff5d6c", "#ff9f43", "#f3b34c"])
+                st.plotly_chart(fig_pie, use_container_width=True, config={"displayModeBar": False})
 
-        # Kelly ที่ถูกต้องขึ้น: f* = W - (1-W)/R, R = avg win / avg loss (ใช้ 1.0 เป็นค่าฐานปลอดภัย)
-        W = bt["winrate"] / 100
-        kelly = max(0.0, (W - (1 - W) / 1.0)) * 100  # R≈1 (1.5%TP/1.5%SL) → conservative
-
-        st.markdown(f"""
-        <div class="calc-result" style="margin-top:0">
-          <div style="font-size:11px;letter-spacing:2px;text-transform:uppercase;
-                      color:#9aa6b8;margin-bottom:10px">RISK METRICS · {conf_level}% Confidence</div>
-          <div class="calc-row"><span>VaR/วัน ({conf_level}%)</span><span>{var_pct:.2f}%</span></div>
-          <div class="calc-row"><span>VaR เงิน</span><span>${var_thb:,.0f}</span></div>
-          <div class="calc-row"><span>Expected Shortfall</span><span>{es_pct:.2f}%</span></div>
-          <div class="calc-row"><span>ES เงิน</span><span>${es_thb:,.0f}</span></div>
-          <div class="calc-row"><span>Max Drawdown</span><span>{m['mdd']:.1f}%</span></div>
-          <div class="calc-row"><span>Max Loss เงิน (DD)</span>
-            <span>${invest_amt * abs(m['mdd'])/100:,.0f}</span></div>
-          <div class="calc-row"><span>Kelly Criterion</span>
-            <span>{kelly:.1f}% ของพอร์ต</span></div>
-        </div>
-        """, unsafe_allow_html=True)
-
-    st.info(f"📌 มุมนักลงทุนไทย: ตัวเลขเป็น USD (≈ {usdthb:.2f} บาท/ดอลลาร์ ณ ปัจจุบัน) — "
-            "การลงทุนหุ้น US มีความเสี่ยงค่าเงิน USD/THB เพิ่มอีกชั้น (บาทแข็ง = ผลตอบแทนจริงลดลง) · "
-            "ภาษีหัก ณ ที่จ่ายปันผลตั้งค่าเริ่มต้น 15% ตามอนุสัญญาภาษีซ้อนไทย-สหรัฐ (ปรับได้) · "
-            "ยังไม่รวมภาษี capital gains และค่าธรรมเนียมแปลงเงิน")
+        # ── เมตริกความเสี่ยงระดับพอร์ต ──
+        mt = pf["metrics"]
+        if mt:
+            st.markdown('<div class="section-title" style="font-size:17px;margin-top:8px">📐 ความเสี่ยงระดับพอร์ต</div>',
+                        unsafe_allow_html=True)
+            rk1, rk2, rk3, rk4 = st.columns(4)
+            with rk1:
+                st.markdown(f"""<div class="mcard"><div class="mcard-label">ความผันผวน/ปี</div>
+                  <div class="mcard-value">{mt['vol']:.1f}%</div></div>""", unsafe_allow_html=True)
+            with rk2:
+                st.markdown(f"""<div class="mcard neg"><div class="mcard-label">Max Drawdown</div>
+                  <div class="mcard-value">{mt['mdd']:.1f}%</div></div>""", unsafe_allow_html=True)
+            with rk3:
+                beta_txt = f"{mt['beta']:.2f}" if mt['beta'] is not None else "—"
+                st.markdown(f"""<div class="mcard"><div class="mcard-label">Beta (เทียบ S&P 500)</div>
+                  <div class="mcard-value">{beta_txt}</div>
+                  <div class="mcard-sub">>1 เหวี่ยงกว่าตลาด</div></div>""", unsafe_allow_html=True)
+            with rk4:
+                if mt['avg_corr'] is not None:
+                    div_txt = ("กระจายดี" if mt['avg_corr'] < 0.4 else
+                               "ปานกลาง" if mt['avg_corr'] < 0.7 else "กระจุกตัว")
+                    dcl = "pos" if mt['avg_corr'] < 0.4 else "neg" if mt['avg_corr'] >= 0.7 else ""
+                    st.markdown(f"""<div class="mcard {dcl}"><div class="mcard-label">Correlation เฉลี่ย</div>
+                      <div class="mcard-value">{mt['avg_corr']:.2f}</div>
+                      <div class="mcard-sub">{div_txt}</div></div>""", unsafe_allow_html=True)
+                else:
+                    st.markdown("""<div class="mcard"><div class="mcard-label">Correlation เฉลี่ย</div>
+                      <div class="mcard-value">—</div>
+                      <div class="mcard-sub">ต้องมี ≥2 สินทรัพย์</div></div>""", unsafe_allow_html=True)
+            st.info("📌 Beta บอกว่าพอร์ตเคลื่อนไหวแรงกว่า/น้อยกว่าตลาดแค่ไหน · "
+                    "Correlation เฉลี่ยต่ำ = สินทรัพย์ไม่ขึ้นลงพร้อมกัน = กระจายความเสี่ยงได้ดี (ลดความเสี่ยงรวม)")
 
 # ══════════════════════════════════════════════════════════════
-#  TAB 6 — AI CHAT  (Claude) — เพื่อนคุย + ที่ปรึกษา
+#  PAGE — INCOME (วางแผนเงิน · เครื่องคิดเลขการลงทุน)
 # ══════════════════════════════════════════════════════════════
-with tab_chat:
-    col_ch, _ = st.columns([3, 2])
-    with col_ch:
-        st.markdown('<div class="section-title">🤖 AI ที่ปรึกษาการลงทุน (Claude)</div>',
-                    unsafe_allow_html=True)
-        st.caption("ผู้ช่วยวิเคราะห์เชิงปริมาณ ตอบตรงประเด็น · อ้างอิงตัวเลข DGV · ขับเคลื่อนโดย Claude")
+elif page == "income":
+    st.markdown('<div class="section-title">💰 วางแผนเงิน (Investment Planner)</div>',
+                unsafe_allow_html=True)
+    st.markdown(f"""
+    <div class="fc-banner">
+      จำลองการเติบโตของเงินลงทุนแบบ <b>ทบต้นรายเดือน</b> พร้อมเงินลงทุนเพิ่มทุกเดือน (DCA) —
+      คำนวณ 3 สถานการณ์ (แย่ · ปกติ · ดี) จากผลตอบแทนและความผันผวนจริงของ <b>{symbol}</b>
+      <br><span style="color:var(--muted);font-size:12px">ปรับสมมติฐานได้เอง · รวมผลของปันผล ภาษีหัก ณ ที่จ่าย และค่าธรรมเนียม · แปลงเป็นเงินบาทให้ด้วย</span>
+    </div>
+    """, unsafe_allow_html=True)
 
-        rt_ctx = ""
+    ic1, ic2, ic3, ic4 = st.columns(4)
+    with ic1:
+        capital = st.number_input("เงินลงทุนเริ่มต้น ($)", min_value=0.0, value=10000.0, step=1000.0)
+    with ic2:
+        monthly = st.number_input("ลงทุนเพิ่ม/เดือน ($)", min_value=0.0, value=500.0, step=100.0)
+    with ic3:
+        years = st.number_input("ระยะเวลา (ปี)", min_value=1, max_value=50, value=10, step=1)
+    with ic4:
+        _default_ret = float(max(-15.0, min(35.0, round(m["cagr"], 1))))
+        annual_return = st.number_input("ผลตอบแทนคาดหวัง/ปี (%)", value=_default_ret, step=0.5,
+                                        help=f"ค่าเริ่มต้น = CAGR ย้อนหลังของ {symbol} ({m['cagr']:+.1f}%) ปรับได้ตามที่คุณคาด")
+
+    with st.expander("⚙️ ปันผล · ภาษี · ค่าธรรมเนียม (สำหรับนักลงทุนไทย)", expanded=False):
+        ec1, ec2, ec3 = st.columns(3)
+        with ec1:
+            div_yield = st.number_input("ปันผล/ปี (%)", min_value=0.0, value=0.0, step=0.5,
+                                        help="เงินปันผลที่ได้รับต่อปี (นำกลับไปลงทุนต่อ)")
+        with ec2:
+            wht = st.number_input("ภาษีหัก ณ ที่จ่าย (%)", min_value=0.0, max_value=50.0, value=15.0, step=1.0,
+                                  help="หุ้นสหรัฐหักภาษีปันผล 15% สำหรับนักลงทุนไทย (ตามสนธิสัญญาภาษีซ้อน)")
+        with ec3:
+            fee = st.number_input("ค่าธรรมเนียม/ปี (%)", min_value=0.0, value=0.0, step=0.1,
+                                  help="ค่าธรรมเนียมการจัดการกองทุน/โบรกเกอร์ต่อปี (ถ้ามี)")
+
+    # ── โมเดลการเติบโต (ทบต้นรายเดือน) ──
+    months = int(years * 12)
+    div_m = div_yield / 100 * (1 - wht / 100) / 12   # ปันผลสุทธิหลังภาษี ต่อเดือน
+    fee_m = fee / 100 / 12
+
+    def project(ann_ret_pct):
+        eff = ann_ret_pct / 100 / 12 + div_m - fee_m
+        bal = capital
+        out = [capital]
+        for _ in range(months):
+            bal = bal * (1 + eff) + monthly
+            out.append(bal)
+        return out
+
+    vol_band = m["vol_l"]   # ±1σ ความผันผวนต่อปี (%)
+    base_path = project(annual_return)
+    bull_path = project(annual_return + vol_band)
+    bear_path = project(max(-90.0, annual_return - vol_band))
+
+    total_contrib = capital + monthly * months
+    final_base = base_path[-1]
+    total_gain = final_base - total_contrib
+    gain_pct = (total_gain / total_contrib * 100) if total_contrib > 0 else 0.0
+
+    # ── การ์ดสรุป ──
+    oc1, oc2, oc3, oc4 = st.columns(4)
+    gcl = "pos" if total_gain >= 0 else "neg"
+    with oc1:
+        st.markdown(f"""<div class="mcard gold"><div class="mcard-label">มูลค่าปลายทาง (ปกติ)</div>
+          <div class="mcard-value">${final_base:,.0f}</div>
+          <div class="mcard-sub">ใน {years} ปี</div></div>""", unsafe_allow_html=True)
+    with oc2:
+        st.markdown(f"""<div class="mcard"><div class="mcard-label">เงินที่ลงไปทั้งหมด</div>
+          <div class="mcard-value">${total_contrib:,.0f}</div>
+          <div class="mcard-sub">ต้น ${capital:,.0f} + เพิ่ม ${monthly:,.0f}/ด.</div></div>""",
+          unsafe_allow_html=True)
+    with oc3:
+        st.markdown(f"""<div class="mcard {gcl}"><div class="mcard-label">กำไรจากการลงทุน</div>
+          <div class="mcard-value">{'+' if total_gain>=0 else ''}${total_gain:,.0f}</div>
+          <div class="mcard-sub">{gain_pct:+.0f}% จากเงินต้น</div></div>""", unsafe_allow_html=True)
+    with oc4:
+        usdthb = fetch_usdthb()
+        st.markdown(f"""<div class="mcard"><div class="mcard-label">≈ เงินบาท (ปลายทาง)</div>
+          <div class="mcard-value" style="font-size:18px">฿{final_base*usdthb:,.0f}</div>
+          <div class="mcard-sub">ที่ ฿{usdthb:.2f}/$</div></div>""", unsafe_allow_html=True)
+
+    # ── กราฟการเติบโต 3 สถานการณ์ ──
+    xs = list(range(months + 1))
+    xs_years = [x / 12 for x in xs]
+    contrib_line = [capital + monthly * i for i in xs]
+    fig_g = go.Figure()
+    fig_g.add_trace(go.Scatter(x=xs_years, y=bull_path, mode="lines", name=f"ดี (+{vol_band:.0f}% vol)",
+                               line=dict(color="#2ee6a0", width=2, dash="dot")))
+    fig_g.add_trace(go.Scatter(x=xs_years, y=base_path, mode="lines", name="ปกติ (ตามคาด)",
+                               line=dict(color="#e6c35c", width=2.5),
+                               fill="tonexty", fillcolor="rgba(46,230,160,0.05)"))
+    fig_g.add_trace(go.Scatter(x=xs_years, y=bear_path, mode="lines", name=f"แย่ (−{vol_band:.0f}% vol)",
+                               line=dict(color="#ff5d6c", width=2, dash="dot"),
+                               fill="tonexty", fillcolor="rgba(255,93,108,0.05)"))
+    fig_g.add_trace(go.Scatter(x=xs_years, y=contrib_line, mode="lines", name="เงินต้นสะสม",
+                               line=dict(color="#7d8799", width=1.5, dash="dash")))
+    dark_layout(fig_g, height=420, title="การเติบโตของพอร์ต — 3 สถานการณ์")
+    fig_g.update_xaxes(title="ปี")
+    fig_g.update_yaxes(title="มูลค่าพอร์ต ($)")
+    st.plotly_chart(fig_g, use_container_width=True, config={"displayModeBar": False})
+
+    sc_c1, sc_c2, sc_c3 = st.columns(3)
+    for col, (label, path, c) in zip(
+        [sc_c1, sc_c2, sc_c3],
+        [("🔴 แย่", bear_path, "#ff5d6c"), ("🟡 ปกติ", base_path, "#e6c35c"), ("🟢 ดี", bull_path, "#2ee6a0")]):
+        g = path[-1] - total_contrib
+        with col:
+            st.markdown(f"""<div class="mcard" style="--accent:{c}">
+              <div class="mcard-label">{label}</div>
+              <div class="mcard-value" style="color:{c}">${path[-1]:,.0f}</div>
+              <div class="mcard-sub">กำไร {'+' if g>=0 else ''}${g:,.0f} · ≈ ฿{path[-1]*usdthb:,.0f}</div></div>""",
+              unsafe_allow_html=True)
+
+    # ── เมตริกความเสี่ยง (VaR / ES / Kelly) ──
+    st.markdown('<div class="section-title" style="font-size:17px;margin-top:10px">⚠️ มุมความเสี่ยง</div>',
+                unsafe_allow_html=True)
+    rets_i = data["Close"].pct_change().dropna()
+    kelly_raw = float(rets_i.mean() / (rets_i.var() + 1e-12))
+    kelly = max(0.0, min(kelly_raw, 1.0))
+    kc1, kc2, kc3 = st.columns(3)
+    with kc1:
+        st.markdown(f"""<div class="mcard neg"><div class="mcard-label">VALUE AT RISK (95%)</div>
+          <div class="mcard-value">{m['var95']:.2f}%</div>
+          <div class="mcard-sub">วันแย่ ๆ มีโอกาส 5% ที่จะขาดทุนเกินนี้/วัน</div></div>""", unsafe_allow_html=True)
+    with kc2:
+        st.markdown(f"""<div class="mcard neg"><div class="mcard-label">EXPECTED SHORTFALL</div>
+          <div class="mcard-value">{m['es95']:.2f}%</div>
+          <div class="mcard-sub">ค่าเฉลี่ยขาดทุนในวันที่แย่กว่า VaR</div></div>""", unsafe_allow_html=True)
+    with kc3:
+        kcl = "pos" if kelly > 0 else "neg"
+        st.markdown(f"""<div class="mcard {kcl}"><div class="mcard-label">KELLY CRITERION</div>
+          <div class="mcard-value">{kelly*100:.0f}%</div>
+          <div class="mcard-sub">สัดส่วนเงินที่เหมาะ (ทางทฤษฎี) · นิยมใช้ครึ่งหนึ่ง (½ Kelly)</div></div>""",
+          unsafe_allow_html=True)
+
+    st.info("📌 ตัวเลขสมมติจากผลตอบแทน/ความผันผวนในอดีต — ผลจริงอาจต่างมาก · "
+            "Kelly Criterion บอกสัดส่วนเงินลงทุนที่ทำให้พอร์ตโตเร็วสุดทางทฤษฎี แต่เสี่ยงสูง "
+            "นักลงทุนส่วนใหญ่ใช้แค่ครึ่งเดียว (½ Kelly) · นี่ไม่ใช่คำแนะนำการลงทุน ควรปรึกษาผู้เชี่ยวชาญ")
+
+# ══════════════════════════════════════════════════════════════
+#  PAGE — CHAT (ที่ปรึกษา AI · Claude)
+# ══════════════════════════════════════════════════════════════
+elif page == "chat":
+    st.markdown('<div class="section-title">🤖 ถาม AI ที่ปรึกษาการลงทุน</div>', unsafe_allow_html=True)
+    st.caption("ผู้ช่วยเชิงปริมาณที่อิงตัวเลขและสถิติย้อนหลัง — Claude (Anthropic) "
+               "วิเคราะห์จากข้อมูลของสินทรัพย์ที่คุณกำลังดูอยู่")
+
+    # ── สร้างบริบท (context) จากหน้าต่าง ๆ ที่เปิดไว้ — degrade ได้ถ้าหน้าไหนยังไม่ถูกเปิด ──
+    ctx = [
+        "คุณคือ DGV ผู้ช่วยวิเคราะห์การลงทุนเชิงปริมาณ ตอบเป็นภาษาไทยแบบมืออาชีพ กระชับ มีโครงสร้าง "
+        "เป็นกลาง (เหมือน ChatGPT/Gemini) วิเคราะห์จากตัวเลขและสถิติย้อนหลังล้วน ๆ ไม่อิงข่าวลือหรืออารมณ์ "
+        "เตือนเสมอว่าผลตอบแทนย้อนหลังไม่รับประกันอนาคต และนี่ไม่ใช่คำแนะนำการลงทุน",
+        f"\nสินทรัพย์ที่ผู้ใช้กำลังดู: {symbol} ({WATCHLIST.get(symbol, symbol)})",
+        f"ราคาล่าสุด {fmt_p(cur_price)} ({price_chg_pct:+.2f}% วันนี้)",
+        f"คะแนนรวม {m['score']}/100 → {m['verdict']}",
+        f"CAGR {m['cagr']:+.1f}%/ปี · Sharpe {m['sharpe']:.2f} · Sortino {m['sortino']:.2f} · "
+        f"Max Drawdown {m['mdd']:.1f}% · ความผันผวน {m['vol_l']:.1f}%/ปี · Momentum {m['momentum']:+.1f}% · RSI {m['rsi']:.0f}",
+        f"ผลตอบแทนย้อนหลัง: 1เดือน {m['ret_1m']:+.1f}% · 6เดือน {m['ret_6m']:+.1f}% · 1ปี {m['ret_1y']:+.1f}% · 3ปี {m['ret_3y']:+.1f}%",
+        f"ความเสี่ยง: VaR95 {m['var95']:.2f}%/วัน · Expected Shortfall {m['es95']:.2f}% · Win Rate (backtest) {bt['winrate']}%",
+    ]
+    try:
         if rt_quote:
-            rt_ctx = f"""
-• ราคา Real-time (Finnhub): {fmt_p(rt_quote['c'])} (เปลี่ยน {price_chg:+.2f} / {price_chg_pct:+.2f}%)
-• High วันนี้: {fmt_p(rt_quote['h'])} · Low: {fmt_p(rt_quote['l'])} · Open: {fmt_p(rt_quote['o'])}"""
+            ctx.append(f"Real-time: {fmt_p(rt_quote['c'])} (High {fmt_p(rt_quote['h'])}, Low {fmt_p(rt_quote['l'])})")
+    except NameError:
+        pass
+    try:
+        ctx.append(f"พยากรณ์ Monte Carlo: ผลตอบแทนคาดหวัง {fc['exp_return']:+.1f}% "
+                   f"โอกาสขึ้น {fc['prob_up']:.0f}% (ν={fc['nu']})")
+    except NameError:
+        pass
+    try:
+        ctx.append(f"พยากรณ์เชิงโมเดล: โมเดลแม่นสุด {adv['best_name']} (MAPE {adv['best_mape']:.1f}%), "
+                   f"Consensus {adv['consensus_ret']:+.1f}%")
+    except NameError:
+        pass
+    try:
+        if comp_news or gen_news:
+            ctx.append(f"Sentiment ข่าวล่าสุด: {sent_score:+d} (จากการนับคำหยาบ ๆ)")
+    except NameError:
+        pass
+    try:
+        if pf and pf["rows"]:
+            holds = ", ".join(f"{r['ticker']} {r['weight']:.0f}%" for r in pf["rows"] if r["ok"])
+            line = f"พอร์ตจริงของผู้ใช้: มูลค่า ${pf['total_val']:,.0f}, กำไร/ขาดทุน {pf['total_pnl_pct']:+.1f}% [{holds}]"
+            if pf["metrics"]:
+                line += (f" · Sharpe {pf['metrics']['sharpe']:.2f}, Vol {pf['metrics']['vol']:.1f}%, "
+                         f"MaxDD {pf['metrics']['mdd']:.1f}%")
+            ctx.append(line)
+    except NameError:
+        pass
+    sys_ctx = "\n".join(ctx)
 
-        # ── บริบทพยากรณ์ขั้นสูง (5 โมเดล) ──
-        fc_ctx = ""
+    # ── ปุ่มคำถามด่วน ──
+    prompt = None
+    quick = ["สรุปความเสี่ยงของสินทรัพย์นี้",
+             "ผลตอบแทนย้อนหลังเป็นอย่างไร",
+             "ควรจัดสรรเงินลงทุนอย่างไร",
+             "วิเคราะห์พอร์ตของฉัน"]
+    qcols = st.columns(4)
+    for col, q in zip(qcols, quick):
+        if col.button(q, use_container_width=True, key=f"qp_{q}"):
+            prompt = q
+
+    # ── แสดงประวัติแชต ──
+    msgs_html = ""
+    for msg in st.session_state["chat"]:
+        is_user = msg["role"] == "user"
+        body = msg["content"].replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\n", "<br>")
+        if is_user:
+            msgs_html += f"""<div class="msg-row u">
+              <div class="av usr">คุณ</div><div class="bub u-b">{body}</div></div>"""
+        else:
+            msgs_html += f"""<div class="msg-row">
+              <div class="av ai">D</div><div class="bub ai-b">{body}</div></div>"""
+    st.markdown(f'<div class="chat-wrap">{msgs_html}</div>', unsafe_allow_html=True)
+
+    # ── ช่องพิมพ์ ──
+    typed = st.chat_input("พิมพ์คำถามเกี่ยวกับการลงทุน เช่น สินทรัพย์นี้เสี่ยงไหม...")
+    if typed:
+        prompt = typed
+
+    if prompt:
+        st.session_state["chat"].append({"role": "user", "content": prompt})
         try:
-            if adv is not None:
-                fc_ctx = (f"\n• พยากรณ์ขั้นสูง: โมเดลแม่นสุด «{adv['best_name']}» (MAPE {adv['best_mape']:.1f}%) | "
-                          f"Consensus 5 โมเดล → {adv['consensus_ret']:+.1f}%")
-        except NameError:
-            pass
+            client = get_claude_client()
+            # ส่งประวัติย้อนหลังไม่เกิน 10 ข้อความ (ลด token)
+            history = [{"role": msg["role"], "content": msg["content"]}
+                       for msg in st.session_state["chat"][-10:]]
+            with st.spinner("DGV กำลังวิเคราะห์..."):
+                resp = client.messages.create(
+                    model=CLAUDE_MODEL, max_tokens=1400, system=sys_ctx, messages=history)
+            answer = "".join(b.text for b in resp.content if b.type == "text")
+        except Exception as e:
+            answer = (f"ขออภัย เชื่อมต่อ AI ไม่สำเร็จ — ตรวจสอบ ANTHROPIC_API_KEY ใน Streamlit secrets\n\n"
+                      f"รายละเอียด: {e}")
+        st.session_state["chat"].append({"role": "assistant", "content": answer})
+        st.rerun()
 
-        # ── บริบทข่าว (พาดหัวล่าสุด + sentiment) ──
-        news_ctx = ""
-        try:
-            heads = (comp_news or []) + (gen_news or [])
-            if heads:
-                top_heads = "; ".join((n.get("headline", "") or "")[:90] for n in heads[:6])
-                news_ctx = (f"\n• ข่าวล่าสุด (sentiment heuristic {sent_score:+d}): {top_heads}")
-        except NameError:
-            pass
-
-        # ── บริบทพอร์ตจริงของผู้ใช้ (จากแท็บพอร์ตของฉัน) ──
-        port_ctx = ""
-        try:
-            if pf and pf["total_val"] > 0:
-                hold_str = ", ".join(
-                    f"{r['ticker']} {r['weight']:.0f}% ({r['pnl_pct']:+.0f}%)"
-                    for r in sorted(pf["rows"], key=lambda x: x["value"], reverse=True) if r["ok"]
-                )
-                port_ctx = (f"\n• พอร์ตจริงของผู้ใช้: มูลค่า ${pf['total_val']:,.0f} "
-                            f"กำไร/ขาดทุนรวม {pf['total_pnl_pct']:+.1f}% | ถือ: {hold_str}")
-                if pf.get("metrics"):
-                    _mt = pf["metrics"]
-                    _bt = f"{_mt['beta']:.2f}" if _mt.get("beta") is not None else "—"
-                    port_ctx += (f" | ความเสี่ยงพอร์ต: CAGR {_mt['cagr']:+.1f}% "
-                                 f"Vol {_mt['vol']:.0f}% Sharpe {_mt['sharpe']:.2f} Beta {_bt}")
-        except NameError:
-            pass
-
-        sys_ctx = f"""คุณคือ "DGV" ผู้ช่วยวิเคราะห์การลงทุนเชิงปริมาณ ตอบในสไตล์ผู้ช่วย AI มืออาชีพ แบบเดียวกับ ChatGPT หรือ Gemini — เป็นกลาง กระชับ ชัดเจน ตรงประเด็น และมีโครงสร้างอ่านง่าย
-
-แนวทางการตอบ:
-• ตอบตรงคำถามทันที ไม่เกริ่นยืดยาว ไม่ออกตัว
-• ใช้น้ำเสียงทางการที่เป็นมิตร หลีกเลี่ยงการลงท้าย "ครับ" ทุกประโยค และไม่ใส่อิโมจิที่ไม่จำเป็น
-• จัดระเบียบคำตอบด้วยหัวข้อ/บูลเล็ตเมื่อช่วยให้อ่านง่าย สรุปประเด็นสำคัญขึ้นก่อน
-• อ้างอิงตัวเลขจริงด้านล่างเสมอเวลาวิเคราะห์ และอธิบายความหมายของตัวเลขสั้น ๆ
-• ให้ภาพที่สมดุล ระบุทั้งจุดแข็งและความเสี่ยง ไม่เชียร์เกินจริงและไม่ขู่เกินจริง
-• เชื่อมโยงข่าว (ถ้ามี) เข้ากับแนวโน้มราคาเมื่อผู้ใช้ถามถึงอนาคต/ข่าว
-• ถ้าผู้ใช้ถามถึง "พอร์ตของฉัน/พอร์ตผม" ให้อ้างอิงข้อมูลพอร์ตจริงด้านล่าง (สัดส่วน กำไร/ขาดทุน ความเสี่ยง Beta) วิเคราะห์การกระจุกตัว/กระจายเสี่ยง และให้มุมมองอย่างสมดุล
-• ตอบเป็นภาษาไทยเป็นค่าเริ่มต้น และสลับภาษาตามที่ผู้ใช้ใช้
-
-ข้อมูลเชิงปริมาณปัจจุบันของ {symbol}:{rt_ctx}
-• CAGR: {m['cagr']:+.1f}%/ปี | Sharpe: {m['sharpe']:.2f} | Sortino: {m['sortino']:.2f} | Calmar: {m['calmar']:.2f}
-• Max Drawdown: {m['mdd']:.1f}% | VaR 95%: {m['var95']:.2f}%/วัน | Expected Shortfall: {m['es95']:.2f}%
-• Win Rate Backtest: {bt['winrate']}% ({bt['wins']}W/{bt['losses']}L)
-• Momentum Score: {m['momentum']:+.1f}% | Z-Score: {m['zscore']:+.2f}
-• RSI: {m['rsi']:.1f} | MACD: {'Bullish' if m['macd']>m['macd_sig'] else 'Bearish'}
-• Linear Trend: {m['trend_slope']:+.1f}%/ปี | R²={m['r2']:.2f}
-• Volatility: Short={m['vol_s']:.1f}% Long={m['vol_l']:.1f}%
-• ผลตอบแทน: 1M {m['ret_1m']:+.1f}% · 3M {m['ret_3m']:+.1f}% · 1Y {m['ret_1y']:+.1f}%
-• Composite Score: {m['score']}/100 → {m['verdict']}{fc_ctx}{news_ctx}{port_ctx}"""
-
-        # Quick prompts (ปุ่มเริ่มต้นบทสนทนา)
-        st.markdown("**💬 เริ่มจากคำถามยอดฮิต:**")
-        qp1, qp2, qp3, qp4 = st.columns(4)
-        quick = None
-        with qp1:
-            if st.button(f"📈 {symbol} น่าลงทุนไหม?", use_container_width=True):
-                quick = f"ช่วยสรุปหน่อยว่า {symbol} ตอนนี้น่าลงทุนไหม จากตัวเลขที่มี?"
-        with qp2:
-            if st.button("⚠️ เสี่ยงแค่ไหน?", use_container_width=True):
-                quick = f"{symbol} มีความเสี่ยงระดับไหน ถ้าผมลงเงินไป จะขาดทุนหนักสุดได้แค่ไหน?"
-        with qp3:
-            if st.button("💡 ควรลงเท่าไหร่?", use_container_width=True):
-                quick = f"ถ้าผมมีเงินก้อนหนึ่ง ควรแบ่งลงทุนใน {symbol} สัดส่วนเท่าไหร่ดี?"
-        with qp4:
-            if st.button("💼 วิเคราะห์พอร์ตของฉัน", use_container_width=True):
-                quick = "ช่วยวิเคราะห์พอร์ตของฉันหน่อย — กระจายความเสี่ยงดีไหม มีตัวไหนกระจุกหรือเสี่ยงเกินไป และควรปรับอะไร?"
-
-        # Chat history render
-        chat_html = '<div class="chat-wrap">'
-        for msg in st.session_state.chat:
-            content = msg["content"].replace(chr(10), "<br>")
-            if msg["role"] == "assistant":
-                chat_html += f'<div class="msg-row"><div class="av ai">C</div><div class="bub ai-b">{content}</div></div>'
-            else:
-                chat_html += f'<div class="msg-row u"><div class="av usr">คุณ</div><div class="bub u-b">{content}</div></div>'
-        chat_html += '</div>'
-        st.markdown(chat_html, unsafe_allow_html=True)
-
-        typed = st.chat_input("ถาม DGV ได้เลย เช่น ความเสี่ยง ผลตอบแทน หรือการจัดสรรเงินลงทุน",
-                              key="main_chat")
-        user_msg = quick or typed
-
-        if user_msg:
-            st.session_state.chat.append({"role": "user", "content": user_msg})
-            try:
-                client = get_claude_client()
-                hist = [
-                    {"role": m_["role"], "content": m_["content"]}
-                    for m_ in st.session_state.chat[1:-1]
-                ]
-                with st.spinner("🤖 DGV กำลังวิเคราะห์ตัวเลขและเรียบเรียงคำตอบ..."):
-                    resp = client.messages.create(
-                        model=CLAUDE_MODEL,
-                        max_tokens=1024,
-                        system=sys_ctx,
-                        messages=hist + [{"role": "user", "content": user_msg}],
-                    )
-                reply = "".join(
-                    block.text for block in resp.content if block.type == "text"
-                )
-            except Exception as e:
-                reply = (f"ขออภัยครับ ตอนนี้ผมเชื่อมต่อ AI ไม่ได้ 😅 "
-                         f"(ลองเช็คว่าตั้งค่า ANTHROPIC_API_KEY ใน secrets แล้วหรือยัง)\n\n`{e}`")
-            st.session_state.chat.append({"role": "assistant", "content": reply})
+    if len(st.session_state["chat"]) > 1:
+        if st.button("🗑️ ล้างประวัติการสนทนา"):
+            st.session_state["chat"] = st.session_state["chat"][:1]
             st.rerun()
 
-        if st.button("🗑️ ล้างบทสนทนา"):
-            st.session_state.chat = st.session_state.chat[:1]
-            st.rerun()
-
-# ─────────────────────────────────────────────────────────────
-#  REAL-TIME GUIDE (Expander) — แนะนำการหากราฟเรียลไทม์
-# ─────────────────────────────────────────────────────────────
-with st.expander("📡 วิธีดู/หากราฟแบบเรียลไทม์ (Real-time) — คำแนะนำ"):
-    st.markdown("""
-**ในแอปนี้ (อัปเดตแล้ว ✅):** กราฟ Real-time ด้านบนเป็น **ข้อมูลจริง** — แท่งราคา intraday
-(1m/5m/15m/1h) จาก yfinance + จุดราคา live ล่าสุดจาก Finnhub อัปเดตเองทุก ~3 วินาที
-โดยไม่ต้องรีเฟรชหน้า สลับช่วงเวลา/สไตล์ (เส้น↔แท่งเทียน) ได้จากปุ่มเหนือกราฟ
-
-**Symbol ที่รองรับ live price (Finnhub) ในแอปนี้:**
-- หุ้น/ETF สหรัฐ: `AAPL`, `NVDA`, `MSFT`, `SPY`, `QQQ`, `ARKK` ฯลฯ
-- คริปโต: `BTC-USD`, `ETH-USD`, `SOL-USD`, `BNB-USD`, `XRP-USD` (→ Binance)
-- Forex: `EURUSD=X`, `GBPUSD=X`, `USDJPY=X`, `USDTHB=X` (→ OANDA)
-- ⚠️ ทองคำ `GC=F`, เงิน `SI=F`, น้ำมัน `CL=F`, ดัชนี `^GSPC/^IXIC/^DJI` ใช้แท่ง intraday
-  จาก yfinance (Finnhub free ไม่รองรับ live price แต่กราฟ intraday ยังเห็นได้)
-    """)
-
-# ─────────────────────────────────────────────────────────────
-#  FOOTER
-# ─────────────────────────────────────────────────────────────
-st.markdown("<br>", unsafe_allow_html=True)
-fcol1, fcol2 = st.columns([1, 3])
+# ──────────────────────────────────────────────────────────────
+#  FOOTER (ท้ายหน้า — แสดงทุกหน้า)
+# ──────────────────────────────────────────────────────────────
+st.markdown("<hr style='border-color:rgba(255,255,255,0.08);margin:28px 0 14px'>",
+            unsafe_allow_html=True)
+fcol1, fcol2 = st.columns([1, 4])
 with fcol1:
-    if st.button("🔄 โหลดข้อมูลวิเคราะห์ใหม่ทั้งหมด"):
-        fetch_realtime_quote.clear()
-        fetch_intraday.clear()
-        fetch_data.clear()
-        fetch_watchlist_scores.clear()
-        monte_carlo_forecast.clear()
-        advanced_forecast.clear()
-        fetch_company_news.clear()
-        fetch_general_news.clear()
+    if st.button("🔄 ล้างแคช & รีโหลดข้อมูล"):
+        st.cache_data.clear()
         st.rerun()
 with fcol2:
-    st.caption("กราฟ Real-time (intraday จริง) อัปเดตเองทุก 3 วินาที (fragment) · "
-               "ปุ่มนี้โหลดข้อมูลย้อนหลัง + ตัวเลขวิเคราะห์ + พยากรณ์ + ข่าวใหม่ทั้งหมด · "
-               "DGV เป็นเครื่องมือวิเคราะห์เชิงปริมาณ")
+    st.caption("DGV Investment Analyzer · ข้อมูลย้อนหลังจาก yfinance/Stooq · Real-time & ข่าวจาก Finnhub · "
+               "AI โดย Claude (Anthropic) · วิเคราะห์ด้วยคณิตศาสตร์/สถิติล้วน ๆ — "
+               "เพื่อการศึกษาเท่านั้น ไม่ใช่คำแนะนำการลงทุน")
